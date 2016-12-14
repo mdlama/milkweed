@@ -1,0 +1,76 @@
+---
+title: "Figure 4: Buds per stem"
+output: 
+  html_document:
+    toc: true
+---
+
+# Initialization
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(dplyr)
+library(lme4)
+library(plot3D) # For mesh function
+library(ggplot2)
+library(grid)
+library(RColorBrewer)
+library(scales)
+library(gtable)
+library(gridExtra)
+```
+
+Load the fit.
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+load("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/budlingsPerStemFit.RData")
+```
+
+# Budlings-per-stem
+
+Let's start with just the data points.
+
+```{r}
+plotdata <- data.frame(log_herb_avg = budlings.per.stem.fit$model$log_herb_mean, 
+                       buds_per_stem = exp(budlings.per.stem.fit$model$`log(buds_per_stem)`),
+                       site = budlings.per.stem.fit$site)
+
+p <- plotdata %>% ggplot(aes(x = log_herb_avg, 
+                             y = buds_per_stem,
+                             color = site)) + 
+                  geom_point()
+
+p
+```
+
+Let's add the fit.
+
+```{r}
+xpts <- seq(from=log(0.1), to=log(6.1), length.out = 1000)
+ypts <- predict(budlings.per.stem.fit, new = data.frame(log_herb_mean = xpts), se.fit=TRUE)
+plotdata <- data.frame(log_herb_avg = xpts, 
+                       buds_per_stem = exp(ypts$fit),
+                       lwr = exp(ypts$fit-1.96*ypts$se.fit),
+                       upr = exp(ypts$fit+1.96*ypts$se.fit),
+                       site = NA)
+
+p <- p + geom_line(data = plotdata, color = "black", linetype = "solid") +
+         geom_ribbon(data = plotdata, aes(ymin=lwr, ymax=upr), alpha = 0.2) + 
+         scale_y_continuous(limits = c(0, 2.8))
+         
+p <- p + theme_bw() +
+         xlab("ln(Herbivory Score)") +
+         ylab("Per capita clonal reproduction\n (sprouts/stem)") +
+         labs(color="Sites") + 
+         theme(legend.background = element_rect(fill="lightgrey",
+                                                size=0.1,
+                                                linetype="solid"),
+               legend.key.size =  unit(0.2, "in"),
+               legend.position = c(0.875, 0.65))
+
+p
+```
+
+Save figure.
+
+```{r}
+ggsave("../Figure4.png", height=4, width=6, device = "png", p)
+```

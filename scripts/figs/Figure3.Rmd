@@ -1,0 +1,261 @@
+---
+title: "Exploratory Figure 3: Distributions"
+date: "September 13, 2016"
+output: 
+  html_document:
+    toc: true
+---
+
+# Initialization
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(dplyr)
+library(lme4)
+library(plot3D) # For mesh function
+library(ggplot2)
+library(grid)
+library(RColorBrewer)
+library(scales)
+library(gtable)
+library(gridExtra)
+```
+
+Load the Milkweed Model class and fits.
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+source("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/mwMod.R")
+# load("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/vitalFits.RData")
+load("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/munchedFit.RData")
+load("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/budlingFit.RData")
+load("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/seedlingFit.RData")
+```
+
+# Plot Herbivory Distributions
+
+First, let's create the plot data.
+
+```{r, warning=FALSE}
+N <- 1000
+bx <- seq(from = log(0.1), to = log(6.1), length.out = N+1)
+x <- 0.5*(bx[1:N] + bx[2:(N+1)])
+
+y <- munched.fit[['BLD1']]$predict(bx, justmunch=TRUE)
+sum(y)*(bx[2]-bx[1])
+plotdata <- data.frame(site = "BLD1",
+                       x = x,
+                       y = y)
+
+y <- munched.fit[['BLD2']]$predict(bx, justmunch=TRUE)
+sum(y)*(bx[2]-bx[1])
+plotdata <- bind_rows(plotdata,
+                      data.frame(site = "BLD2",
+                                 x = x,
+                                 y = y))
+
+y <- munched.fit[['PWR']]$predict(bx, justmunch=TRUE)
+sum(y)*(bx[2]-bx[1])
+plotdata <- bind_rows(plotdata,
+                      data.frame(site = "PWR",
+                                 x = x,
+                                 y = y))
+
+y <- munched.fit[['SKY']]$predict(bx, justmunch=TRUE)
+sum(y)*(bx[2]-bx[1])
+plotdata <- bind_rows(plotdata,
+                      data.frame(site = "SKY",
+                                 x = x,
+                                 y = y))
+
+y <- munched.fit[['YTB']]$predict(bx, justmunch=TRUE)
+sum(y)*(bx[2]-bx[1])
+plotdata <- bind_rows(plotdata,
+                      data.frame(site = "YTB",
+                                 x = x,
+                                 y = y))
+
+y <- munched.fit[['Bertha']]$predict(bx, justmunch=TRUE)
+plotdata <- bind_rows(plotdata,
+                      data.frame(site = "Combined",
+                                 x = x,
+                                 y = y))
+
+plotdata$site <- factor(plotdata$site, levels = c("BLD1", "BLD2", "PWR", "SKY", "YTB", "Combined"))
+```
+
+Now, let's create the plot.
+```{r}
+pa <- plotdata %>% ggplot(aes(x = x, y = y, fill = site, colour = site)) + 
+                  geom_line() + 
+                  geom_area(position = "identity", alpha = 0.3)
+
+pa <- pa + theme_bw() +
+         xlab("ln(Herbivory Score)") +
+         ylab("Probability Density") +
+         scale_x_continuous(limits = c(log(0.1), log(6.1))) + 
+         scale_fill_manual(values = c(hue_pal()(5), NA)) + 
+         scale_color_manual(values = c(hue_pal()(5), "black")) +
+         labs(colour="Sites", fill="Sites") +
+           theme(legend.background = element_rect(fill="lightgrey",
+                                                size=0.1,
+                                                linetype="solid"),
+                 legend.key.size =  unit(0.18, "in"),
+                 legend.position = c(0.885, 0.72))
+
+pa <- pa + ggtitle("(a)") + 
+           theme(plot.title = element_text(hjust = 0, margin=margin(b = 15, unit = "pt")))
+
+         # The following code is useful to remove an aesthetic from the legend.
+         # guides(fill = guide_legend(override.aes = list(fill = NA)),
+         #         color = guide_legend(title="New"))
+
+pa
+```
+
+Finally, we'll save it to file.
+```{r}
+ggsave("../Figure3a.png", height=5, width=8, device = "png", pa)
+```
+
+# Plot Budling Distributions
+
+First, let's create the plot data.
+
+```{r}
+N <- 1000
+bx <- seq(from = 0, to = 160, length.out = N+1)
+x <- 0.5*(bx[1:N] + bx[2:(N+1)])
+
+y <- budling.fit[['BLD1']]$predict(bx)
+sum(y)*(bx[2]-bx[1])
+plotdata <- data.frame(site = "BLD1",
+                       x = x,
+                       y = y)
+
+y <- budling.fit[['BLD2']]$predict(bx)
+sum(y)*(bx[2]-bx[1])
+plotdata <- bind_rows(plotdata,
+                      data.frame(site = "BLD2",
+                                 x = x,
+                                 y = y))
+
+y <- budling.fit[['PWR']]$predict(bx)
+sum(y)*(bx[2]-bx[1])
+plotdata <- bind_rows(plotdata,
+                      data.frame(site = "PWR",
+                                 x = x,
+                                 y = y))
+
+y <- budling.fit[['SKY']]$predict(bx)
+sum(y)*(bx[2]-bx[1])
+plotdata <- bind_rows(plotdata,
+                      data.frame(site = "SKY",
+                                 x = x,
+                                 y = y))
+
+y <- budling.fit[['YTB']]$predict(bx)
+sum(y)*(bx[2]-bx[1])
+plotdata <- bind_rows(plotdata,
+                      data.frame(site = "YTB",
+                                 x = x,
+                                 y = y))
+
+y <- budling.fit[['Bertha']]$predict(bx)
+plotdata <- bind_rows(plotdata, 
+                      data.frame(site = "Combined",
+                                 x = x,
+                                 y = y))
+
+y <- seedling.fit$predict(bx)
+plotdata <- bind_rows(plotdata,
+                      data.frame(site = "Seedlings",
+                                 x = x,
+                                 y = y))
+
+plotdata$site <- factor(plotdata$site, levels = c("BLD1", "BLD2", "PWR", "SKY", "YTB", "Combined", "Seedlings"))
+```
+
+Now, let's create the plot.
+```{r}
+pb <- plotdata %>% ggplot(aes(x = x, y = y, fill = site, colour = site, linetype = site)) + 
+                  geom_line() + 
+                  geom_area(position = "identity", alpha = 0.3)
+
+pb <- pb + theme_bw() +
+         xlab("Apical Height (cm)") +
+         ylab("Probability Density") +
+         scale_x_continuous(limits = c(0, 160)) +
+         scale_fill_manual(values = c(hue_pal()(5), NA, NA)) + 
+         scale_color_manual(values = c(hue_pal()(5), "black", "black")) + 
+         scale_linetype_manual(values = c(1,1,1,1,1,1,2)) +
+         labs(colour="Sites", fill="Sites", linetype="Sites") +
+         theme(legend.background = element_rect(fill="lightgrey",
+                                                size=0.1,
+                                                linetype="solid"),
+               legend.key.size =  unit(0.2, "in"),
+               legend.position = c(0.875, 0.65))
+
+pb <- pb + ggtitle("(b)") + 
+           theme(plot.title = element_text(hjust = 0, margin=margin(b = 15, unit = "pt")))
+
+pb
+```
+
+Finally, we'll save it to file.
+```{r}
+ggsave("../Figure3b.png", height=5, width=8, device = "png", pb)
+pall <- grid.arrange(pa, pb, ncol=2)
+ggsave("../Figure3.png", height=4, width=12, device = "png", pall)
+```
+
+# Appendix
+
+Load the aggregate data set & necessary packages
+```{r}
+metadata=tbl_df(read.csv("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/Milkweed/DATA SETS/Data Frames/metadata13to15.csv"))
+
+# Where there was a plant in June and NA for height in Sept, make surv 0
+metadata <- metadata %>% mutate(surv = ifelse(is.na(surv) & is.na(h_apical.next) & !is.na(h_apical), 0, surv), 
+                                munched = ifelse(herb_avg > 0, 1, 0),
+                                log_herb_avg = log(0.1+herb_avg))
+
+# Filter out plants with log_herb_avg = NA
+metadata <- metadata %>% filter(!is.na(h_apical),
+                                !is.na(h_apical.next),
+                                !is.na(herb_avg),
+                                h_apical.next > 50,
+                                !(site == "YTB" & h_apical <= 50))
+```
+
+Show conditional distributions for positive herbivory scores.  This doesn't look quite like the parametric versions above.  Not sure why.  Would be interesting to try and create the curves manually and check what the area under the curve is.  Possible future work.
+```{r}
+plotdata <- metadata %>% group_by(site) %>% 
+                         mutate(pmunch = sum(log_herb_avg > -2.2, na.rm=T)/(n()*n())) %>%
+                         filter(log_herb_avg > -2.2) %>%
+                         select(site, log_herb_avg, pmunch)
+
+plotdata$bpmunch <- sum(metadata$log_herb_avg > -2.2)/(nrow(metadata)*nrow(metadata))  # For Bertha
+
+p <- plotdata %>% ggplot(aes(x = log_herb_avg, fill = site, colour = site, weight = pmunch)) +
+                  geom_area(stat="density", position="identity", alpha=0.3) + 
+                  geom_line(stat="density") +
+                  geom_line(aes(x = log_herb_avg, fill = NA, weight = bpmunch), stat="density", colour="black")
+
+p <- p + theme_bw() +
+         xlab("ln(Herbivory Score)") +
+         ylab("Probability Density") +
+         scale_x_continuous(limits = c(log(0.1), log(6.1))) +
+         scale_y_continuous(limits = c(0, 0.8))
+
+p
+
+# plotdata %>% ggplot(aes(x = log_herb_avg, fill = site, colour = site)) + 
+#                     geom_density(aes(y = ..density..), position = "identity", alpha=0.3)
+
+# metadata_pherb <- metadata %>% filter(log_herb_avg > -2.2)
+
+# p <- metadata_pherb %>% ggplot(aes(x = log_herb_avg, fill = site, colour = site))
+# p <- p + geom_area(stat="density", position="identity", alpha=0.3) + 
+#          geom_line(stat="density") +
+#          geom_line(aes(x = log_herb_avg, fill = NA), stat="density", colour="black") + 
+#          theme_bw()
+# ggsave("../Figure3.png", height=5, width=8, device = "png", p)
+```
