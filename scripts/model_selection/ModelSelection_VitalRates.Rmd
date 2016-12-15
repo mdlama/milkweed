@@ -12,21 +12,8 @@ Load necessary packages.
 ```{r, message=FALSE, warning=FALSE}
 library(dplyr)
 library(lme4) #lme4 package contains function lmer() to analyze linear mixed effects regressions. 
+library
 library(lattice) #lattice package contains function dotplot() to visualize confidence intervals of parameter estimates in each site
-```
-
-```{r}
-# Create class
-# foo <- structure(list(mdl, scaled, vars, pars), class = "vrate")
-predict.vrate <- function(obj, newdata, type="Bertha") {
-  pars <- obj$pars$unscaled
-  linpart <- pars[type,"(Intercept)"] + pars[type,obj$vars[1]]*newdata[[obj$vars[1]]] + pars[type,obj$vars[2]]*newdata[[obj$vars[2]]] + pars[type,paste0(obj$vars[1],":",obj$vars[2])]*newdata[[obj$vars[1]]]*newdata[[obj$vars[2]]]
-  if (class(obj$mdl) == "glmerMod") {
-    predict.vrate <- obj$mdl@resp$family$linkinv(linpart)
-  } else {
-    predict.vrate <- linpart
-  }
-}
 ```
 
 Load the aggregate data set & necessary packages
