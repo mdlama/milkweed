@@ -31,18 +31,7 @@ predict.vrate <- function(obj, newdata, type="Bertha") {
 
 Load the aggregate data set & necessary packages
 ```{r}
-metadata=tbl_df(read.csv("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/Milkweed/DATA SETS/Data Frames/metadata13to15.csv"))
-
-# Where there was a plant in June and NA for height in Sept, make surv 0
-metadata <- metadata %>% mutate(surv = ifelse(is.na(surv) & is.na(h_apical.next) & !is.na(h_apical), 0, surv), 
-                                munched = ifelse(herb_avg > 0, 1, 0),
-                                log_herb_avg = log(0.1+herb_avg))
-
-# Tried indicator variable for herb_avg - close to just log(c+x), so not using
-# metadata <- metadata %>% mutate(surv = ifelse(is.na(surv) & is.na(h_apical.next) & !is.na(h_apical), 0, surv), 
-                                #munched = ifelse(herb_avg > 0, 1, 0),
-                                #herb_avg = ifelse(munched == 1, log(herb_avg), herb_avg))
-# See: http://stats.stackexchange.com/questions/4831/logistic-regression-transforming-variables
+metadata=tbl_df(read.csv("../../data/stemdata.csv"))
 ```
 
 # Model Selection
