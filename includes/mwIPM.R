@@ -252,6 +252,32 @@ setGrowthFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
     
     metadata_sc <- metadata_usc %>% mutate_each(funs(sc = as.numeric(scale(.))), 
                                                 h_apical, 
+                                                h_apical.next, 
+                                                log_herb_avg)
+    
+    
+    cat("Computing growth fit...")
+    growth.mdl <- lmer(h_apical.next ~ h_apical + h_apical:log_herb_avg + (h_apical+log_herb_avg|site/transect)+(h_apical|year), data=metadata_sc, REML=T)
+    cat("done!\n")
+    
+    growth.fit <- mwMod(list(mdl = growth.mdl, 
+                             vars = c("h_apical", "log_herb_avg"), 
+                             scaled = list(h_apical = scale(metadata_usc$h_apical),
+                                           h_apical.next = scale(metadata_usc$h_apical.next),
+                                           log_herb_avg = scale(metadata_usc$log_herb_avg))))
+    # Check parameters
+    cat("Checking parameters:\n")
+    checkPars(growth.fit)
+    
+    save(growth.fit, file = "../../data/calculated/growthFit.RData")
+  } else {
+    load("../../data/calculated/growthFit.RData")
+  }
+  
+  obj$pars$growth.fit <- growth.fit
+  
+  return(obj)
+}
                                                 log_herb_avg)
     
     cat("Computing growth fit...")
