@@ -23,9 +23,7 @@ metadata_usc <- metadata %>% filter(!is.na(h_apical),
                                     !is.na(h_apical.next),
                                     !is.na(herb_avg),
                                     !is.na(fec.flower),
-                                    !is.na(surv),
-                                    h_apical.next > 50,
-                                    !(site == "YTB" & h_apical <= 50))
+                                    !is.na(surv))
 
 metadata_sc <- metadata_usc %>% mutate_each(funs(sc = as.numeric(scale(.))), h_apical, log_herb_avg)
 
@@ -123,4 +121,4 @@ pods.fit <- mwMod(list(mdl = pods.mdl,
 cat("Checking parameters:\n")
 checkPars(pods.fit)
 
-save(flower.fit, surv.fit, growth.fit, pods.fit, file = "vitalFits.RData")
+# save(flower.fit, surv.fit, growth.fit, pods.fit, file = "vitalFits.RData")
