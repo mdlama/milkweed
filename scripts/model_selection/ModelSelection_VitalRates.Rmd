@@ -12,7 +12,7 @@ Load necessary packages.
 ```{r, message=FALSE, warning=FALSE}
 library(dplyr)
 library(lme4) #lme4 package contains function lmer() to analyze linear mixed effects regressions. 
-library
+library(ggplot2)
 library(lattice) #lattice package contains function dotplot() to visualize confidence intervals of parameter estimates in each site
 ```
 
@@ -47,16 +47,19 @@ metadata_sc %>% ggplot(aes(x = h_apical,
                 facet_wrap(~ site)
 ```
 
-First fit full model.
-
+Full model first.  Use nAGQ = 0 for quick approximations.
 ```{r}
-# Use nAGQ = 0 for quick approximations
 flower.reg.mdl1=glmer(fec.flower ~ h_apical*log_herb_avg + (h_apical*log_herb_avg|site/transect) + (h_apical*log_herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+```
 
+Let's try and simplify `site/transect` random effect first, but we'll keep `log_herb_avg` in as that is our main interest.
+```{r}
 flower.reg.mdl2=glmer(fec.flower ~ h_apical*log_herb_avg + (log_herb_avg|site/transect) + (h_apical*log_herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
 
 flower.reg.mdl3=glmer(fec.flower ~ h_apical*log_herb_avg + (1|site/transect) + (h_apical*log_herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+```
 
+```{r}
 flower.reg.mdl4=glmer(fec.flower ~ h_apical*log_herb_avg + (1|site/transect) + (h_apical+log_herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
 
 flower.reg.mdl5=glmer(fec.flower ~ h_apical*log_herb_avg + (1|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=0, family=binomial())
