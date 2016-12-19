@@ -6,6 +6,7 @@ setPars <- function(x) UseMethod("setPars")
 setFloweringFit <- function(obj, compute, update) UseMethod("setFloweringFit")
 setSurvivalFit <- function(obj, compute, update) UseMethod("setSurvivalFit")
 setGrowthFit <- function(obj, compute, update) UseMethod("setGrowthFit")
+setPodsFit <- function(obj, compute, update) UseMethod("setPodsFit")
 
 # Set matrices from fits
 setFlowering <- function(x) UseMethod("setFlowering")
@@ -150,7 +151,8 @@ setPars.mwIPM <- function(obj, update = TRUE) {
   
   obj <- obj %>% setFloweringFit(compute = FALSE, update = FALSE) %>% 
                  setSurvivalFit(compute = FALSE, update = FALSE) %>%
-                 setGrowthFit(compute = FALSE, update = FALSE)
+                 setGrowthFit(compute = FALSE, update = FALSE) %>%
+                 setPodsFit(compute = FALSE, update = FALSE)
 
   detach("file:../../data/calculated/vitalFits.RData")
   detach("file:../../data/calculated/seedlingFit.RData")
@@ -278,27 +280,41 @@ setGrowthFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
   
   return(obj)
 }
+
+setPodsFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
+  if (!file.exists("../../data/calculated/podsFit.RData") | (compute)) {
+    # We only want stems that flowered, survived and have data for pods
+    metadata_usc <- obj$data %>% filter(!is.na(h_apical),
+                                        !is.na(h_apical.next),
+                                        !is.na(herb_avg),
+                                        fec.flower == 1,
+                                        surv == 1,
+                                        !is.na(N_pods))
+    
+    metadata_sc <- metadata_usc %>% mutate_each(funs(sc = as.numeric(scale(.))), 
+                                                h_apical, 
+                                                h_apical.next, 
                                                 log_herb_avg)
     
-    cat("Computing growth fit...")
-    growth.mdl <- lmer(h_apical.next ~ h_apical + h_apical:log_herb_avg + (h_apical+log_herb_avg|site/transect)+(h_apical|year), data=metadata_sc, REML=T)
+    cat("Computing pods fit...")
+    pods.mdl <- glmer(N_pods ~ h_apical.next + log_herb_avg - 1 + (h_apical.next+log_herb_avg|site/transect)+(h_apical.next+log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
     cat("done!\n")
     
-    growth.fit <- mwMod(list(mdl = growth.mdl, 
-                             vars = c("h_apical", "log_herb_avg"), 
-                             scaled = list(h_apical = scale(metadata_usc$h_apical),
-                                           h_apical.next = scale(metadata_usc$h_apical.next),
-                                           log_herb_avg = scale(metadata_usc$log_herb_avg))))
+    pods.fit <- mwMod(list(mdl = pods.mdl, 
+                           vars = c("h_apical.next", "log_herb_avg"), 
+                           scaled = list(h_apical = scale(metadata_usc$h_apical),
+                                         h_apical.next = scale(metadata_usc$h_apical.next),
+                                         log_herb_avg = scale(metadata_usc$log_herb_avg))))
     # Check parameters
     cat("Checking parameters:\n")
-    checkPars(growth.fit)
+    checkPars(pods.fit)
     
-    save(growth.fit, file = "../../data/calculated/growthFit.RData")
+    save(pods.fit, file = "../../data/calculated/podsFit.RData")
   } else {
-    load("../../data/calculated/growthFit.RData")
+    load("../../data/calculated/podsFit.RData")
   }
   
-  obj$pars$growth.fit <- growth.fit
+  obj$pars$pods.fit <- pods.fit
   
   return(obj)
 }
