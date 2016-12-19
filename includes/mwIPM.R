@@ -139,8 +139,7 @@ setPars.mwIPM <- function(obj, update = TRUE) {
   attach("../../data/calculated/seedlingEmergence.RData", warn.conflicts = FALSE)
   seeds_per_pod_data <- read.csv("../../data/seeddata.csv")
 
-  obj$pars <- list(growth.fit = growth.fit,
-                   pods.fit = pods.fit,
+  obj$pars <- list(pods.fit = pods.fit,
                    seedling.fit = seedling.fit,
                    budling.fit = budling.fit,
                    munched.fit = munched.fit,
@@ -149,9 +148,10 @@ setPars.mwIPM <- function(obj, update = TRUE) {
                    seeds.per.pod = mean(seeds_per_pod_data$total_seed),
                    dist.herb = NA)
   
-  obj <- obj %>% setSurvivalFit(compute = FALSE, update = FALSE) %>% 
-                 setFloweringFit(compute = FALSE, update = FALSE)
- 
+  obj <- obj %>% setFloweringFit(compute = FALSE, update = FALSE) %>% 
+                 setSurvivalFit(compute = FALSE, update = FALSE) %>%
+                 setGrowthFit(compute = FALSE, update = FALSE)
+
   detach("file:../../data/calculated/vitalFits.RData")
   detach("file:../../data/calculated/seedlingFit.RData")
   detach("file:../../data/calculated/budlingFit.RData")
@@ -237,6 +237,42 @@ setSurvivalFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
   }
   
   obj$pars$surv.fit <- surv.fit
+  
+  return(obj)
+}
+
+setGrowthFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
+  if (!file.exists("../../data/calculated/growthFit.RData") | (compute)) {
+    # We only want stems that flowered and survived
+    metadata_usc <- obj$data %>% filter(!is.na(h_apical),
+                                        !is.na(h_apical.next),
+                                        !is.na(herb_avg),
+                                        fec.flower == 1,
+                                        surv == 1)
+    
+    metadata_sc <- metadata_usc %>% mutate_each(funs(sc = as.numeric(scale(.))), 
+                                                h_apical, 
+                                                log_herb_avg)
+    
+    cat("Computing growth fit...")
+    growth.mdl <- lmer(h_apical.next ~ h_apical + h_apical:log_herb_avg + (h_apical+log_herb_avg|site/transect)+(h_apical|year), data=metadata_sc, REML=T)
+    cat("done!\n")
+    
+    growth.fit <- mwMod(list(mdl = growth.mdl, 
+                             vars = c("h_apical", "log_herb_avg"), 
+                             scaled = list(h_apical = scale(metadata_usc$h_apical),
+                                           h_apical.next = scale(metadata_usc$h_apical.next),
+                                           log_herb_avg = scale(metadata_usc$log_herb_avg))))
+    # Check parameters
+    cat("Checking parameters:\n")
+    checkPars(growth.fit)
+    
+    save(growth.fit, file = "../../data/calculated/growthFit.RData")
+  } else {
+    load("../../data/calculated/growthFit.RData")
+  }
+  
+  obj$pars$growth.fit <- growth.fit
   
   return(obj)
 }
