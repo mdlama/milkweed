@@ -2,6 +2,11 @@
 setVars <- function(x) UseMethod("setVars")
 setPars <- function(x) UseMethod("setPars")
 
+# Perform fits
+setFloweringFit <- function(obj, compute, update) UseMethod("setFloweringFit")
+setSurvivalFit <- function(obj, compute, update) UseMethod("setSurvivalFit")
+setGrowthFit <- function(obj, compute, update) UseMethod("setGrowthFit")
+
 # Set matrices from fits
 setFlowering <- function(x) UseMethod("setFlowering")
 setSurvival <- function(x) UseMethod("setSurvival")
@@ -124,19 +129,17 @@ setVars.mwIPM <- function (obj, update = TRUE) {
 setPars.mwIPM <- function(obj, update = TRUE) {
   #
   # For now, just load them from file here.  In the future, this should be done outside this function.
-  #
+  # The future is now.  Moving these to proper location.
 
-  attach("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/vitalFits.RData", warn.conflicts = FALSE)
-  attach("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/seedlingFit.RData", warn.conflicts = FALSE)
-  attach("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/budlingFit.RData", warn.conflicts = FALSE)
-  attach("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/munchedFit.RData", warn.conflicts = FALSE)
-  attach("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/budlingsPerStemFit.RData", warn.conflicts = FALSE)
-  attach("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/seedlingEmergence.RData", warn.conflicts = FALSE)
-  seeds_per_pod_data <- read.csv("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/Milkweed/DATA SETS/seeds_per_pod_final.csv")
+  attach("../../data/calculated/vitalFits.RData", warn.conflicts = FALSE)
+  attach("../../data/calculated/seedlingFit.RData", warn.conflicts = FALSE)
+  attach("../../data/calculated/budlingFit.RData", warn.conflicts = FALSE)
+  attach("../../data/calculated/munchedFit.RData", warn.conflicts = FALSE)
+  attach("../../data/calculated/budlingsPerStemFit.RData", warn.conflicts = FALSE)
+  attach("../../data/calculated/seedlingEmergence.RData", warn.conflicts = FALSE)
+  seeds_per_pod_data <- read.csv("../../data/seeddata.csv")
 
-  obj$pars <- list(flower.fit = flower.fit,
-                   growth.fit = growth.fit,
-                   surv.fit = surv.fit,
+  obj$pars <- list(growth.fit = growth.fit,
                    pods.fit = pods.fit,
                    seedling.fit = seedling.fit,
                    budling.fit = budling.fit,
@@ -145,13 +148,16 @@ setPars.mwIPM <- function(obj, update = TRUE) {
                    seedling.emergence = seedling.emergence,
                    seeds.per.pod = mean(seeds_per_pod_data$total_seed),
                    dist.herb = NA)
+  
+  obj <- obj %>% setSurvivalFit(compute = FALSE, update = FALSE) %>% 
+                 setFloweringFit(compute = FALSE, update = FALSE)
  
-  detach("file:~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/vitalFits.RData")
-  detach("file:~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/seedlingFit.RData")
-  detach("file:~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/budlingFit.RData")
-  detach("file:~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/munchedFit.RData")
-  detach("file:~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/budlingsPerStemFit.RData")
-  detach("file:~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/seedlingEmergence.RData")
+  detach("file:../../data/calculated/vitalFits.RData")
+  detach("file:../../data/calculated/seedlingFit.RData")
+  detach("file:../../data/calculated/budlingFit.RData")
+  detach("file:../../data/calculated/munchedFit.RData")
+  detach("file:../../data/calculated/budlingsPerStemFit.RData")
+  detach("file:../../data/calculated/seedlingEmergence.RData")
 
   if (update) {
     obj <- setFlowering(obj)
@@ -161,6 +167,76 @@ setPars.mwIPM <- function(obj, update = TRUE) {
     obj <- setHerbivory(obj, update=FALSE)
     obj <- setSeedlingRecruitment(obj)
   }
+  
+  return(obj)
+}
+
+setFloweringFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
+  if (!file.exists("../../data/calculated/flowerFit.RData") | (compute)) {
+    metadata_usc <- metadata %>% filter(!is.na(h_apical),
+                                        !is.na(h_apical.next),
+                                        !is.na(herb_avg),
+                                        !is.na(fec.flower),
+                                        !is.na(surv))
+    
+    metadata_sc <- metadata_usc %>% mutate_each(funs(sc = as.numeric(scale(.))), 
+                                                h_apical, 
+                                                log_herb_avg)
+    
+    cat("Computing flowering fit...")
+    flower.mdl <- glmer(fec.flower ~ h_apical + h_apical:log_herb_avg - 1 + (1|site/transect)+(h_apical+log_herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+    cat("done!\n")
+    
+    flower.fit <- mwMod(list(mdl = flower.mdl, 
+                             vars = c("h_apical", "log_herb_avg"), 
+                             scaled = list(h_apical = scale(metadata_usc$h_apical), 
+                                           log_herb_avg = scale(metadata_usc$log_herb_avg))))
+    
+    # Check parameters
+    cat("Checking parameters:\n")
+    checkPars(flower.fit)
+  
+    save(flower.fit, file = "../../data/calculated/flowerFit.RData")
+  } else {
+    load("../../data/calculated/flowerFit.RData")
+  }
+  
+  obj$pars$flower.fit <- flower.fit
+  
+  return(obj)
+}
+
+setSurvivalFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
+  if (!file.exists("../../data/calculated/survivalFit.RData") | (compute)) {
+    metadata_usc <- obj$data %>% filter(!is.na(h_apical),
+                                        !is.na(h_apical.next),
+                                        !is.na(herb_avg),
+                                        fec.flower == 1,
+                                        !is.na(surv))
+    
+    metadata_sc <- metadata_usc %>% mutate_each(funs(sc = as.numeric(scale(.))), 
+                                                h_apical, 
+                                                log_herb_avg)
+    
+    cat("Computing survival fit...")
+    surv.mdl <- glmer(surv ~ 1 + (log_herb_avg|site/transect)+(1|year), data=metadata_sc, family=binomial(), nAGQ=1, control=glmerCtrl)
+    cat("done!\n")
+    
+    surv.fit <- mwMod(list(mdl = surv.mdl, 
+                           vars = c("h_apical", "log_herb_avg"), 
+                           scaled = list(h_apical = scale(metadata_usc$h_apical), 
+                                         log_herb_avg = scale(metadata_usc$log_herb_avg))))
+    
+    # Check parameters
+    cat("Checking parameters:\n")
+    checkPars(surv.fit)
+    
+    save(surv.fit, file = "../../data/calculated/survivalFit.RData")
+  } else {
+    load("../../data/calculated/survivalFit.RData")
+  }
+  
+  obj$pars$surv.fit <- surv.fit
   
   return(obj)
 }
