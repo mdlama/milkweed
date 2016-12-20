@@ -140,8 +140,7 @@ setPars.mwIPM <- function(obj, update = TRUE) {
   attach("../../data/calculated/seedlingEmergence.RData", warn.conflicts = FALSE)
   seeds_per_pod_data <- read.csv("../../data/seeddata.csv")
 
-  obj$pars <- list(pods.fit = pods.fit,
-                   seedling.fit = seedling.fit,
+  obj$pars <- list(seedling.fit = seedling.fit,
                    budling.fit = budling.fit,
                    munched.fit = munched.fit,
                    budlings.per.stem.fit = budlings.per.stem.fit,
