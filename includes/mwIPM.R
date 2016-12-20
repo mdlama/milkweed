@@ -9,12 +9,12 @@ setGrowthFit <- function(obj, compute, update) UseMethod("setGrowthFit")
 setPodsFit <- function(obj, compute, update) UseMethod("setPodsFit")
 
 # Set matrices from fits
-setFlowering <- function(x) UseMethod("setFlowering")
-setSurvival <- function(x) UseMethod("setSurvival")
-setHerbivory <- function(obj, dist.herb, update) UseMethod("setHerbivory")
-setPods <- function(x) UseMethod("setPods")
-setGrowth <- function(x) UseMethod("setGrowth")
-setSeedlingRecruitment <- function(x) UseMethod("setSeedlingRecruitment")
+setFloweringMatrix <- function(x) UseMethod("setFloweringMatrix")
+setSurvivalMatrix <- function(x) UseMethod("setSurvivalMatrix")
+setHerbivoryMatrix <- function(obj, dist.herb, update) UseMethod("setHerbivoryMatrix")
+setPodsMatrix <- function(x) UseMethod("setPodsMatrix")
+setGrowthMatrix <- function(x) UseMethod("setGrowthMatrix")
+setSeedlingRecruitmentMatrix <- function(x) UseMethod("setSeedlingRecruitmentMatrix")
 
 # Compute kernels from matrices
 computeSexualKernel <- function(x) UseMethod("computeSexualKernel")
@@ -132,7 +132,6 @@ setPars.mwIPM <- function(obj, update = TRUE) {
   # For now, just load them from file here.  In the future, this should be done outside this function.
   # The future is now.  Moving these to proper location.
 
-  attach("../../data/calculated/vitalFits.RData", warn.conflicts = FALSE)
   attach("../../data/calculated/seedlingFit.RData", warn.conflicts = FALSE)
   attach("../../data/calculated/budlingFit.RData", warn.conflicts = FALSE)
   attach("../../data/calculated/munchedFit.RData", warn.conflicts = FALSE)
@@ -148,12 +147,13 @@ setPars.mwIPM <- function(obj, update = TRUE) {
                    seeds.per.pod = mean(seeds_per_pod_data$total_seed),
                    dist.herb = NA)
   
-  obj <- obj %>% setFloweringFit(compute = FALSE, update = FALSE) %>% 
-                 setSurvivalFit(compute = FALSE, update = FALSE) %>%
-                 setGrowthFit(compute = FALSE, update = FALSE) %>%
-                 setPodsFit(compute = FALSE, update = FALSE)
+  compute = FALSE
+  
+  obj <- obj %>% setFloweringFit(compute = compute, update = FALSE) %>% 
+                 setSurvivalFit(compute = compute, update = FALSE) %>%
+                 setGrowthFit(compute = compute, update = FALSE) %>%
+                 setPodsFit(compute = compute, update = FALSE)
 
-  detach("file:../../data/calculated/vitalFits.RData")
   detach("file:../../data/calculated/seedlingFit.RData")
   detach("file:../../data/calculated/budlingFit.RData")
   detach("file:../../data/calculated/munchedFit.RData")
@@ -161,16 +161,18 @@ setPars.mwIPM <- function(obj, update = TRUE) {
   detach("file:../../data/calculated/seedlingEmergence.RData")
 
   if (update) {
-    obj <- setFlowering(obj)
-    obj <- setSurvival(obj)
-    obj <- setGrowth(obj)
-    obj <- setPods(obj)
-    obj <- setHerbivory(obj, update=FALSE)
-    obj <- setSeedlingRecruitment(obj)
+    obj <- setFloweringMatrix(obj)
+    obj <- setSurvivalMatrix(obj)
+    obj <- setGrowthMatrix(obj)
+    obj <- setPodsMatrix(obj)
+    obj <- setHerbivoryMatrix(obj, update=FALSE)
+    obj <- setSeedlingRecruitmentMatrix(obj)
   }
   
   return(obj)
 }
+
+# Fits ------------------------------
 
 setFloweringFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
   if (!file.exists("../../data/calculated/flowerFit.RData") | (compute)) {
@@ -318,7 +320,9 @@ setPodsFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
   return(obj)
 }
 
-setFlowering.mwIPM <- function(obj, update = TRUE) {
+# Matrices ------------------------------
+
+setFloweringMatrix.mwIPM <- function(obj, update = TRUE) {
   # Flowering
   # N x N^2
   obj$matrices$F = t(c(outer(obj$vars$h_apical$x, obj$vars$log_herb_avg$x, function(x,y) {predict(obj$pars$flower.fit, newdata = data.frame(h_apical = x, log_herb_avg = y), type=obj$site)})))[rep(1,obj$N),]
@@ -326,7 +330,7 @@ setFlowering.mwIPM <- function(obj, update = TRUE) {
   return(obj)
 }
 
-setSurvival.mwIPM <- function(obj, update = TRUE) {
+setSurvivalMatrix.mwIPM <- function(obj, update = TRUE) {
   # Survival
   # N x N^2
   obj$matrices$S = t(c(outer(obj$vars$h_apical$x, obj$vars$log_herb_avg$x, function(x,y) {predict(obj$pars$surv.fit, newdata = data.frame(h_apical = x, log_herb_avg = y), type=obj$site)})))[rep(1,obj$N),]
@@ -334,7 +338,7 @@ setSurvival.mwIPM <- function(obj, update = TRUE) {
   return(obj)
 }
 
-setGrowth.mwIPM <- function(obj, update = TRUE) {
+setGrowthMatrix.mwIPM <- function(obj, update = TRUE) {
   # Growth
   # N x N^2
 
@@ -360,7 +364,7 @@ setGrowth.mwIPM <- function(obj, update = TRUE) {
 # Plot growth
 # image.plot(h_apical, h_apical.next, t(G%*%H), col=topo.colors(100))
 
-setPods.mwIPM <- function(obj, update = TRUE) {
+setPodsMatrix.mwIPM <- function(obj, update = TRUE) {
   # Pods
   # N x N^2
 
@@ -378,7 +382,7 @@ setPods.mwIPM <- function(obj, update = TRUE) {
   return(obj)
 }
 
-setHerbivory.mwIPM <- function(obj, dist.herb = NA, update = TRUE) {
+setHerbivoryMatrix.mwIPM <- function(obj, dist.herb = NA, update = TRUE) {
   # Herbivory matrix
   # N x N^2
   
@@ -410,7 +414,7 @@ setHerbivory.mwIPM <- function(obj, dist.herb = NA, update = TRUE) {
 }
 
 ## Seeding Recruitment
-setSeedlingRecruitment.mwIPM <- function(obj, update = TRUE) {
+setSeedlingRecruitmentMatrix.mwIPM <- function(obj, update = TRUE) {
   # N x N
   
   R <- t(t(obj$pars$seedling.fit$predict(obj$vars$h_apical$b)))%*%t(rep(1,obj$N))
@@ -419,6 +423,8 @@ setSeedlingRecruitment.mwIPM <- function(obj, update = TRUE) {
   
   return(obj)
 }
+
+# Kernels ------------------------------
 
 computeSexualKernel.mwIPM <- function(obj) {
   attach(obj$vars, warn.conflicts = FALSE)
@@ -466,7 +472,8 @@ computeFullKernel.mwIPM <- function(obj) {
   return(obj)
 }
 
-## MPM
+# Analysis ------------------------------
+
 computeMPM.mwIPM <- function(obj) {
   attach(obj$vars, warn.conflicts = FALSE)
   attach(obj$pars, warn.conflicts = FALSE)
