@@ -38,6 +38,9 @@ computeMPM <- function(x) UseMethod("computeMPM")
 # Analyze growth rate
 analyzeGrowthRate <- function(x) UseMethod("analyzeGrowthRate")
 
+# Views
+viewBudlingDistFit <- function(obj) UseMethod("viewBudlingDistFit")
+
 glmerCtrl <- glmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
 
 # Constructor ----------------------
@@ -625,4 +628,73 @@ computeMPM.mwIPM <- function(obj) {
 
 analyzeGrowthRate.mwIPM <- function(obj) {
   return(Re(eigen(obj$kernels$K)$values[1]))
+}
+
+# Views ------------------------------
+
+viewBudlingDistFit <- function(obj) {
+  budling.fit <- obj$pars$budling.fit
+  attach(obj$pars, warn.conflicts = FALSE)
+  attach(obj$vars$h_apical, warn.conflicts = FALSE)
+
+  y <- budling.fit[['BLD1']]$predict(b)
+  plotdata <- data.frame(site = "BLD1",
+                         x = x,
+                         y = y)
+  
+  y <- budling.fit[['BLD2']]$predict(b)
+  sum(y)*(bx[2]-bx[1])
+  plotdata <- bind_rows(plotdata,
+                        data.frame(site = "BLD2",
+                                   x = x,
+                                   y = y))
+  
+  y <- budling.fit[['PWR']]$predict(b)
+  plotdata <- bind_rows(plotdata,
+                        data.frame(site = "PWR",
+                                   x = x,
+                                   y = y))
+  
+  y <- budling.fit[['SKY']]$predict(b)
+  plotdata <- bind_rows(plotdata,
+                        data.frame(site = "SKY",
+                                   x = x,
+                                   y = y))
+  
+  y <- budling.fit[['YTB']]$predict(b)
+  plotdata <- bind_rows(plotdata,
+                        data.frame(site = "YTB",
+                                   x = x,
+                                   y = y))
+  
+  y <- budling.fit[['Bertha']]$predict(b)
+  plotdata <- bind_rows(plotdata, 
+                        data.frame(site = "Combined",
+                                   x = x,
+                                   y = y))
+  
+  plotdata$site <- factor(plotdata$site, levels = c("BLD1", "BLD2", "PWR", "SKY", "YTB", "Combined"))
+  
+  pb <- plotdata %>% ggplot(aes(x = x, y = y, fill = site, colour = site)) + 
+    geom_line() + 
+    geom_area(position = "identity", alpha = 0.3)
+  
+  pb <- pb + ggtitle("Budling Distributions") +
+    theme_bw() +
+    xlab("Apical Height (cm)") +
+    ylab("Probability Density") +
+    scale_x_continuous(limits = c(0, 160)) +
+    scale_fill_manual(values = c(hue_pal()(5), NA)) + 
+    scale_color_manual(values = c(hue_pal()(5), "black")) + 
+    labs(colour="Sites", fill="Sites", linetype="Sites") +
+    theme(legend.background = element_rect(fill="lightgrey",
+                                           size=0.1,
+                                           linetype="solid"),
+          legend.key.size =  unit(0.2, "in"),
+          legend.position = c(0.875, 0.65))
+  
+  detach(obj$pars)
+  detach(obj$vars$h_apical)
+  
+  return(pb)
 }
