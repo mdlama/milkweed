@@ -41,6 +41,7 @@ analyzeGrowthRate <- function(x) UseMethod("analyzeGrowthRate")
 
 # Views
 viewBudlingDistFit <- function(obj) UseMethod("viewBudlingDistFit")
+viewHerbivoryDistFit <- function(obj) UseMethod("viewHerbivoryDistFit")
 
 glmerCtrl <- glmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
 
@@ -699,7 +700,6 @@ analyzeGrowthRate.mwIPM <- function(obj) {
 # Views ------------------------------
 
 viewBudlingDistFit <- function(obj) {
-  budling.fit <- obj$pars$budling.fit
   attach(obj$pars, warn.conflicts = FALSE)
   attach(obj$vars$h_apical, warn.conflicts = FALSE)
 
@@ -763,4 +763,69 @@ viewBudlingDistFit <- function(obj) {
   detach(obj$vars$h_apical)
   
   return(pb)
+}
+
+viewHerbivoryDistFit <- function(obj) {
+  attach(obj$pars, warn.conflicts = FALSE)
+  attach(obj$vars$log_herb_avg, warn.conflicts = FALSE)
+  
+  y <- munched.fit[['BLD1']]$predict(b, justmunch=TRUE)
+  plotdata <- data.frame(site = "BLD1",
+                         x = x,
+                         y = y)
+  
+  y <- munched.fit[['BLD2']]$predict(b, justmunch=TRUE)
+  plotdata <- bind_rows(plotdata,
+                        data.frame(site = "BLD2",
+                                   x = x,
+                                   y = y))
+  
+  y <- munched.fit[['PWR']]$predict(b, justmunch=TRUE)
+  plotdata <- bind_rows(plotdata,
+                        data.frame(site = "PWR",
+                                   x = x,
+                                   y = y))
+  
+  y <- munched.fit[['SKY']]$predict(b, justmunch=TRUE)
+  plotdata <- bind_rows(plotdata,
+                        data.frame(site = "SKY",
+                                   x = x,
+                                   y = y))
+  
+  y <- munched.fit[['YTB']]$predict(b, justmunch=TRUE)
+  plotdata <- bind_rows(plotdata,
+                        data.frame(site = "YTB",
+                                   x = x,
+                                   y = y))
+  
+  y <- munched.fit[['Bertha']]$predict(b, justmunch=TRUE)
+  plotdata <- bind_rows(plotdata,
+                        data.frame(site = "Combined",
+                                   x = x,
+                                   y = y))
+  
+  plotdata$site <- factor(plotdata$site, levels = c("BLD1", "BLD2", "PWR", "SKY", "YTB", "Combined"))
+
+  pa <- plotdata %>% ggplot(aes(x = x, y = y, fill = site, colour = site)) + 
+    geom_line() + 
+    geom_area(position = "identity", alpha = 0.3)
+  
+  pa <- pa + ggtitle("Herbivory Distributions") + 
+    theme_bw() +
+    xlab("ln(Herbivory Score)") +
+    ylab("Probability Density") +
+    scale_x_continuous(limits = c(log(0.1), log(6.1))) + 
+    scale_fill_manual(values = c(hue_pal()(5), NA)) + 
+    scale_color_manual(values = c(hue_pal()(5), "black")) +
+    labs(colour="Sites", fill="Sites") +
+    theme(legend.background = element_rect(fill="lightgrey",
+                                           size=0.1,
+                                           linetype="solid"),
+          legend.key.size =  unit(0.18, "in"),
+          legend.position = c(0.885, 0.72))
+  
+  detach(obj$pars)
+  detach(obj$vars$log_herb_avg)
+  
+  return(pa)
 }
