@@ -145,14 +145,12 @@ setPars.mwIPM <- function(obj, update = TRUE) {
   # For now, just load them from file here.  In the future, this should be done outside this function.
   # The future is now.  Moving these to proper location.
 
-  attach("../../data/calculated/seedlingFit.RData", warn.conflicts = FALSE)
   attach("../../data/calculated/budlingFit.RData", warn.conflicts = FALSE)
   attach("../../data/calculated/munchedFit.RData", warn.conflicts = FALSE)
   attach("../../data/calculated/budlingsPerStemFit.RData", warn.conflicts = FALSE)
   attach("../../data/calculated/seedlingEmergence.RData", warn.conflicts = FALSE)
 
-  obj$pars <- list(seedling.fit = seedling.fit,
-                   budling.fit = budling.fit,
+  obj$pars <- list(budling.fit = budling.fit,
                    munched.fit = munched.fit,
                    budlings.per.stem.fit = budlings.per.stem.fit,
                    seedling.emergence = seedling.emergence,
@@ -164,9 +162,9 @@ setPars.mwIPM <- function(obj, update = TRUE) {
                  setFloweringFit(compute = compute, update = FALSE) %>% 
                  setSurvivalFit(compute = compute, update = FALSE) %>%
                  setGrowthFit(compute = compute, update = FALSE) %>%
-                 setPodsFit(compute = compute, update = FALSE)
+                 setPodsFit(compute = compute, update = FALSE) %>%
+                 setSeedlingDistFit(compute = compute, update = FALSE)
 
-  detach("file:../../data/calculated/seedlingFit.RData")
   detach("file:../../data/calculated/budlingFit.RData")
   detach("file:../../data/calculated/munchedFit.RData")
   detach("file:../../data/calculated/budlingsPerStemFit.RData")
@@ -204,6 +202,7 @@ setSeedsPerPodConst.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
 
 # Fits ------------------------------
 
+## Vital rates
 setFloweringFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
   if (!file.exists("../../data/calculated/flowerFit.RData") | (compute)) {
     metadata_usc <- metadata %>% filter(!is.na(h_apical),
@@ -346,6 +345,48 @@ setPodsFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
   }
   
   obj$pars$pods.fit <- pods.fit
+  
+  return(obj)
+}
+
+## Distributions
+setSeedlingDistFit <- function(obj, compute = FALSE, update = TRUE) {
+  if (!file.exists("../../data/calculated/seedlingDistFit.RData") | (compute)) {
+    h_apical <- (obj$data %>% filter(seedling == 1))$h_apical
+    
+    cat("Computing seedling distribution fit...")
+    f1 <- fitdist(h_apical, "lnorm")
+    cat("done!\n")
+    
+    seedling.fit <- vector("list", 2)
+    seedling.fit[[1]] <- f1
+    seedling.fit[[2]] <- eval(parse(
+      text = sprintf(
+        "function(x) {
+           N <- length(x)
+           dx <- x[2]-x[1]
+           y <- rep(0, N-1)
+           for (j in 1:(N-1)) {
+             y[j] = p%s(x[j+1], %g, %g) - p%s(x[j], %g, %g)
+           }
+           y <- y/(dx*sum(y))
+         }",
+         seedling.fit[[1]]$distname,
+         seedling.fit[[1]]$estimate[1],
+         seedling.fit[[1]]$estimate[2],
+         seedling.fit[[1]]$distname,
+         seedling.fit[[1]]$estimate[1],
+         seedling.fit[[1]]$estimate[2]
+      )
+    ))
+    names(seedling.fit) <- c("fit", "predict")
+    
+    save(seedling.fit, file = "../../data/calculated/seedlingDistFit.RData")
+  } else {
+    load("../../data/calculated/seedlingDistFit.RData")
+  }
+  
+  obj$pars$seedling.fit <- seedling.fit
   
   return(obj)
 }
