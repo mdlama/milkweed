@@ -709,7 +709,6 @@ viewBudlingDistFit <- function(obj) {
                          y = y)
   
   y <- budling.fit[['BLD2']]$predict(b)
-  sum(y)*(bx[2]-bx[1])
   plotdata <- bind_rows(plotdata,
                         data.frame(site = "BLD2",
                                    x = x,
