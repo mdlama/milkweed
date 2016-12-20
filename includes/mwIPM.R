@@ -1,12 +1,22 @@
+# Declarations ----------------------
+
 # Setup generic functions
 setVars <- function(x) UseMethod("setVars")
 setPars <- function(x) UseMethod("setPars")
 
+# Constants
+setSeedsPerPodConst <- function(obj, compute, update) UseMethod("setSeedsPerPodConst")
+
 # Perform fits
+
+## Vital rates
 setFloweringFit <- function(obj, compute, update) UseMethod("setFloweringFit")
 setSurvivalFit <- function(obj, compute, update) UseMethod("setSurvivalFit")
 setGrowthFit <- function(obj, compute, update) UseMethod("setGrowthFit")
 setPodsFit <- function(obj, compute, update) UseMethod("setPodsFit")
+
+## Distributions
+setSeedlingDistFit <- function(obj, compute, update) UseMethod("setSeedlingDistFit")
 
 # Set matrices from fits
 setFloweringMatrix <- function(x) UseMethod("setFloweringMatrix")
@@ -29,7 +39,8 @@ analyzeGrowthRate <- function(x) UseMethod("analyzeGrowthRate")
 
 glmerCtrl <- glmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
 
-# Constructor for mwMod class
+# Constructor ----------------------
+
 mwIPM <- function(x) {
   #
   # Specify min and max of variables in list form.
@@ -98,6 +109,8 @@ mwIPM <- function(x) {
   return(y)
 }
 
+# Vars & Pars ----------------------
+
 setVars.mwIPM <- function (obj, update = TRUE) {
   N <- obj$N
   
@@ -137,19 +150,18 @@ setPars.mwIPM <- function(obj, update = TRUE) {
   attach("../../data/calculated/munchedFit.RData", warn.conflicts = FALSE)
   attach("../../data/calculated/budlingsPerStemFit.RData", warn.conflicts = FALSE)
   attach("../../data/calculated/seedlingEmergence.RData", warn.conflicts = FALSE)
-  seeds_per_pod_data <- read.csv("../../data/seeddata.csv")
 
   obj$pars <- list(seedling.fit = seedling.fit,
                    budling.fit = budling.fit,
                    munched.fit = munched.fit,
                    budlings.per.stem.fit = budlings.per.stem.fit,
                    seedling.emergence = seedling.emergence,
-                   seeds.per.pod = mean(seeds_per_pod_data$total_seed),
                    dist.herb = NA)
   
   compute = FALSE
   
-  obj <- obj %>% setFloweringFit(compute = compute, update = FALSE) %>% 
+  obj <- obj %>% setSeedsPerPodConst(compute = compute, update = FALSE) %>%
+                 setFloweringFit(compute = compute, update = FALSE) %>% 
                  setSurvivalFit(compute = compute, update = FALSE) %>%
                  setGrowthFit(compute = compute, update = FALSE) %>%
                  setPodsFit(compute = compute, update = FALSE)
@@ -169,6 +181,24 @@ setPars.mwIPM <- function(obj, update = TRUE) {
     obj <- setSeedlingRecruitmentMatrix(obj)
   }
   
+  return(obj)
+}
+
+# Constants ------------------------------
+
+setSeedsPerPodConst.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
+  if (!file.exists("../../data/calculated/seedsPerPodConst.RData") | (compute)) {
+    seeds_per_pod_data <- read.csv("../../data/seeddata.csv")
+    
+    seeds.per.pod = mean(seeds_per_pod_data$total_seed)
+    
+    save(seeds.per.pod, file = "../../data/calculated/seedsPerPodConst.RData")
+  } else {
+    load("../../data/calculated/seedsPerPodConst.RData")
+  }
+  
+  obj$pars$seeds.per.pod <- seeds.per.pod
+    
   return(obj)
 }
 
@@ -413,7 +443,6 @@ setHerbivoryMatrix.mwIPM <- function(obj, dist.herb = NA, update = TRUE) {
   return(obj)
 }
 
-## Seeding Recruitment
 setSeedlingRecruitmentMatrix.mwIPM <- function(obj, update = TRUE) {
   # N x N
   
