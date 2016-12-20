@@ -180,7 +180,7 @@ setFloweringFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
                                         !is.na(fec.flower),
                                         !is.na(surv))
     
-    metadata_sc <- metadata_usc %>% mutate_each(funs(sc = as.numeric(scale(.))), 
+    metadata_sc <- metadata_usc %>% mutate_each(funs(as.numeric(scale(.))), 
                                                 h_apical, 
                                                 log_herb_avg)
     
@@ -215,7 +215,7 @@ setSurvivalFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
                                         fec.flower == 1,
                                         !is.na(surv))
     
-    metadata_sc <- metadata_usc %>% mutate_each(funs(sc = as.numeric(scale(.))), 
+    metadata_sc <- metadata_usc %>% mutate_each(funs(as.numeric(scale(.))), 
                                                 h_apical, 
                                                 log_herb_avg)
     
@@ -251,7 +251,7 @@ setGrowthFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
                                         fec.flower == 1,
                                         surv == 1)
     
-    metadata_sc <- metadata_usc %>% mutate_each(funs(sc = as.numeric(scale(.))), 
+    metadata_sc <- metadata_usc %>% mutate_each(funs(as.numeric(scale(.))), 
                                                 h_apical, 
                                                 h_apical.next, 
                                                 log_herb_avg)
@@ -290,7 +290,7 @@ setPodsFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
                                         surv == 1,
                                         !is.na(N_pods))
     
-    metadata_sc <- metadata_usc %>% mutate_each(funs(sc = as.numeric(scale(.))), 
+    metadata_sc <- metadata_usc %>% mutate_each(funs(as.numeric(scale(.))), 
                                                 h_apical, 
                                                 h_apical.next, 
                                                 log_herb_avg)
