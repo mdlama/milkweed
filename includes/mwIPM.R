@@ -18,6 +18,7 @@ setPodsFit <- function(obj, compute, update) UseMethod("setPodsFit")
 ## Distributions
 setSeedlingDistFit <- function(obj, compute, update) UseMethod("setSeedlingDistFit")
 setBudlingDistFit <- function(obj, compute, update) UseMethod("setBudlingDistFit")
+setHerbivoryDistFit <- function(obj, compute, update) UseMethod("setHerbivoryDistFit")
 
 # Set matrices from fits
 setFloweringMatrix <- function(x) UseMethod("setFloweringMatrix")
@@ -149,12 +150,10 @@ setPars.mwIPM <- function(obj, update = TRUE) {
   # For now, just load them from file here.  In the future, this should be done outside this function.
   # The future is now.  Moving these to proper location.
 
-  attach("../../data/calculated/munchedFit.RData", warn.conflicts = FALSE)
   attach("../../data/calculated/budlingsPerStemFit.RData", warn.conflicts = FALSE)
   attach("../../data/calculated/seedlingEmergence.RData", warn.conflicts = FALSE)
 
-  obj$pars <- list(munched.fit = munched.fit,
-                   budlings.per.stem.fit = budlings.per.stem.fit,
+  obj$pars <- list(budlings.per.stem.fit = budlings.per.stem.fit,
                    seedling.emergence = seedling.emergence,
                    dist.herb = NA)
   
@@ -165,9 +164,9 @@ setPars.mwIPM <- function(obj, update = TRUE) {
                  setGrowthFit(compute = compute, update = FALSE) %>%
                  setPodsFit(compute = compute, update = FALSE) %>%
                  setSeedlingDistFit(compute = compute, update = FALSE) %>%
-                 setBudlingDistFit(compute = compute, update = FALSE)
+                 setBudlingDistFit(compute = compute, update = FALSE) %>%
+                 setHerbivoryDistFit(compute = compute, update = FALSE)
 
-  detach("file:../../data/calculated/munchedFit.RData")
   detach("file:../../data/calculated/budlingsPerStemFit.RData")
   detach("file:../../data/calculated/seedlingEmergence.RData")
 
@@ -444,6 +443,73 @@ setBudlingDistFit <- function(obj, compute = FALSE, update = TRUE) {
 }
   
   obj$pars$budling.fit <- budling.fit
+  
+  return(obj)
+}
+
+setHerbivoryDistFit <- function(obj, compute = FALSE, update = TRUE) {
+  if (!file.exists("../../data/calculated/herbivoryDistFit.RData") | (compute)) {
+    sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
+    mdls <- c("lnorm", "lnorm", "gamma", "lnorm", "lnorm", "gamma")
+    munched.fit <- vector('list', 6)
+    names(munched.fit) <- sites
+    
+    for (i in 1:6) {
+      if (i == 1) { # Bertha
+        thissite <- obj$data %>% filter(!is.na(h_apical),
+                                        !is.na(munched))
+      } else { # Sites
+        thissite <- obj$data %>% filter(site == sites[i],
+                                        !is.na(h_apical),
+                                        !is.na(munched))
+      }
+      pmunch <- sum(thissite$munched == 1)/nrow(thissite)
+      herb_avg <- (thissite %>% filter(munched == 1))$herb_avg
+      
+      cat("Computing herbivory distribution fit for", sites[i], "...")
+      f0 <- fitdist(herb_avg, mdls[i])
+      cat("done!\n")
+      
+      munched.fit[[i]] <- vector("list", 3)
+      munched.fit[[i]][[1]] <- f0
+      munched.fit[[i]][[2]] <- pmunch
+      munched.fit[[i]][[3]] <-
+        eval(parse(
+          text = sprintf(
+            "function(x, justmunch=FALSE) {
+               N <- length(x)
+               dx <- x[2]-x[1]
+               z <- exp(x)-0.1
+               y <- rep(0, N)
+               for (j in 1:(N-1)) {
+                 y[j] = p%s(z[j+1], %g, %g) - p%s(z[j], %g, %g)
+               }
+               y <- (%g/(dx*sum(y)))*y
+               if (!justmunch) {
+                 y[1] <- y[1] + (1-%g)/dx
+               }
+               y <- y[1:(N-1)]
+            }",
+            munched.fit[[i]][[1]]$distname,
+            munched.fit[[i]][[1]]$estimate[1],
+            munched.fit[[i]][[1]]$estimate[2],
+            munched.fit[[i]][[1]]$distname,
+            munched.fit[[i]][[1]]$estimate[1],
+            munched.fit[[i]][[1]]$estimate[2],
+            munched.fit[[i]][[2]],
+            munched.fit[[i]][[2]]
+          )
+        ))
+      
+      names(munched.fit[[i]]) <- c("fit", "pmunch", "predict")
+    }
+    
+    save(budling.fit, file = "../../data/calculated/herbivoryDistFit.RData")
+    } else {
+      load("../../data/calculated/herbivoryDistFit.RData")
+    }
+  
+  obj$pars$munched.fit <- munched.fit
   
   return(obj)
 }
