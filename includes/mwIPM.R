@@ -17,6 +17,7 @@ setPodsFit <- function(obj, compute, update) UseMethod("setPodsFit")
 
 ## Distributions
 setSeedlingDistFit <- function(obj, compute, update) UseMethod("setSeedlingDistFit")
+setBudlingDistFit <- function(obj, compute, update) UseMethod("setBudlingDistFit")
 
 # Set matrices from fits
 setFloweringMatrix <- function(x) UseMethod("setFloweringMatrix")
@@ -145,27 +146,24 @@ setPars.mwIPM <- function(obj, update = TRUE) {
   # For now, just load them from file here.  In the future, this should be done outside this function.
   # The future is now.  Moving these to proper location.
 
-  attach("../../data/calculated/budlingFit.RData", warn.conflicts = FALSE)
   attach("../../data/calculated/munchedFit.RData", warn.conflicts = FALSE)
   attach("../../data/calculated/budlingsPerStemFit.RData", warn.conflicts = FALSE)
   attach("../../data/calculated/seedlingEmergence.RData", warn.conflicts = FALSE)
 
-  obj$pars <- list(budling.fit = budling.fit,
-                   munched.fit = munched.fit,
+  obj$pars <- list(munched.fit = munched.fit,
                    budlings.per.stem.fit = budlings.per.stem.fit,
                    seedling.emergence = seedling.emergence,
                    dist.herb = NA)
   
   compute = FALSE
-  
   obj <- obj %>% setSeedsPerPodConst(compute = compute, update = FALSE) %>%
                  setFloweringFit(compute = compute, update = FALSE) %>% 
                  setSurvivalFit(compute = compute, update = FALSE) %>%
                  setGrowthFit(compute = compute, update = FALSE) %>%
                  setPodsFit(compute = compute, update = FALSE) %>%
-                 setSeedlingDistFit(compute = compute, update = FALSE)
+                 setSeedlingDistFit(compute = compute, update = FALSE) %>%
+                 setBudlingDistFit(compute = compute, update = FALSE)
 
-  detach("file:../../data/calculated/budlingFit.RData")
   detach("file:../../data/calculated/munchedFit.RData")
   detach("file:../../data/calculated/budlingsPerStemFit.RData")
   detach("file:../../data/calculated/seedlingEmergence.RData")
@@ -387,6 +385,62 @@ setSeedlingDistFit <- function(obj, compute = FALSE, update = TRUE) {
   }
   
   obj$pars$seedling.fit <- seedling.fit
+  
+  return(obj)
+}
+
+setBudlingDistFit <- function(obj, compute = FALSE, update = TRUE) {
+  if (!file.exists("../../data/calculated/budlingDistFit.RData") | (compute)) {
+    sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
+    mdls <- c("norm", "weibull", "norm", "weibull", "gamma", "lnorm")
+    budling.fit <- vector('list', 6)
+    names(budling.fit) <- sites
+    
+    for (i in 1:6) {
+      if (i == 1) { # Bertha
+        h_apical <- (obj$data %>% filter(seedling == 0,
+                                         !is.na(h_apical)))$h_apical
+      } else { # Sites
+        h_apical <- (obj$data %>% filter(seedling == 0, 
+                                         site == sites[i],
+                                         !is.na(h_apical)))$h_apical
+      }
+
+      cat("Computing budling distribution fit for", sites[i], "...")
+      f0 <- fitdist(h_apical, mdls[i])
+      cat("done!\n")
+
+      budling.fit[[i]] <- vector("list", 2)
+      budling.fit[[i]][[1]] <- f0
+      budling.fit[[i]][[2]] <-
+        eval(parse(
+          text = sprintf(
+            "function(x) {
+               N <- length(x)
+               dx <- x[2]-x[1]
+               y <- rep(0, N-1)
+               for (j in 1:(N-1)) {
+                 y[j] = p%s(x[j+1], %g, %g) - p%s(x[j], %g, %g)
+               }
+               y <- y/(dx*sum(y))
+            }",
+            budling.fit[[i]][[1]]$distname,
+            budling.fit[[i]][[1]]$estimate[1],
+            budling.fit[[i]][[1]]$estimate[2],
+            budling.fit[[i]][[1]]$distname,
+            budling.fit[[i]][[1]]$estimate[1],
+            budling.fit[[i]][[1]]$estimate[2]
+          )
+        ))
+      names(budling.fit[[i]]) <- c("fit", "predict")
+    }
+    
+    save(budling.fit, file = "../../data/calculated/budlingDistFit.RData")
+} else {
+  load("../../data/calculated/budlingDistFit.RData")
+}
+  
+  obj$pars$budling.fit <- budling.fit
   
   return(obj)
 }
