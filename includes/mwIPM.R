@@ -21,6 +21,9 @@ setSeedlingDistFit <- function(obj, compute, update) UseMethod("setSeedlingDistF
 setBudlingDistFit <- function(obj, compute, update) UseMethod("setBudlingDistFit")
 setHerbivoryDistFit <- function(obj, compute, update) UseMethod("setHerbivoryDistFit")
 
+## Regressions
+setBudlingsPerStemFit <- function(obj, compute, update) UseMethod("setBudlingsPerStemFit")
+
 # Set matrices from fits
 setFloweringMatrix <- function(x) UseMethod("setFloweringMatrix")
 setSurvivalMatrix <- function(x) UseMethod("setSurvivalMatrix")
@@ -152,14 +155,12 @@ setPars.mwIPM <- function(obj, update = TRUE) {
   # For now, just load them from file here.  In the future, this should be done outside this function.
   # The future is now.  Moving these to proper location.
 
-  attach("../../data/calculated/budlingsPerStemFit.RData", warn.conflicts = FALSE)
-
-  obj$pars <- list(budlings.per.stem.fit = budlings.per.stem.fit,
-                   dist.herb = NA)
+  obj$pars <- list(dist.herb = NA)
   
   compute = FALSE
   obj <- obj %>% setSeedsPerPodConst(compute = compute, update = FALSE) %>%
                  setSeedlingEmergenceConst(compute = compute, update = FALSE) %>%
+                 setBudlingsPerStemFit(compute = compute, update = FALSE) %>%
                  setFloweringFit(compute = compute, update = FALSE) %>% 
                  setSurvivalFit(compute = compute, update = FALSE) %>%
                  setGrowthFit(compute = compute, update = FALSE) %>%
@@ -167,8 +168,6 @@ setPars.mwIPM <- function(obj, update = TRUE) {
                  setSeedlingDistFit(compute = compute, update = FALSE) %>%
                  setBudlingDistFit(compute = compute, update = FALSE) %>%
                  setHerbivoryDistFit(compute = compute, update = FALSE)
-
-  detach("file:../../data/calculated/budlingsPerStemFit.RData")
 
   if (update) {
     obj <- setFloweringMatrix(obj)
@@ -397,7 +396,7 @@ setPodsFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
 }
 
 ## Distributions
-setSeedlingDistFit <- function(obj, compute = FALSE, update = TRUE) {
+setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
   if (!file.exists("../../data/calculated/seedlingDistFit.RData") | (compute)) {
     h_apical <- (obj$data %>% filter(seedling == 1))$h_apical
     
@@ -438,7 +437,7 @@ setSeedlingDistFit <- function(obj, compute = FALSE, update = TRUE) {
   return(obj)
 }
 
-setBudlingDistFit <- function(obj, compute = FALSE, update = TRUE) {
+setBudlingDistFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
   if (!file.exists("../../data/calculated/budlingDistFit.RData") | (compute)) {
     sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
     mdls <- c("norm", "weibull", "norm", "weibull", "gamma", "lnorm")
@@ -494,7 +493,7 @@ setBudlingDistFit <- function(obj, compute = FALSE, update = TRUE) {
   return(obj)
 }
 
-setHerbivoryDistFit <- function(obj, compute = FALSE, update = TRUE) {
+setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
   if (!file.exists("../../data/calculated/herbivoryDistFit.RData") | (compute)) {
     sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
     mdls <- c("lnorm", "lnorm", "gamma", "lnorm", "lnorm", "gamma")
@@ -557,6 +556,51 @@ setHerbivoryDistFit <- function(obj, compute = FALSE, update = TRUE) {
     }
   
   obj$pars$munched.fit <- munched.fit
+  
+  return(obj)
+}
+
+setBudlingsPerStemFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
+  if (!file.exists("../../data/calculated/budlingsPerStemFit.RData") | (compute)) {  
+    data_gp <- obj$data %>% group_by(year, transect) %>% 
+                            summarize(N_seedlings = sum(seedling, na.rm=T), 
+                                      N_total = sum(aliveJune, na.rm=T), 
+                                      N_budlings = N_total - N_seedlings,
+                                      log_herb_mean = mean(log_herb_avg, na.rm=T),
+                                      site = first(site))
+    
+    data13_14 <- data_gp %>% filter(year %in% 2013:2014) %>% 
+                             group_by(transect) %>% 
+                             summarize(bdlgs_per_stem = last(N_budlings)/first(N_total),
+                                       log_herb_mean = first(log_herb_mean),
+                                       site = first(site))
+    
+    data14_15 <- data_gp %>% filter(year %in% 2014:2015 & transect != 70) %>%
+                             group_by(transect) %>% 
+                             summarize(bdlgs_per_stem = last(N_budlings)/first(N_total),
+                                       log_herb_mean = first(log_herb_mean),
+                                       site = first(site))
+    
+    fulldat <- bind_rows(data13_14, data14_15)
+
+    merged <- fulldat %>% group_by(transect) %>% 
+                          summarize(log_herb_mean = mean(log_herb_mean),
+                                    bdlgs_per_stem = mean(bdlgs_per_stem),
+                                    site = first(site))
+    
+    cat("Calculating budlings per stem fit...")
+    exp.model <- lm(log(bdlgs_per_stem) ~ log_herb_mean, data=merged)
+    cat("done!\n")
+
+    budlings.per.stem.fit <- exp.model
+    budlings.per.stem.fit$site <- merged$site
+    
+    save(budlings.per.stem.fit, file = "../../data/calculated/budlingsPerStemFit.RData")
+  } else {
+    load("../../data/calculated/budlingsPerStemFit.RData")
+  }
+  
+  obj$pars$budlings.per.stem.fit <- budlings.per.stem.fit
   
   return(obj)
 }
