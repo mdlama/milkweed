@@ -6,6 +6,7 @@ setPars <- function(x) UseMethod("setPars")
 
 # Constants
 setSeedsPerPodConst <- function(obj, compute, update) UseMethod("setSeedsPerPodConst")
+setSeedlingEmergenceConst <- function(obj, compute, update) UseMethod("setSeedlingEmergenceConst")
 
 # Perform fits
 
@@ -152,14 +153,13 @@ setPars.mwIPM <- function(obj, update = TRUE) {
   # The future is now.  Moving these to proper location.
 
   attach("../../data/calculated/budlingsPerStemFit.RData", warn.conflicts = FALSE)
-  attach("../../data/calculated/seedlingEmergence.RData", warn.conflicts = FALSE)
 
   obj$pars <- list(budlings.per.stem.fit = budlings.per.stem.fit,
-                   seedling.emergence = seedling.emergence,
                    dist.herb = NA)
   
   compute = FALSE
   obj <- obj %>% setSeedsPerPodConst(compute = compute, update = FALSE) %>%
+                 setSeedlingEmergenceConst(compute = compute, update = FALSE) %>%
                  setFloweringFit(compute = compute, update = FALSE) %>% 
                  setSurvivalFit(compute = compute, update = FALSE) %>%
                  setGrowthFit(compute = compute, update = FALSE) %>%
@@ -169,7 +169,6 @@ setPars.mwIPM <- function(obj, update = TRUE) {
                  setHerbivoryDistFit(compute = compute, update = FALSE)
 
   detach("file:../../data/calculated/budlingsPerStemFit.RData")
-  detach("file:../../data/calculated/seedlingEmergence.RData")
 
   if (update) {
     obj <- setFloweringMatrix(obj)
@@ -199,6 +198,53 @@ setSeedsPerPodConst.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
   obj$pars$seeds.per.pod <- seeds.per.pod
     
   return(obj)
+}
+
+setSeedlingEmergenceConst.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
+  if (!file.exists("../../data/calculated/seedlingEmergenceConst.RData") | (compute)) {  
+    sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
+    seedling.emergence <- rep(NA, 6)
+    names(seedling.emergence) <- sites
+    
+    # Need seeds per pod, so compute if needed
+    if (is.na(obj$pars$seeds.per.pod)) {
+      cat("Need seeds per pod to compute seedling emergence.  Loading now...")
+      obj <- setSeedsPerPod(obj)
+      cat("done!\n")
+    }
+    seeds.per.pod <- obj$pars$seeds.per.pod
+    
+    # Bertha
+    data_gp <- obj$data %>% group_by(year) %>% summarize(N_seedlings = sum(seedling, na.rm=T), 
+                                                         N_seeds = seeds.per.pod*sum(N_pods, na.rm=T))
+    
+    seedling.emergence[1] <- mean(data_gp$N_seedlings[2:3]/data_gp$N_seeds[1:2])
+    
+    # Sites
+    data_gp <- obj$data %>% group_by(year, site) %>% 
+                            summarize(N_seedlings = sum(seedling, na.rm=T), 
+                                      N_seeds = seeds.per.pod*sum(N_pods, na.rm=T))
+    
+    data13_14 <- data_gp %>% filter(year %in% 2013:2014) %>% 
+                             group_by(site) %>% 
+                             summarize(emergence = last(N_seedlings)/first(N_seeds))
+
+    data14_15 <- data_gp %>% filter(year %in% 2014:2015) %>% 
+                             group_by(site) %>% 
+                             summarize(emergence = last(N_seedlings)/first(N_seeds))
+    
+    fulldat <- bind_rows(data13_14, data14_15)
+    
+    seedling.emergence[2:6] <- (fulldat %>% group_by(site) %>% summarize(emergence = mean(emergence)))$emergence
+    
+    save(seedling.emergence, file = "../../data/calculated/seedlingEmergenceConst.RData")
+  } else {
+    load("../../data/calculated/seedlingEmergenceConst.RData")
+  }
+  
+  obj$pars$seedling.emergence <- seedling.emergence
+  
+  return(obj)  
 }
 
 # Fits ------------------------------
