@@ -39,9 +39,9 @@ computeMPM <- function(x) UseMethod("computeMPM")
 # Analyze growth rate
 analyzeGrowthRate <- function(x) UseMethod("analyzeGrowthRate")
 
-# Views
-viewBudlingDistFit <- function(obj) UseMethod("viewBudlingDistFit")
-viewHerbivoryDistFit <- function(obj) UseMethod("viewHerbivoryDistFit")
+# Renderers
+renderBudlingDistFit <- function(obj) UseMethod("renderBudlingDistFit")
+renderHerbivoryDistFit <- function(obj) UseMethod("renderHerbivoryDistFit")
 
 glmerCtrl <- glmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
 
@@ -657,7 +657,6 @@ computeClonalKernel.mwIPM <- function(obj) {
   return(obj)
 }
 
-## Full kernel
 computeFullKernel.mwIPM <- function(obj) {
   obj$kernels$K <- obj$kernels$Ks + obj$kernels$Kc
   # image.plot(h_apical, h_apical, t(K), col=topo.colors(100))
@@ -697,9 +696,9 @@ analyzeGrowthRate.mwIPM <- function(obj) {
   return(Re(eigen(obj$kernels$K)$values[1]))
 }
 
-# Views ------------------------------
+# Renderers ------------------------------
 
-viewBudlingDistFit <- function(obj) {
+renderBudlingDistFit.mwIPM <- function(obj) {
   attach(obj$pars, warn.conflicts = FALSE)
   attach(obj$vars$h_apical, warn.conflicts = FALSE)
 
@@ -764,7 +763,7 @@ viewBudlingDistFit <- function(obj) {
   return(pb)
 }
 
-viewHerbivoryDistFit <- function(obj) {
+renderHerbivoryDistFit.mwIPM <- function(obj) {
   attach(obj$pars, warn.conflicts = FALSE)
   attach(obj$vars$log_herb_avg, warn.conflicts = FALSE)
   
