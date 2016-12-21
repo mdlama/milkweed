@@ -1,3 +1,11 @@
+# Dependencies ----------------------
+
+library(dplyr)
+library(ggplot2)
+library(fitdistrplus)
+library(lme4)
+source("../../includes/mwMod.R")
+
 # Declarations ----------------------
 
 # Setup generic functions
@@ -37,8 +45,9 @@ computeSexualKernel <- function(x) UseMethod("computeSexualKernel")
 computeClonalKernel <- function(x) UseMethod("computeClonalKernel")
 computeFullKernel <- function(x) UseMethod("computeFullKernel")
 
-# Compute MPM
+# Setup or compute MPM/IPM
 computeMPM <- function(x) UseMethod("computeMPM")
+setSite <- function(obj, site) UseMethod("setSite")
 
 # Analyze growth rate
 analyzeGrowthRate <- function(x) UseMethod("analyzeGrowthRate")
@@ -187,7 +196,9 @@ setSeedsPerPodConst.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
   if (!file.exists("../../data/calculated/seedsPerPodConst.RData") | (compute)) {
     seeds_per_pod_data <- read.csv("../../data/seeddata.csv")
     
+    cat("Computing seeds per pod constant...")
     seeds.per.pod = mean(seeds_per_pod_data$total_seed)
+    cat("done!\n")
     
     save(seeds.per.pod, file = "../../data/calculated/seedsPerPodConst.RData")
   } else {
@@ -214,6 +225,7 @@ setSeedlingEmergenceConst.mwIPM <- function(obj, compute = FALSE, update = TRUE)
     seeds.per.pod <- obj$pars$seeds.per.pod
     
     # Bertha
+    cat("Computing seedling emergence constants...")
     data_gp <- obj$data %>% group_by(year) %>% summarize(N_seedlings = sum(seedling, na.rm=T), 
                                                          N_seeds = seeds.per.pod*sum(N_pods, na.rm=T))
     
@@ -235,6 +247,7 @@ setSeedlingEmergenceConst.mwIPM <- function(obj, compute = FALSE, update = TRUE)
     fulldat <- bind_rows(data13_14, data14_15)
     
     seedling.emergence[2:6] <- (fulldat %>% group_by(site) %>% summarize(emergence = mean(emergence)))$emergence
+    cat("done!\n")
     
     save(seedling.emergence, file = "../../data/calculated/seedlingEmergenceConst.RData")
   } else {
@@ -550,7 +563,7 @@ setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
       names(munched.fit[[i]]) <- c("fit", "pmunch", "predict")
     }
     
-    save(budling.fit, file = "../../data/calculated/herbivoryDistFit.RData")
+    save(munched.fit, file = "../../data/calculated/herbivoryDistFit.RData")
     } else {
       load("../../data/calculated/herbivoryDistFit.RData")
     }
@@ -756,6 +769,20 @@ computeFullKernel.mwIPM <- function(obj) {
 }
 
 # Analysis ------------------------------
+
+setSite.mwIPM <- function(obj, site = "Bertha") {
+  if ((site != obj$site) && (site %in% c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB"))) {
+    obj$site <- site
+    obj <- setFloweringMatrix(obj) %>% 
+           setSurvivalMatrix(obj) %>% 
+           setGrowthMatrix(obj) %>% 
+           setPodsMatrix(obj) %>%
+           setHerbivoryMatrix(obj) %>% 
+           setSeedlingRecruitmentMatrix(obj)
+  }
+  
+  return(obj)
+}
 
 computeMPM.mwIPM <- function(obj) {
   attach(obj$vars, warn.conflicts = FALSE)
