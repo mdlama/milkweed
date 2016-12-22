@@ -1,12 +1,3 @@
-# Dependencies ----------------------
-
-library(dplyr)
-library(ggplot2)
-library(fitdistrplus)
-library(lme4)
-library(scales)
-source("../../includes/mwMod.R")
-
 # Declarations ----------------------
 
 # Setup generic functions
