@@ -4,13 +4,14 @@ library(dplyr)
 library(ggplot2)
 library(fitdistrplus)
 library(lme4)
+library(scales)
 source("../../includes/mwMod.R")
 
 # Declarations ----------------------
 
 # Setup generic functions
-setVars <- function(x) UseMethod("setVars")
-setPars <- function(x) UseMethod("setPars")
+setVars <- function(obj) UseMethod("setVars")
+setPars <- function(obj, update) UseMethod("setPars")
 
 # Constants
 setSeedsPerPodConst <- function(obj, compute, update) UseMethod("setSeedsPerPodConst")
@@ -60,7 +61,7 @@ glmerCtrl <- glmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
 
 # Constructor ----------------------
 
-mwIPM <- function(x) {
+mwIPM <- function(x = list()) {
   #
   # Specify min and max of variables in list form.
   #
@@ -72,26 +73,27 @@ mwIPM <- function(x) {
   }
   if (all(names(x) != "site")) {
     site = "Bertha"
+    x$site <- NA
   } else if (!(site %in% c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB"))) {
     stop(paste(site, "is not a valid site!  Please choose one of Bertha, BLD1, BLD2, PWR, SKY, or YTB."))
   }
   
   x <- append(x, list(data_orig = data,
-                      vars = list(h_apical = append(h_apical, list(min = NA,
-                                                                   max = NA,
-                                                                   b = NA,
-                                                                   x = NA,
-                                                                   dx = NA)),
-                                  h_apical.next = append(h_apical.next, list(min = NA,
-                                                                             max = NA,
-                                                                             b = NA,
-                                                                             x = NA,
-                                                                             dx = NA)),
-                                  log_herb_avg = append(log_herb_avg, list(min = NA,
-                                                                           max = NA,
-                                                                           b = NA,
-                                                                           x = NA,
-                                                                           dx = NA))),
+                      vars = list(h_apical = list(min = NA,
+                                                  max = NA,
+                                                  b = NA,
+                                                  x = NA,
+                                                  dx = NA),
+                                  h_apical.next = list(min = NA,
+                                                       max = NA,
+                                                       b = NA,
+                                                       x = NA,
+                                                       dx = NA),
+                                  log_herb_avg = list(min = NA,
+                                                      max = NA,
+                                                      b = NA,
+                                                      x = NA,
+                                                      dx = NA)),
                       pars = list(flower.fit = NA,
                                   growth.fit = NA,
                                   surv.fit = NA,
@@ -114,41 +116,41 @@ mwIPM <- function(x) {
                       MPM = NA))
   
   y <- structure(x, class = "mwIPM") %>% 
-       setPars(y) %>% 
+       setPars(update = FALSE) %>% 
        setSite(site = site) %>%
-       computeMPM(y)
+       computeMPM()
   
   return(y)
 }
 
 # Vars & Pars ----------------------
 
-setVars.mwIPM <- function (obj, update = TRUE) {
+setVars.mwIPM <- function (obj) {
   N <- obj$N
   
   if (obj$site != "Bertha") {
     data <- obj$data %>% filter(site == obj$site)
   }
-  data <- data %>% summarize(max_h_apical = max(h_apical, na.rm=T),
+  data <- obj$data %>% summarize(max_h_apical = max(h_apical, na.rm=T),
                              max_h_apical.next = max(h_apical.next, na.rm=T))
   
   # h_apical
   h_apical <- list(min = 0,
-                   max = 1.1*max_h_apical)
+                   max = 1.1*data$max_h_apical)
   h_apical$b = h_apical$min + c(0:N)*(h_apical$max - h_apical$min)/N # boundary points
   h_apical$x = 0.5*(h_apical$b[1:N]+h_apical$b[2:(N+1)])
   h_apical$dx = h_apical$b[2]-h_apical$b[1] # class size
   
   # h_apical.next
-  obj$vars$h_apical.next <- list(min = 0,
-                                 max = 1.3*max_h_apical.next)
+  h_apical.next <- list(min = 0,
+                        max = 1.3*data$max_h_apical.next)
   h_apical.next$b = h_apical.next$min + c(0:N)*(h_apical.next$max - h_apical.next$min)/N # boundary points
   h_apical.next$x = 0.5*(h_apical.next$b[1:N]+h_apical.next$b[2:(N+1)])
   h_apical.next$dx = h_apical.next$b[2] - h_apical.next$b[1] # class size
   
   # log_herb_avg
-  obj$vars$log_herb_avg <- list(min = log(0.1),
-                                max = log(6.1))
+  log_herb_avg <- list(min = log(0.1),
+                       max = log(6.1))
   log_herb_avg$b = log_herb_avg$min + c(0:N)*(log_herb_avg$max - log_herb_avg$min)/N # boundary points
   log_herb_avg$x = 0.5*(log_herb_avg$b[1:N] + log_herb_avg$b[2:(N+1)])
   log_herb_avg$dx = log_herb_avg$b[2] - log_herb_avg$b[1] # class size
@@ -180,12 +182,12 @@ setPars.mwIPM <- function(obj, update = TRUE) {
                  setHerbivoryDistFit(compute = compute, update = FALSE)
 
   if (update) {
-    obj <- setFloweringMatrix(obj)
-    obj <- setSurvivalMatrix(obj)
-    obj <- setGrowthMatrix(obj)
-    obj <- setPodsMatrix(obj)
-    obj <- setHerbivoryMatrix(obj, update=FALSE)
-    obj <- setSeedlingRecruitmentMatrix(obj)
+    obj <- obj %>% setFloweringMatrix() %>%
+                   setSurvivalMatrix() %>%
+                   setGrowthMatrix() %>%
+                   setPodsMatrix() %>%
+                   setHerbivoryMatrix(update=FALSE) %>%
+                   setSeedlingRecruitmentMatrix()
   }
   
   return(obj)
@@ -772,22 +774,26 @@ computeFullKernel.mwIPM <- function(obj) {
 # Analysis ------------------------------
 
 setSite.mwIPM <- function(obj, site = "Bertha") {
-  if (site != obj$site) {
+  if (is.na(obj$site) | (site != obj$site)) {
     if (site %in% c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")) {
       obj$site <- site
       
       obj <- setVars(obj)
       
-      obj <- setFloweringMatrix(obj) %>% 
-        setSurvivalMatrix(obj) %>% 
-        setGrowthMatrix(obj) %>% 
-        setPodsMatrix(obj) %>%
-        setHerbivoryMatrix(obj, update=FALSE) %>% 
-        setSeedlingRecruitmentMatrix(obj)
+      obj <- obj %>% 
+        setFloweringMatrix() %>% 
+        setSurvivalMatrix() %>% 
+        setGrowthMatrix() %>% 
+        setPodsMatrix() %>%
+        setHerbivoryMatrix(update=FALSE) %>% 
+        setSeedlingRecruitmentMatrix()
       
-      obj <- computeSexualKernel(obj) %>% 
-        computeClonalKernel(obj) %>%
-        computeFullKernel(obj)
+      obj <- obj %>%
+        computeSexualKernel() %>% 
+        computeClonalKernel() %>%
+        computeFullKernel()
+      
+      obj <- computeMPM(obj)
     } else {
       stop(paste(site, "is not a valid site!  Please choose one of Bertha, BLD1, BLD2, PWR, SKY, or YTB."))
     }
