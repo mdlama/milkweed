@@ -45,6 +45,7 @@ setSite <- function(obj, site) UseMethod("setSite")
 analyzeGrowthRate <- function(x) UseMethod("analyzeGrowthRate")
 
 # Renderers
+renderFloweringFit <- function(obj) UseMethod("renderFloweringFit") 
 renderBudlingDistFit <- function(obj) UseMethod("renderBudlingDistFit")
 renderHerbivoryDistFit <- function(obj) UseMethod("renderHerbivoryDistFit")
 
@@ -57,7 +58,7 @@ mwIPM <- function(x = list()) {
   # Specify min and max of variables in list form.
   #
   if (all(names(x) != "data")) {
-    x$data <- read.csv("../../data/stemdata.csv")
+    x$data <- read.csv(mwROOT("data","stemdata.csv"))
   }
   if (all(names(x) != "N")) {
     x$N = 50
@@ -187,16 +188,16 @@ setPars.mwIPM <- function(obj, update = TRUE) {
 # Constants ------------------------------
 
 setSeedsPerPodConst.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
-  if (!file.exists("../../data/calculated/seedsPerPodConst.RData") | (compute)) {
-    seeds_per_pod_data <- read.csv("../../data/seeddata.csv")
+  if (!file.exists(mwROOT("data","calculated","seedsPerPodConst.RData")) | (compute)) {
+    seeds_per_pod_data <- read.csv(mwROOT("data","seeddata.csv"))
     
     cat("Computing seeds per pod constant...")
     seeds.per.pod = mean(seeds_per_pod_data$total_seed)
     cat("done!\n")
     
-    save(seeds.per.pod, file = "../../data/calculated/seedsPerPodConst.RData")
+    save(seeds.per.pod, file = mwROOT("data","calculated","seedsPerPodConst.RData"))
   } else {
-    load("../../data/calculated/seedsPerPodConst.RData")
+    load(mwROOT("data","calculated","seedsPerPodConst.RData"))
   }
   
   obj$pars$seeds.per.pod <- seeds.per.pod
@@ -205,7 +206,7 @@ setSeedsPerPodConst.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
 }
 
 setSeedlingEmergenceConst.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
-  if (!file.exists("../../data/calculated/seedlingEmergenceConst.RData") | (compute)) {  
+  if (!file.exists(mwROOT("data","calculated","seedlingEmergenceConst.RData")) | (compute)) {  
     sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
     seedling.emergence <- rep(NA, 6)
     names(seedling.emergence) <- sites
@@ -243,9 +244,9 @@ setSeedlingEmergenceConst.mwIPM <- function(obj, compute = FALSE, update = TRUE)
     seedling.emergence[2:6] <- (fulldat %>% group_by(site) %>% summarize(emergence = mean(emergence)))$emergence
     cat("done!\n")
     
-    save(seedling.emergence, file = "../../data/calculated/seedlingEmergenceConst.RData")
+    save(seedling.emergence, file = mwROOT("data","calculated","seedlingEmergenceConst.RData"))
   } else {
-    load("../../data/calculated/seedlingEmergenceConst.RData")
+    load(mwROOT("data","calculated","seedlingEmergenceConst.RData"))
   }
   
   obj$pars$seedling.emergence <- seedling.emergence
@@ -257,7 +258,7 @@ setSeedlingEmergenceConst.mwIPM <- function(obj, compute = FALSE, update = TRUE)
 
 ## Vital rates
 setFloweringFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
-  if (!file.exists("../../data/calculated/flowerFit.RData") | (compute)) {
+  if (!file.exists(mwROOT("data","calculated","flowerFit.RData")) | (compute)) {
     metadata_usc <- metadata %>% filter(!is.na(h_apical),
                                         !is.na(h_apical.next),
                                         !is.na(herb_avg),
@@ -281,9 +282,9 @@ setFloweringFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
     cat("Checking parameters:\n")
     checkPars(flower.fit)
   
-    save(flower.fit, file = "../../data/calculated/flowerFit.RData")
+    save(flower.fit, file = mwROOT("data","calculated","flowerFit.RData"))
   } else {
-    load("../../data/calculated/flowerFit.RData")
+    load(mwROOT("data","calculated","flowerFit.RData"))
   }
   
   obj$pars$flower.fit <- flower.fit
@@ -292,7 +293,7 @@ setFloweringFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
 }
 
 setSurvivalFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
-  if (!file.exists("../../data/calculated/survivalFit.RData") | (compute)) {
+  if (!file.exists(mwROOT("data","calculated","survivalFit.RData")) | (compute)) {
     metadata_usc <- obj$data %>% filter(!is.na(h_apical),
                                         !is.na(h_apical.next),
                                         !is.na(herb_avg),
@@ -316,9 +317,9 @@ setSurvivalFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
     cat("Checking parameters:\n")
     checkPars(surv.fit)
     
-    save(surv.fit, file = "../../data/calculated/survivalFit.RData")
+    save(surv.fit, file = mwROOT("data","calculated","survivalFit.RData"))
   } else {
-    load("../../data/calculated/survivalFit.RData")
+    load(mwROOT("data","calculated","survivalFit.RData"))
   }
   
   obj$pars$surv.fit <- surv.fit
@@ -327,7 +328,7 @@ setSurvivalFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
 }
 
 setGrowthFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
-  if (!file.exists("../../data/calculated/growthFit.RData") | (compute)) {
+  if (!file.exists(mwROOT("data","calculated","growthFit.RData")) | (compute)) {
     # We only want stems that flowered and survived
     metadata_usc <- obj$data %>% filter(!is.na(h_apical),
                                         !is.na(h_apical.next),
@@ -354,9 +355,9 @@ setGrowthFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
     cat("Checking parameters:\n")
     checkPars(growth.fit)
     
-    save(growth.fit, file = "../../data/calculated/growthFit.RData")
+    save(growth.fit, file = mwROOT("data","calculated","growthFit.RData"))
   } else {
-    load("../../data/calculated/growthFit.RData")
+    load(mwROOT("data","calculated","growthFit.RData"))
   }
   
   obj$pars$growth.fit <- growth.fit
@@ -365,7 +366,7 @@ setGrowthFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
 }
 
 setPodsFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
-  if (!file.exists("../../data/calculated/podsFit.RData") | (compute)) {
+  if (!file.exists(mwROOT("data","calculated","podsFit.RData")) | (compute)) {
     # We only want stems that flowered, survived and have data for pods
     metadata_usc <- obj$data %>% filter(!is.na(h_apical),
                                         !is.na(h_apical.next),
@@ -392,9 +393,9 @@ setPodsFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
     cat("Checking parameters:\n")
     checkPars(pods.fit)
     
-    save(pods.fit, file = "../../data/calculated/podsFit.RData")
+    save(pods.fit, file = mwROOT("data","calculated","podsFit.RData"))
   } else {
-    load("../../data/calculated/podsFit.RData")
+    load(mwROOT("data","calculated","podsFit.RData"))
   }
   
   obj$pars$pods.fit <- pods.fit
@@ -404,7 +405,7 @@ setPodsFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
 
 ## Distributions
 setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
-  if (!file.exists("../../data/calculated/seedlingDistFit.RData") | (compute)) {
+  if (!file.exists(mwROOT("data","calculated","seedlingDistFit.RData")) | (compute)) {
     h_apical <- (obj$data %>% filter(seedling == 1))$h_apical
     
     cat("Computing seedling distribution fit...")
@@ -434,9 +435,9 @@ setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
     ))
     names(seedling.fit) <- c("fit", "predict")
     
-    save(seedling.fit, file = "../../data/calculated/seedlingDistFit.RData")
+    save(seedling.fit, file = mwROOT("data","calculated","seedlingDistFit.RData"))
   } else {
-    load("../../data/calculated/seedlingDistFit.RData")
+    load(mwROOT("data","calculated","seedlingDistFit.RData"))
   }
   
   obj$pars$seedling.fit <- seedling.fit
@@ -445,7 +446,7 @@ setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
 }
 
 setBudlingDistFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
-  if (!file.exists("../../data/calculated/budlingDistFit.RData") | (compute)) {
+  if (!file.exists(mwROOT("data","calculated","budlingDistFit.RData")) | (compute)) {
     sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
     mdls <- c("norm", "weibull", "norm", "weibull", "gamma", "lnorm")
     budling.fit <- vector('list', 6)
@@ -490,9 +491,9 @@ setBudlingDistFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
       names(budling.fit[[i]]) <- c("fit", "predict")
     }
     
-    save(budling.fit, file = "../../data/calculated/budlingDistFit.RData")
+    save(budling.fit, file = mwROOT("data","calculated","budlingDistFit.RData"))
 } else {
-  load("../../data/calculated/budlingDistFit.RData")
+  load(mwROOT("data","calculated","budlingDistFit.RData"))
 }
   
   obj$pars$budling.fit <- budling.fit
@@ -501,7 +502,7 @@ setBudlingDistFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
 }
 
 setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
-  if (!file.exists("../../data/calculated/herbivoryDistFit.RData") | (compute)) {
+  if (!file.exists(mwROOT("data","calculated","herbivoryDistFit.RData")) | (compute)) {
     sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
     mdls <- c("lnorm", "lnorm", "gamma", "lnorm", "lnorm", "gamma")
     munched.fit <- vector('list', 6)
@@ -557,9 +558,9 @@ setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
       names(munched.fit[[i]]) <- c("fit", "pmunch", "predict")
     }
     
-    save(munched.fit, file = "../../data/calculated/herbivoryDistFit.RData")
+    save(munched.fit, file = mwROOT("data","calculated","herbivoryDistFit.RData"))
     } else {
-      load("../../data/calculated/herbivoryDistFit.RData")
+      load(mwROOT("data","calculated","herbivoryDistFit.RData"))
     }
   
   obj$pars$munched.fit <- munched.fit
@@ -568,7 +569,7 @@ setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
 }
 
 setBudlingsPerStemFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
-  if (!file.exists("../../data/calculated/budlingsPerStemFit.RData") | (compute)) {  
+  if (!file.exists(mwROOT("data","calculated","budlingsPerStemFit.RData")) | (compute)) {  
     data_gp <- obj$data %>% group_by(year, transect) %>% 
                             summarize(N_seedlings = sum(seedling, na.rm=T), 
                                       N_total = sum(aliveJune, na.rm=T), 
@@ -602,9 +603,9 @@ setBudlingsPerStemFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
     budlings.per.stem.fit <- exp.model
     budlings.per.stem.fit$site <- merged$site
     
-    save(budlings.per.stem.fit, file = "../../data/calculated/budlingsPerStemFit.RData")
+    save(budlings.per.stem.fit, file = mwROOT("data","calculated","budlingsPerStemFit.RData"))
   } else {
-    load("../../data/calculated/budlingsPerStemFit.RData")
+    load(mwROOT("data","calculated","budlingsPerStemFit.RData"))
   }
   
   obj$pars$budlings.per.stem.fit <- budlings.per.stem.fit
@@ -825,6 +826,96 @@ analyzeGrowthRate.mwIPM <- function(obj) {
 }
 
 # Renderers ------------------------------
+
+renderFloweringFit.mwIPM <- function(obj) {
+  attach(obj$pars, warn.conflicts = FALSE)
+  attach(obj$vars, warn.conflicts = FALSE)
+  
+  ## Top (heatmap)
+  M <- mesh(h_apical$x, log_herb_avg$x)
+  plotdata <- tbl_df(data.frame(h_apical = as.vector(M$x),
+                                log_herb_avg = as.vector(M$y)))
+  z <- predict(flower.fit, 
+               newdata=data.frame(h_apical = as.vector(M$x),
+                                  log_herb_avg = as.vector(M$y)),
+               type="Bertha")
+  plotdata <- plotdata %>% mutate(prob.flower = z) 
+  
+  # Heatmap
+  imgt <- ggplot(plotdata, aes(x = h_apical, y = log_herb_avg, z = prob.flower)) +
+    geom_raster(aes(fill = prob.flower)) +
+    geom_contour(colour = "white", alpha = 0.8) + 
+    scale_fill_gradientn("Flowering\nProbability", 
+                         colours=c("#00000000","#BBBBBBBB"),
+                         limits=c(0, 1))
+  
+  imgt <- imgt + theme(axis.line = element_blank()) + 
+    scale_x_continuous(limits = c(0, h_apical$max), expand = c(0, 0)) + 
+    scale_y_continuous(limits = c(log_herb_avg$min, log_herb_avg$max), expand = c(0, 0)) +
+    ylab("Log(Herbivory)")
+  
+  # Add lines
+  herb_ex <- data.frame(yintercept = c(log(0.1), mean(obj$data$log_herb_avg, na.rm=T), log(6.1)))
+  
+  imgt <- imgt + geom_hline(aes(yintercept = yintercept),
+                          data = herb_ex,
+                          linetype = c(1, 2, 5),
+                          col = brewer.pal(5, "YlOrRd")[2:4],
+                          size=1)
+  
+  # Move over a bit to match panel (b) below
+  imgt <- imgt + 
+    theme(axis.text.x = element_blank(),
+          axis.title.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          plot.title = element_text(hjust = 0,
+                                    margin=margin(b = 15, unit = "pt")))
+
+  ## Bottom (curves)
+  min <- data.frame(h_apical = h_apical$x, 
+                    prob.flower = predict(flower.fit, 
+                                          newdata=data.frame(h_apical = h_apical$x, 
+                                                             log_herb_avg = herb_ex[1,1]), 
+                                          type="Bertha"),
+                    Herbivory = "min")
+  avg <- data.frame(h_apical = h_apical$x, 
+                    prob.flower = predict(flower.fit, 
+                                          newdata=data.frame(h_apical = h_apical$x,
+                                                             log_herb_avg = herb_ex[2,1]),
+                                          type="Bertha"),
+                    Herbivory = "avg")
+  max <- data.frame(h_apical = h_apical$x, 
+                    prob.flower = predict(flower.fit, 
+                                          newdata=data.frame(h_apical = h_apical$x, 
+                                                             log_herb_avg = herb_ex[3,1]),
+                                          type="Bertha"),
+                    Herbivory = "max")
+  
+  mycurves <- rbind(min, avg, max) 
+  mycurves$Herbivory <- as.factor(mycurves$Herbivory)
+  
+  imgb <- ggplot(mycurves, aes(x = h_apical, y = prob.flower, col = Herbivory, linetype = Herbivory)) +
+    geom_line(size = 1.0) + 
+    scale_x_continuous(limits = c(0, h_apical$max), expand = c(0, 0)) + 
+    scale_color_manual(values = brewer.pal(5, "YlOrRd")[2:4]) +
+    xlab("Apical Height (cm)") +
+    ylab("Flowering Probability")     
+  
+  imgb <- imgb + theme(legend.position = "none")
+  
+  gt <- ggplotGrob(imgt)
+  gb <- ggplotGrob(imgb)
+  gb <- gtable_add_cols(gb, unit(1, "mm"))
+  g <- rbind(gt, gb, size="first")
+  g$widths <- unit.pmax(gt$widths, gb$widths)
+  
+  img <- grid.arrange(g)
+  
+  detach(obj$pars)
+  detach(obj$vars$h_apical)
+  
+  return(img)
+}
 
 renderBudlingDistFit.mwIPM <- function(obj) {
   attach(obj$pars, warn.conflicts = FALSE)

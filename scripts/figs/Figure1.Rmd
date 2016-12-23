@@ -6,13 +6,12 @@ output:
     toc: true
 ---
 
-Load the Milkweed Model class.
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-source("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/mwMod.R")
-load("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/vitalFits.RData")
+source("../../.Rprofile")
+ipm <- mwIPM()
 ```
 
-```{r, echo=FALSE, warning=FALSE, message=FALSE}
+```{r, eval=FALSE, echo=FALSE, warning=FALSE, message=FALSE}
 library(dplyr)
 library(lme4)
 library(plot3D) # For mesh function
@@ -27,113 +26,7 @@ library(gridExtra)
 
 Let's prepare the data we will use for all vital rates.
 
-## Exploratory
-
 ### Flowering
-
-```{r, echo=FALSE}
-vital.fit <- flower.fit
-
-mydata <- tbl_df(data.frame(h_apical = rep(as.vector(M$x), 6),
-                            log_herb_avg = rep(as.vector(M$y), 6)))
-z <- rep(0, nrow(mydata))
-for (i in 1:6) {
-  z[(1+100*100*(i-1)):(100*100*i)] <- predict(vital.fit, 
-                                              newdata=data.frame(h_apical = as.vector(M$x),
-                                                                 log_herb_avg = as.vector(M$y)),
-                                              type=rownames(vital.fit$pars$scaled)[i])
-}
-mydata <- mydata %>% mutate(prob.flower = z) 
-mydata$site <- rep(rownames(vital.fit$pars$scaled), each=100*100)
-
-mydata %>% ggplot(aes(x = h_apical, y = log_herb_avg, z = prob.flower)) +
-  geom_raster(aes(fill = prob.flower)) +
-  geom_contour(colour = "white") + 
-  facet_grid(site ~ .)
-```
-
-```
-fec.flower ~ h_apical*log_herb_avg + (1 | site/transect) + (h_apical + log_herb_avg | year)
-```
-
-```{r, echo=FALSE}
-flower.fit$pars$unscaled
-```
-
-### Survival
-
-Visualization doesn't really help us here.
-
-```{r, echo=FALSE}
-formula(surv.fit$mdl)
-surv.fit$pars$unscaled
-```
-
-### Growth
-
-```{r, echo=FALSE}
-vital.fit <- growth.fit
-
-mydata <- tbl_df(data.frame(h_apical = rep(as.vector(M$x), 6),
-                            log_herb_avg = rep(as.vector(M$y), 6)))
-z <- rep(0, nrow(mydata))
-for (i in 1:6) {
-  z[(1+100*100*(i-1)):(100*100*i)] <- predict(vital.fit, 
-                                              newdata=data.frame(h_apical = as.vector(M$x),
-                                                                 log_herb_avg = as.vector(M$y)),
-                                              type=rownames(vital.fit$pars$scaled)[i])
-}
-mydata <- mydata %>% mutate(h_apical.next = z) 
-mydata$site <- rep(rownames(vital.fit$pars$scaled), each=100*100)
-
-mydata %>% ggplot(aes(x = h_apical, y = log_herb_avg, z = h_apical.next)) +
-  geom_raster(aes(fill = h_apical.next)) +
-  geom_contour(colour = "white") + 
-  facet_grid(site ~ .)
-```
-
-```
-h_apical.next ~ h_apical*log_herb_avg + (h_apical + log_herb_avg | site/transect) + (h_apical | year)
-```
-
-```{r, echo=FALSE}
-growth.fit$pars$unscaled
-```
-
-### Pods
-
-```{r, echo=FALSE}
-vital.fit <- pods.fit
-
-mydata <- tbl_df(data.frame(h_apical.next = rep(as.vector(M$x), 6),
-                            log_herb_avg = rep(as.vector(M$y), 6)))
-z <- rep(0, nrow(mydata))
-for (i in 1:6) {
-  z[(1+100*100*(i-1)):(100*100*i)] <- predict(vital.fit, 
-                                              newdata=data.frame(h_apical.next = as.vector(M$x),
-                                                                 log_herb_avg = as.vector(M$y)),
-                                              type=rownames(vital.fit$pars$scaled)[i])
-}
-mydata <- mydata %>% mutate(log_N_pods = log(z)) 
-mydata$site <- rep(rownames(vital.fit$pars$scaled), each=100*100)
-
-mydata %>% ggplot(aes(x = h_apical.next, y = log_herb_avg, z = log_N_pods)) +
-  geom_raster(aes(fill = log_N_pods)) +
-  geom_contour(colour = "white") + 
-  facet_grid(site ~ .)
-```
-
-```
-N_pods ~ h_apical.next + log_herb_avg + (h_apical.next + log_herb_avg | site/transect) + (h_apical.next + log_herb_avg | year)
-```
-
-```{r, echo=FALSE}
-pods.fit$pars$unscaled
-```
-
-## Final
-
-### Flowering [Panel (a)]
 
 Load the aggregate data set & necessary packages
 ```{r}
