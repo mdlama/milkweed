@@ -8,50 +8,29 @@ output:
 # Initialization
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-library(dplyr)
-library(tidyr)
-library(lme4)
-library(plot3D) # For mesh function
-library(ggplot2)
-library(grid)
-library(RColorBrewer)
-library(scales)
-library(gtable)
-library(gridExtra)
-```
-
-```{r}
-source("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/mwMod.R")
-source("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/mwIPM.R")
+source("../../.Rprofile")
 ```
 
 Load and filter data.
 ```{r}
-metadata=tbl_df(read.csv("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/Milkweed/DATA SETS/Data Frames/metadata13to15.csv"))
-
-# Where there was a plant in June and NA for height in Sept, make surv 0
-metadata <- metadata %>% mutate(surv = ifelse(is.na(surv) & is.na(h_apical.next) & !is.na(h_apical), 0, surv), 
-                                munched = ifelse(herb_avg > 0, 1, 0),
-                                log_herb_avg = log(0.1+herb_avg),
-                                h_apical.next > 50,
-                                !(site == "YTB" & h_apical <= 50)) %>%
-  filter(site == site)
+metadata=tbl_df(read.csv(MWROOT("data","stemdata.csv")))
 ```
 
 ```{r}
 compute <- TRUE
 sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
 
+ipm <- mwIPM()
 if (compute) {
   plotdata <- data.frame()
   for (i in 1:length(sites)) {
-    ipm <- mwIPM(list(data = metadata, N = 50, site = sites[i]))
+    ipm <- ipm %>% setSite(sites[i])
     plotdata <- rbind(plotdata, data.frame(log_herb_avg = ipm$vars$log_herb_avg$x,
-                                           growth_rate = sapply(1:ipm$N, function (x) { ipm %>% setHerbivory(dist.herb = c(rep(0,x-1), 1/ipm$vars$log_herb_avg$dx, rep(0,ipm$N-x))) %>% analyzeGrowthRate() }), site = sites[i]))
+                                           growth_rate = sapply(1:ipm$N, function (x) { ipm %>% setHerbivoryMatrix(dist.herb = c(rep(0,x-1), 1/ipm$vars$log_herb_avg$dx, rep(0,ipm$N-x))) %>% analyzeGrowthRate() }), site = sites[i]))
   }
-  save(plotdata, file="~/Google Drive/Project :: ipmwam/Papers/SivansPaper/Figures/Figure 5/plotdata.RData")
+  save(plotdata, file=MWROOT("data","calculated","figure5.RData"))
 } else {
-  load("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/Figures/Figure 5/plotdata.RData")
+  load(MWROOT("data","calculated","figure5.RData"))
 }
 plotdata <- rbind(plotdata, data.frame(log_herb_avg = ipm$vars$log_herb_avg$x,
                                        growth_rate = exp(predict(ipm$pars$budlings.per.stem.fit, new = data.frame(log_herb_mean = ipm$vars$log_herb_avg$x))),
@@ -109,5 +88,5 @@ p
 Save figure.
 
 ```{r}
-ggsave("../Figure5.png", height=4, width=6, device = "png", p)
+# ggsave("../Figure5.png", height=4, width=6, device = "png", p)
 ```
