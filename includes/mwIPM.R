@@ -121,7 +121,7 @@ setVars.mwIPM <- function (obj) {
   N <- obj$N
   
   if (obj$site != "Bertha") {
-    data <- obj$data %>% filter(site == obj$site)
+    data <- obj$data %>% dplyr::filter(site == obj$site)
   }
   data <- obj$data %>% summarize(max_h_apical = max(h_apical, na.rm=T),
                              max_h_apical.next = max(h_apical.next, na.rm=T))
