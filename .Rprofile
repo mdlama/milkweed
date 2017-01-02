@@ -1,3 +1,4 @@
+library(stats)  # To avoid non-masking of stats filter function.  Need to move to package workflow.
 library(rprojroot)
 library(dplyr)
 library(ggplot2)
