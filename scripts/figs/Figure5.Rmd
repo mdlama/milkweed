@@ -9,28 +9,62 @@ output:
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 source("../../.Rprofile")
-```
-
-Load and filter data.
-```{r}
-metadata=tbl_df(read.csv(MWROOT("data","stemdata.csv")))
+library(doParallel)
 ```
 
 ```{r}
+compute <- FALSE
+
+if (compute) {
+  sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
+  ipm <- mwIPM()
+  plotdata <- data.frame(log_herb_avg = ipm$vars$log_herb_avg$x,
+                         growth_rate = sapply(1:ipm$N, 
+                                              function (x) { 
+                                                ipm %>% 
+                                                  setHerbivoryMatrix(dist.herb = c(rep(0,x-1), 1/ipm$vars$log_herb_avg$dx, rep(0,ipm$N-x))) %>% 
+                                                  analyzeGrowthRate()
+                                              }))
+  
+  cl <- makeCluster(6)
+  registerDoParallel(cl)
+  results <- tbl_df(foreach(i=1:10, .combine=bind_rows) %dopar% {
+    source("../../.Rprofile")
+    ipm %<>% bootIPM()
+    thisone <- ipm$data %>% group_by(site) %>% summarize(log_herb_avg = mean(log_herb_avg, na.rm=T), growth_rate = NA)
+    thisone$growth_rate <- sapply(sites[-1], function (x) {ipm %>% setSite(x) %>% analyzeGrowthRate()})
+    thisone
+  })
+  
+  save(plotdata, results, file=mwROOT("data","calculated","figure5.RData"))
+} else {
+  load(mwROOT("data","calculated","figure5.RData"))
+}
+
+p <- plotdata %>% ggplot(aes(x = log_herb_avg,
+                             y = growth_rate)) +
+                  geom_line()
+
+p <- p + geom_point(aes(x = log_herb_avg, y = growth_rate, color = site), data=results) + stat_ellipse(aes(x = log_herb_avg, y = growth_rate, color = site), data = results)
+```
+
+```{r, eval=F}
 compute <- TRUE
 sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
 
 ipm <- mwIPM()
+plotdata <- data.frame()
+
 if (compute) {
   plotdata <- data.frame()
-  for (i in 1:length(sites)) {
-    ipm <- ipm %>% setSite(sites[i])
+  
+  ipm <- ipm %>% setSite(sites[i])
     plotdata <- rbind(plotdata, data.frame(log_herb_avg = ipm$vars$log_herb_avg$x,
                                            growth_rate = sapply(1:ipm$N, function (x) { ipm %>% setHerbivoryMatrix(dist.herb = c(rep(0,x-1), 1/ipm$vars$log_herb_avg$dx, rep(0,ipm$N-x))) %>% analyzeGrowthRate() }), site = sites[i]))
-  }
-  save(plotdata, file=MWROOT("data","calculated","figure5.RData"))
+    
+  save(plotdata, file=mwROOT("data","calculated","figure5.RData"))
 } else {
-  load(MWROOT("data","calculated","figure5.RData"))
+  load(mwROOT("data","calculated","figure5.RData"))
 }
 plotdata <- rbind(plotdata, data.frame(log_herb_avg = ipm$vars$log_herb_avg$x,
                                        growth_rate = exp(predict(ipm$pars$budlings.per.stem.fit, new = data.frame(log_herb_mean = ipm$vars$log_herb_avg$x))),
