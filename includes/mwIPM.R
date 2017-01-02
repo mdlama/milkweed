@@ -2,27 +2,27 @@
 
 # Setup generic functions
 setVars <- function(obj) UseMethod("setVars")
-setPars <- function(obj, update) UseMethod("setPars")
+setPars <- function(obj, compute, saveresults, update) UseMethod("setPars")
 
 # Constants
-setSeedsPerPodConst <- function(obj, compute, update) UseMethod("setSeedsPerPodConst")
-setSeedlingEmergenceConst <- function(obj, compute, update) UseMethod("setSeedlingEmergenceConst")
+setSeedsPerPodConst <- function(obj, compute, saveresults, update) UseMethod("setSeedsPerPodConst")
+setSeedlingEmergenceConst <- function(obj, compute, saveresults, update) UseMethod("setSeedlingEmergenceConst")
 
 # Perform fits
 
 ## Vital rates
-setFloweringFit <- function(obj, compute, update) UseMethod("setFloweringFit")
-setSurvivalFit <- function(obj, compute, update) UseMethod("setSurvivalFit")
-setGrowthFit <- function(obj, compute, update) UseMethod("setGrowthFit")
-setPodsFit <- function(obj, compute, update) UseMethod("setPodsFit")
+setFloweringFit <- function(obj, compute, saveresults, update) UseMethod("setFloweringFit")
+setSurvivalFit <- function(obj, compute, saveresults, update) UseMethod("setSurvivalFit")
+setGrowthFit <- function(obj, compute, saveresults, update) UseMethod("setGrowthFit")
+setPodsFit <- function(obj, compute, saveresults, update) UseMethod("setPodsFit")
 
 ## Distributions
-setSeedlingDistFit <- function(obj, compute, update) UseMethod("setSeedlingDistFit")
-setBudlingDistFit <- function(obj, compute, update) UseMethod("setBudlingDistFit")
-setHerbivoryDistFit <- function(obj, compute, update) UseMethod("setHerbivoryDistFit")
+setSeedlingDistFit <- function(obj, compute, saveresults, update) UseMethod("setSeedlingDistFit")
+setBudlingDistFit <- function(obj, compute, saveresults, update) UseMethod("setBudlingDistFit")
+setHerbivoryDistFit <- function(obj, compute, saveresults, update) UseMethod("setHerbivoryDistFit")
 
 ## Regressions
-setBudlingsPerStemFit <- function(obj, compute, update) UseMethod("setBudlingsPerStemFit")
+setBudlingsPerStemFit <- function(obj, compute, saveresults, update) UseMethod("setBudlingsPerStemFit")
 
 # Set matrices from fits
 setFloweringMatrix <- function(x) UseMethod("setFloweringMatrix")
@@ -39,7 +39,8 @@ computeFullKernel <- function(x) UseMethod("computeFullKernel")
 
 # Setup or compute MPM/IPM
 computeMPM <- function(x) UseMethod("computeMPM")
-setSite <- function(obj, site) UseMethod("setSite")
+setSite <- function(obj, site, compute) UseMethod("setSite")
+bootIPM <- function(obj) UseMethod("bootIPM")
 
 # Analyze growth rate
 analyzeGrowthRate <- function(x) UseMethod("analyzeGrowthRate")
@@ -57,6 +58,7 @@ mwIPM <- function(x = list()) {
   #
   # Specify min and max of variables in list form.
   #
+  
   if (all(names(x) != "data")) {
     x$data <- read.csv(mwROOT("data","stemdata.csv"))
   }
@@ -69,8 +71,23 @@ mwIPM <- function(x = list()) {
   } else if (!(site %in% c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB"))) {
     stop(paste(site, "is not a valid site!  Please choose one of Bertha, BLD1, BLD2, PWR, SKY, or YTB."))
   }
+  if (all(names(x) != "compute")) {
+    compute = FALSE
+  } else if (!is.logical(x$compute)) {
+    stop(paste("Variable 'compute' must be TRUE or FALSE."))
+  } else {
+    compute <- x$compute
+  }
+  if (all(names(x) != "saveresults")) {
+    saveresults = FALSE
+  } else if (!is.logical(x$saveresults)) {
+    stop(paste("Variable 'saveresults' must be TRUE or FALSE."))
+  } else {
+    saveresults <- x$saveresults
+  }
+  x <- x[which(!(names(x) %in% c("compute","saveresults")))]
   
-  x <- append(x, list(data_orig = data,
+  x <- append(x, list(data_orig = x$data,
                       vars = list(h_apical = list(min = NA,
                                                   max = NA,
                                                   b = NA,
@@ -108,11 +125,22 @@ mwIPM <- function(x = list()) {
                       MPM = NA))
   
   y <- structure(x, class = "mwIPM") %>% 
-       setPars(update = FALSE) %>% 
-       setSite(site = site) %>%
+       setPars(compute = compute, saveresults = saveresults, update = FALSE) %>% 
+       setSite(compute = compute, site = site) %>%
        computeMPM()
   
   return(y)
+}
+
+bootIPM.mwIPM <- function (obj) {
+  obj$data <- obj$data_orig %>% group_by(site) %>% 
+                                sample_frac(replace=TRUE) %>% 
+                                ungroup()
+  obj %<>% setPars(compute = TRUE, update = FALSE) %>% 
+           setSite(compute = TRUE) %>%
+           computeMPM()
+
+  return(obj)
 }
 
 # Vars & Pars ----------------------
@@ -121,7 +149,7 @@ setVars.mwIPM <- function (obj) {
   N <- obj$N
   
   if (obj$site != "Bertha") {
-    data <- obj$data %>% dplyr::filter(site == obj$site)
+    data <- obj$data %>% filter(site == obj$site)
   }
   data <- obj$data %>% summarize(max_h_apical = max(h_apical, na.rm=T),
                              max_h_apical.next = max(h_apical.next, na.rm=T))
@@ -154,24 +182,43 @@ setVars.mwIPM <- function (obj) {
   return(obj)
 }
 
-setPars.mwIPM <- function(obj, update = TRUE) {
+setPars.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
   #
   # For now, just load them from file here.  In the future, this should be done outside this function.
   # The future is now.  Moving these to proper location.
 
   obj$pars <- list(dist.herb = NA)
   
-  compute = FALSE
-  obj <- obj %>% setSeedsPerPodConst(compute = compute, update = FALSE) %>%
-                 setSeedlingEmergenceConst(compute = compute, update = FALSE) %>%
-                 setBudlingsPerStemFit(compute = compute, update = FALSE) %>%
-                 setFloweringFit(compute = compute, update = FALSE) %>% 
-                 setSurvivalFit(compute = compute, update = FALSE) %>%
-                 setGrowthFit(compute = compute, update = FALSE) %>%
-                 setPodsFit(compute = compute, update = FALSE) %>%
-                 setSeedlingDistFit(compute = compute, update = FALSE) %>%
-                 setBudlingDistFit(compute = compute, update = FALSE) %>%
-                 setHerbivoryDistFit(compute = compute, update = FALSE)
+  obj <- obj %>% setSeedsPerPodConst(compute = compute, 
+                                     saveresults = saveresults, 
+                                     update = FALSE) %>%
+                 setSeedlingEmergenceConst(compute = compute, 
+                                           saveresults = saveresults, 
+                                           update = FALSE) %>%
+                 setBudlingsPerStemFit(compute = compute, 
+                                       saveresults = saveresults, 
+                                       update = FALSE) %>%
+                 setFloweringFit(compute = compute, 
+                                 saveresults = saveresults, 
+                                 update = FALSE) %>% 
+                 setSurvivalFit(compute = compute, 
+                                saveresults = saveresults, 
+                                update = FALSE) %>%
+                 setGrowthFit(compute = compute, 
+                              saveresults = saveresults, 
+                              update = FALSE) %>%
+                 setPodsFit(compute = compute, 
+                            saveresults = saveresults, 
+                            update = FALSE) %>%
+                 setSeedlingDistFit(compute = compute, 
+                                    saveresults = saveresults, 
+                                    update = FALSE) %>%
+                 setBudlingDistFit(compute = compute, 
+                                   saveresults = saveresults, 
+                                   update = FALSE) %>%
+                 setHerbivoryDistFit(compute = compute, 
+                                     saveresults = saveresults, 
+                                     update = FALSE)
 
   if (update) {
     obj <- obj %>% setFloweringMatrix() %>%
@@ -187,7 +234,7 @@ setPars.mwIPM <- function(obj, update = TRUE) {
 
 # Constants ------------------------------
 
-setSeedsPerPodConst.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
+setSeedsPerPodConst.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
   if (!file.exists(mwROOT("data","calculated","seedsPerPodConst.RData")) | (compute)) {
     seeds_per_pod_data <- read.csv(mwROOT("data","seeddata.csv"))
     
@@ -195,7 +242,9 @@ setSeedsPerPodConst.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
     seeds.per.pod = mean(seeds_per_pod_data$total_seed)
     cat("done!\n")
     
-    save(seeds.per.pod, file = mwROOT("data","calculated","seedsPerPodConst.RData"))
+    if (saveresults) {
+      save(seeds.per.pod, file = mwROOT("data","calculated","seedsPerPodConst.RData"))
+    }
   } else {
     load(mwROOT("data","calculated","seedsPerPodConst.RData"))
   }
@@ -205,7 +254,7 @@ setSeedsPerPodConst.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
   return(obj)
 }
 
-setSeedlingEmergenceConst.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
+setSeedlingEmergenceConst.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
   if (!file.exists(mwROOT("data","calculated","seedlingEmergenceConst.RData")) | (compute)) {  
     sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
     seedling.emergence <- rep(NA, 6)
@@ -244,7 +293,9 @@ setSeedlingEmergenceConst.mwIPM <- function(obj, compute = FALSE, update = TRUE)
     seedling.emergence[2:6] <- (fulldat %>% group_by(site) %>% summarize(emergence = mean(emergence)))$emergence
     cat("done!\n")
     
-    save(seedling.emergence, file = mwROOT("data","calculated","seedlingEmergenceConst.RData"))
+    if (saveresults) {
+      save(seedling.emergence, file = mwROOT("data","calculated","seedlingEmergenceConst.RData"))
+    }
   } else {
     load(mwROOT("data","calculated","seedlingEmergenceConst.RData"))
   }
@@ -257,9 +308,9 @@ setSeedlingEmergenceConst.mwIPM <- function(obj, compute = FALSE, update = TRUE)
 # Fits ------------------------------
 
 ## Vital rates
-setFloweringFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
+setFloweringFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
   if (!file.exists(mwROOT("data","calculated","flowerFit.RData")) | (compute)) {
-    metadata_usc <- metadata %>% filter(!is.na(h_apical),
+    metadata_usc <- obj$data %>% filter(!is.na(h_apical),
                                         !is.na(h_apical.next),
                                         !is.na(herb_avg),
                                         !is.na(fec.flower),
@@ -282,7 +333,9 @@ setFloweringFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
     cat("Checking parameters:\n")
     checkPars(flower.fit)
   
-    save(flower.fit, file = mwROOT("data","calculated","flowerFit.RData"))
+    if (saveresults) {
+      save(flower.fit, file = mwROOT("data","calculated","flowerFit.RData"))
+    }
   } else {
     load(mwROOT("data","calculated","flowerFit.RData"))
   }
@@ -292,7 +345,7 @@ setFloweringFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
   return(obj)
 }
 
-setSurvivalFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
+setSurvivalFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
   if (!file.exists(mwROOT("data","calculated","survivalFit.RData")) | (compute)) {
     metadata_usc <- obj$data %>% filter(!is.na(h_apical),
                                         !is.na(h_apical.next),
@@ -317,7 +370,9 @@ setSurvivalFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
     cat("Checking parameters:\n")
     checkPars(surv.fit)
     
-    save(surv.fit, file = mwROOT("data","calculated","survivalFit.RData"))
+    if (saveresults) {
+      save(surv.fit, file = mwROOT("data","calculated","survivalFit.RData"))
+    }
   } else {
     load(mwROOT("data","calculated","survivalFit.RData"))
   }
@@ -327,7 +382,7 @@ setSurvivalFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
   return(obj)
 }
 
-setGrowthFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
+setGrowthFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
   if (!file.exists(mwROOT("data","calculated","growthFit.RData")) | (compute)) {
     # We only want stems that flowered and survived
     metadata_usc <- obj$data %>% filter(!is.na(h_apical),
@@ -355,7 +410,9 @@ setGrowthFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
     cat("Checking parameters:\n")
     checkPars(growth.fit)
     
-    save(growth.fit, file = mwROOT("data","calculated","growthFit.RData"))
+    if (saveresults) {
+      save(growth.fit, file = mwROOT("data","calculated","growthFit.RData"))
+    }
   } else {
     load(mwROOT("data","calculated","growthFit.RData"))
   }
@@ -365,7 +422,7 @@ setGrowthFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
   return(obj)
 }
 
-setPodsFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
+setPodsFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
   if (!file.exists(mwROOT("data","calculated","podsFit.RData")) | (compute)) {
     # We only want stems that flowered, survived and have data for pods
     metadata_usc <- obj$data %>% filter(!is.na(h_apical),
@@ -393,7 +450,9 @@ setPodsFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
     cat("Checking parameters:\n")
     checkPars(pods.fit)
     
-    save(pods.fit, file = mwROOT("data","calculated","podsFit.RData"))
+    if (saveresults) {
+      save(pods.fit, file = mwROOT("data","calculated","podsFit.RData"))
+    }
   } else {
     load(mwROOT("data","calculated","podsFit.RData"))
   }
@@ -404,7 +463,7 @@ setPodsFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
 }
 
 ## Distributions
-setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
+setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
   if (!file.exists(mwROOT("data","calculated","seedlingDistFit.RData")) | (compute)) {
     h_apical <- (obj$data %>% filter(seedling == 1))$h_apical
     
@@ -435,7 +494,9 @@ setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
     ))
     names(seedling.fit) <- c("fit", "predict")
     
-    save(seedling.fit, file = mwROOT("data","calculated","seedlingDistFit.RData"))
+    if (saveresults) {
+      save(seedling.fit, file = mwROOT("data","calculated","seedlingDistFit.RData"))
+    }
   } else {
     load(mwROOT("data","calculated","seedlingDistFit.RData"))
   }
@@ -445,7 +506,7 @@ setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
   return(obj)
 }
 
-setBudlingDistFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
+setBudlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
   if (!file.exists(mwROOT("data","calculated","budlingDistFit.RData")) | (compute)) {
     sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
     mdls <- c("norm", "weibull", "norm", "weibull", "gamma", "lnorm")
@@ -491,7 +552,9 @@ setBudlingDistFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
       names(budling.fit[[i]]) <- c("fit", "predict")
     }
     
-    save(budling.fit, file = mwROOT("data","calculated","budlingDistFit.RData"))
+    if (saveresults) {
+      save(budling.fit, file = mwROOT("data","calculated","budlingDistFit.RData"))
+    }
 } else {
   load(mwROOT("data","calculated","budlingDistFit.RData"))
 }
@@ -501,7 +564,7 @@ setBudlingDistFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
   return(obj)
 }
 
-setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
+setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
   if (!file.exists(mwROOT("data","calculated","herbivoryDistFit.RData")) | (compute)) {
     sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
     mdls <- c("lnorm", "lnorm", "gamma", "lnorm", "lnorm", "gamma")
@@ -558,17 +621,19 @@ setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
       names(munched.fit[[i]]) <- c("fit", "pmunch", "predict")
     }
     
-    save(munched.fit, file = mwROOT("data","calculated","herbivoryDistFit.RData"))
-    } else {
-      load(mwROOT("data","calculated","herbivoryDistFit.RData"))
+    if (saveresults) {
+      save(munched.fit, file = mwROOT("data","calculated","herbivoryDistFit.RData"))
     }
+  } else {
+    load(mwROOT("data","calculated","herbivoryDistFit.RData"))
+  }
   
   obj$pars$munched.fit <- munched.fit
   
   return(obj)
 }
 
-setBudlingsPerStemFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
+setBudlingsPerStemFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
   if (!file.exists(mwROOT("data","calculated","budlingsPerStemFit.RData")) | (compute)) {  
     data_gp <- obj$data %>% group_by(year, transect) %>% 
                             summarize(N_seedlings = sum(seedling, na.rm=T), 
@@ -603,7 +668,9 @@ setBudlingsPerStemFit.mwIPM <- function(obj, compute = FALSE, update = TRUE) {
     budlings.per.stem.fit <- exp.model
     budlings.per.stem.fit$site <- merged$site
     
-    save(budlings.per.stem.fit, file = mwROOT("data","calculated","budlingsPerStemFit.RData"))
+    if (saveresults) {
+      save(budlings.per.stem.fit, file = mwROOT("data","calculated","budlingsPerStemFit.RData"))
+    }
   } else {
     load(mwROOT("data","calculated","budlingsPerStemFit.RData"))
   }
@@ -765,8 +832,8 @@ computeFullKernel.mwIPM <- function(obj) {
 
 # Analysis ------------------------------
 
-setSite.mwIPM <- function(obj, site = "Bertha") {
-  if (is.na(obj$site) | (site != obj$site)) {
+setSite.mwIPM <- function(obj, site = "Bertha", compute = FALSE) {
+  if ((compute) | is.na(obj$site) | (site != obj$site)) {
     if (site %in% c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")) {
       obj$site <- site
       
