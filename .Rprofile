@@ -1,8 +1,8 @@
 library(stats)  # To avoid non-masking of stats filter function.  Need to move to package workflow.
+library(fitdistrplus)
 library(rprojroot)
 library(dplyr)
 library(ggplot2)
-library(fitdistrplus)
 library(lme4)
 library(magrittr)
 
