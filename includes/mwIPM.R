@@ -25,20 +25,20 @@ setHerbivoryDistFit <- function(obj, compute, saveresults, update) UseMethod("se
 setBudlingsPerStemFit <- function(obj, compute, saveresults, update) UseMethod("setBudlingsPerStemFit")
 
 # Set matrices from fits
-setFloweringMatrix <- function(x) UseMethod("setFloweringMatrix")
-setSurvivalMatrix <- function(x) UseMethod("setSurvivalMatrix")
+setFloweringMatrix <- function(obj, update, perturb) UseMethod("setFloweringMatrix")
+setSurvivalMatrix <- function(obj, update, perturb) UseMethod("setSurvivalMatrix")
+setPodsMatrix <- function(obj, update, perturb) UseMethod("setPodsMatrix")
+setGrowthMatrix <- function(obj, update, perturb) UseMethod("setGrowthMatrix")
 setHerbivoryMatrix <- function(obj, dist.herb, update) UseMethod("setHerbivoryMatrix")
-setPodsMatrix <- function(x) UseMethod("setPodsMatrix")
-setGrowthMatrix <- function(x) UseMethod("setGrowthMatrix")
-setSeedlingRecruitmentMatrix <- function(x) UseMethod("setSeedlingRecruitmentMatrix")
+setSeedlingRecruitmentMatrix <- function(obj, update) UseMethod("setSeedlingRecruitmentMatrix")
 
 # Compute kernels from matrices
-computeSexualKernel <- function(x) UseMethod("computeSexualKernel")
-computeClonalKernel <- function(x) UseMethod("computeClonalKernel")
-computeFullKernel <- function(x) UseMethod("computeFullKernel")
+computeSexualKernel <- function(obj) UseMethod("computeSexualKernel")
+computeClonalKernel <- function(obj) UseMethod("computeClonalKernel")
+computeFullKernel <- function(obj) UseMethod("computeFullKernel")
 
 # Setup or compute MPM/IPM
-computeMPM <- function(x) UseMethod("computeMPM")
+computeMPM <- function(obj) UseMethod("computeMPM")
 setSite <- function(obj, site, compute) UseMethod("setSite")
 bootIPM <- function(obj) UseMethod("bootIPM")
 
@@ -682,28 +682,28 @@ setBudlingsPerStemFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALS
 
 # Matrices ------------------------------
 
-setFloweringMatrix.mwIPM <- function(obj, update = TRUE) {
+setFloweringMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   # Flowering
   # N x N^2
-  obj$matrices$F = t(c(outer(obj$vars$h_apical$x, obj$vars$log_herb_avg$x, function(x,y) {predict(obj$pars$flower.fit, newdata = data.frame(h_apical = x, log_herb_avg = y), type=obj$site)})))[rep(1,obj$N),]
+  obj$matrices$F = t(c(outer(obj$vars$h_apical$x, obj$vars$log_herb_avg$x, function(x,y) {predict(obj$pars$flower.fit, newdata = data.frame(h_apical = x, log_herb_avg = y), type=obj$site, perturb=perturb)})))[rep(1,obj$N),]
 
   return(obj)
 }
 
-setSurvivalMatrix.mwIPM <- function(obj, update = TRUE) {
+setSurvivalMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   # Survival
   # N x N^2
-  obj$matrices$S = t(c(outer(obj$vars$h_apical$x, obj$vars$log_herb_avg$x, function(x,y) {predict(obj$pars$surv.fit, newdata = data.frame(h_apical = x, log_herb_avg = y), type=obj$site)})))[rep(1,obj$N),]
+  obj$matrices$S = t(c(outer(obj$vars$h_apical$x, obj$vars$log_herb_avg$x, function(x,y) {predict(obj$pars$surv.fit, newdata = data.frame(h_apical = x, log_herb_avg = y), type=obj$site, perturb=perturb)})))[rep(1,obj$N),]
   
   return(obj)
 }
 
-setGrowthMatrix.mwIPM <- function(obj, update = TRUE) {
+setGrowthMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   # Growth
   # N x N^2
 
   N <- obj$N
-  Mu <- c(outer(obj$vars$h_apical$x, obj$vars$log_herb_avg$x, function(x,y) {predict(obj$pars$growth.fit, newdata = data.frame(h_apical = x, log_herb_avg = y), type=obj$site)}))
+  Mu <- c(outer(obj$vars$h_apical$x, obj$vars$log_herb_avg$x, function(x,y) {predict(obj$pars$growth.fit, newdata = data.frame(h_apical = x, log_herb_avg = y), type=obj$site, perturb=perturb)}))
   G <- matrix(rep(0, N^3), nrow=N)
   for (i in (1:N^2)) {
     for (j in 1:N) {
@@ -724,7 +724,7 @@ setGrowthMatrix.mwIPM <- function(obj, update = TRUE) {
   return(obj)
 }
 
-setPodsMatrix.mwIPM <- function(obj, update = TRUE) {
+setPodsMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   # Pods
   # N x N^2
 
@@ -734,7 +734,7 @@ setPodsMatrix.mwIPM <- function(obj, update = TRUE) {
     # h_apical.next
     for (j in 1:N) {
       # log_herb_avg
-      P[i,(1+(j-1)*N):(j*N)] <- predict(obj$pars$pods.fit, newdata = data.frame(h_apical.next = obj$vars$h_apical.next$x[i], log_herb_avg = obj$vars$log_herb_avg$x[j]), type=obj$site)
+      P[i,(1+(j-1)*N):(j*N)] <- predict(obj$pars$pods.fit, newdata = data.frame(h_apical.next = obj$vars$h_apical.next$x[i], log_herb_avg = obj$vars$log_herb_avg$x[j]), type=obj$site, perturb=perturb)
     }
   }
   obj$matrices$P <- P

@@ -14,9 +14,9 @@ mwMod <- function(x) {
 }
 
 # Method for mwMod prediction
-predict.mwMod <- function(obj, newdata, type="Bertha") {
+predict.mwMod <- function(obj, newdata, type="Bertha", perturb=rep(0,4)) {
   pars <- obj$pars$unscaled
-  linpart <- pars[type,"(Intercept)"] + pars[type,obj$vars[1]]*newdata[[obj$vars[1]]] + pars[type,obj$vars[2]]*newdata[[obj$vars[2]]] + pars[type,paste0(obj$vars[1],":",obj$vars[2])]*newdata[[obj$vars[1]]]*newdata[[obj$vars[2]]]
+  linpart <- (pars[type,"(Intercept)"]+perturb[1]) + (pars[type,obj$vars[1]]+perturb[2])*newdata[[obj$vars[1]]] + (pars[type,obj$vars[2]]+perturb[3])*newdata[[obj$vars[2]]] + (pars[type,paste0(obj$vars[1],":",obj$vars[2])]+perturb[4])*newdata[[obj$vars[1]]]*newdata[[obj$vars[2]]]
   if (class(obj$mdl) == "glmerMod") {
     predict.vrate <- obj$mdl@resp$family$linkinv(linpart)
   } else {
