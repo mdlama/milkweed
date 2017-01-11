@@ -3,4 +3,5 @@
 .RData
 .Ruserdata
 scripts/figs/old_figs
+scripts/figs/*.png
 data/calculated
