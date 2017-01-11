@@ -73,7 +73,6 @@ p1 <- ggplot(mydata, aes(x = h_apical, y = log_herb_avg, z = prob.flower)) +
                            colours=c("#00000000","#BBBBBBBB"),
                            limits=c(0, 1))
 
-# For some reason, coord_cartesian didn't work (left gap between tick marks and image)
 p1 <- p1 + theme(axis.line = element_blank()) + 
      scale_x_continuous(limits = c(0, max(x)), expand = c(0, 0)) + 
      scale_y_continuous(limits = c(-2.5, 2.0), expand = c(0, 0)) +
