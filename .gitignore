@@ -2,6 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
+includes/mwDist.R
 scripts/figs/old_figs
 scripts/figs/*.png
 data/calculated

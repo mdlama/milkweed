@@ -687,6 +687,13 @@ setFloweringMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   # N x N^2
   obj$matrices$F = t(c(outer(obj$vars$h_apical$x, obj$vars$log_herb_avg$x, function(x,y) {predict(obj$pars$flower.fit, newdata = data.frame(h_apical = x, log_herb_avg = y), type=obj$site, perturb=perturb)})))[rep(1,obj$N),]
 
+  if (update) {
+    obj <- obj %>%
+      computeSexualKernel() %>% 
+      computeFullKernel()
+    obj <- computeMPM(obj)
+  }
+  
   return(obj)
 }
 
@@ -694,6 +701,13 @@ setSurvivalMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   # Survival
   # N x N^2
   obj$matrices$S = t(c(outer(obj$vars$h_apical$x, obj$vars$log_herb_avg$x, function(x,y) {predict(obj$pars$surv.fit, newdata = data.frame(h_apical = x, log_herb_avg = y), type=obj$site, perturb=perturb)})))[rep(1,obj$N),]
+  
+  if (update) {
+    obj <- obj %>%
+      computeSexualKernel() %>% 
+      computeFullKernel()
+    obj <- computeMPM(obj)
+  }
   
   return(obj)
 }
@@ -721,6 +735,13 @@ setGrowthMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   # Plot growth
   # image.plot(h_apical, h_apical.next, t(G%*%H), col=topo.colors(100))
   
+  if (update) {
+    obj <- obj %>%
+      computeSexualKernel() %>% 
+      computeFullKernel()
+    obj <- computeMPM(obj)
+  }
+  
   return(obj)
 }
 
@@ -739,6 +760,13 @@ setPodsMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   }
   obj$matrices$P <- P
   
+  if (update) {
+    obj <- obj %>%
+      computeSexualKernel() %>% 
+      computeFullKernel()
+    obj <- computeMPM(obj)
+  }
+  
   return(obj)
 }
 
@@ -750,10 +778,7 @@ setHerbivoryMatrix.mwIPM <- function(obj, dist.herb = NA, update = TRUE) {
   if (any(is.na(dist.herb))) {
     dist.herb <- obj$pars$munched.fit[[obj$site]]$predict(obj$vars$log_herb_avg$b)
   }
-  # Point mass to test growth
-  # dist.herb = c(1/dx.log_herb_avg, rep(0,N-1))
-  # dist.herb = c(rep(0,N-1), 1/dx.log_herb_avg)
-  
+
   H = matrix(rep(0,N^3), nrow = N^2)
   for (i in 1:N) {
     for (I in 1:N) {
@@ -840,10 +865,10 @@ setSite.mwIPM <- function(obj, site = "Bertha", compute = FALSE) {
       obj <- setVars(obj)
       
       obj <- obj %>% 
-        setFloweringMatrix() %>% 
-        setSurvivalMatrix() %>% 
-        setGrowthMatrix() %>% 
-        setPodsMatrix() %>%
+        setFloweringMatrix(update = FALSE) %>% 
+        setSurvivalMatrix(update = FALSE) %>% 
+        setGrowthMatrix(update = FALSE) %>% 
+        setPodsMatrix(update = FALSE) %>%
         setHerbivoryMatrix(update=FALSE) %>% 
         setSeedlingRecruitmentMatrix()
       
@@ -876,8 +901,6 @@ computeMPM.mwIPM <- function(obj) {
   beta <- sum(Kss%*%t(t(budling.fit[[obj$site]]$predict(h_apical$b))))
   pems <- mean.buds.per.stem
   pemb <- mean.buds.per.stem
-  # pems <- sum(Kc%*%t(t(seedling.fit$predict(h_apical.b))))*dx.h_apical
-  # pemb <- sum(Kc%*%t(t(budling.fit[['Bertha']]$predict(h_apical.b))))*dx.h_apical
   
   detach(obj$vars)
   detach(obj$pars)
