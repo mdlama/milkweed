@@ -1,0 +1,77 @@
+---
+title: "Figure 6: Sensitivity and Elasticity Analysis"
+output: 
+  html_document:
+    toc: true
+---
+
+# Initialization
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+source("../../.Rprofile")
+```
+
+```{r}
+compute <- TRUE
+
+if (compute) {
+  ipm <- mwIPM()
+  
+  if (FALSE) {
+  flowering_func <- function(x) {ipm %>% setFloweringMatrix(perturb = x) %>% analyzeGrowthRate()}
+  results <- tbl_df(data.frame(sensitivity = grad(flowering_func,rep(0,4)),
+                               type = as.character("Flowering"),
+                               name = c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
+                               )
+                    )
+  
+  survival_func <- function(x) {ipm %>% setSurvivalMatrix(perturb = x) %>% analyzeGrowthRate()}
+  results %<>% bind_rows(
+                tbl_df(data.frame(sensitivity = grad(survival_func, rep(0,4)),
+                                  type = as.character("Survival"),
+                                  name = c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
+                                  )
+                       )
+               )
+  
+  growth_func <- function(x) {ipm %>% setGrowthMatrix(perturb = x) %>% analyzeGrowthRate()}
+  results %<>% bind_rows(
+                tbl_df(data.frame(sensitivity = grad(growth_func, rep(0,4)),
+                                  type = as.character("Growth"),
+                                  name = c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
+                                  )
+                       )
+               )
+  
+  pods_func <- function(x) {ipm %>% setPodsMatrix(perturb = x) %>% analyzeGrowthRate()}
+  results %<>% bind_rows(
+                tbl_df(data.frame(sensitivity = grad(pods_func, rep(0,4)),
+                                  type = as.character("Pods"),
+                                  name = c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
+                                  )
+                       )
+               )
+  seedling_func <- function(x) {ipm %>% setSeedlingRecruitmentMatrix(perturb = x) %>% analyzeGrowthRate()}
+  results %<>% bind_rows(
+                tbl_df(data.frame(sensitivity = grad(seedling_func, rep(0,2)),
+                                  type = as.character("Seedlings"),
+                                  name = c("mean", "sd")
+                                  )
+                       )
+               )
+  } else {
+    load(mwROOT("data","calculated","figure6.RData"))
+    
+  }
+  save(results, file=mwROOT("data","calculated","figure6.RData"))
+} else {
+  # load(mwROOT("data","calculated","figure6.RData"))
+}
+
+```
+
+Save figure.
+
+```{r}
+# ggsave(mwROOT("scripts","figs","Figure6.png"), height=4, width=6, device = "png", p)
+```
