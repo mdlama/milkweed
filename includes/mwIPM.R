@@ -33,8 +33,8 @@ setHerbivoryMatrix <- function(obj, dist.herb, update) UseMethod("setHerbivoryMa
 setSeedlingRecruitmentMatrix <- function(obj, update, perturb) UseMethod("setSeedlingRecruitmentMatrix")
 
 # Compute kernels from matrices
-computeSexualKernel <- function(obj, perturb) UseMethod("computeSexualKernel")
-computeClonalKernel <- function(obj) UseMethod("computeClonalKernel")
+computeSexualKernel <- function(obj, update, perturb) UseMethod("computeSexualKernel")
+computeClonalKernel <- function(obj, update, perturb) UseMethod("computeClonalKernel")
 computeFullKernel <- function(obj) UseMethod("computeFullKernel")
 
 # Setup or compute MPM/IPM
@@ -57,9 +57,21 @@ perturbTrans <- function(pars, perturb)
 
 # Constructor ----------------------
 
+bootIPM.mwIPM <- function (obj) {
+  obj$data <- obj$data_orig %>% group_by(site) %>% 
+                                sample_frac(replace=TRUE) %>% 
+                                ungroup()
+  obj %<>% setPars(compute = TRUE, update = FALSE) %>% 
+           setSite(compute = TRUE) %>%
+           computeMPM()
+
+  return(obj)
+}
+
 mwIPM <- function(x = list()) {
   #
   # Specify min and max of variables in list form.
+  # Note:  Had to move this AFTER bootIPM or it would'nt load - ?????
   #
   
   if (all(names(x) != "data")) {
@@ -128,22 +140,11 @@ mwIPM <- function(x = list()) {
                       MPM = NA))
   
   y <- structure(x, class = "mwIPM") %>% 
-       setPars(compute = compute, saveresults = saveresults, update = FALSE) %>% 
-       setSite(compute = compute, site = site) %>%
-       computeMPM()
+    setPars(compute = compute, saveresults = saveresults, update = FALSE) %>% 
+    setSite(compute = compute, site = site) %>%
+    computeMPM()
   
   return(y)
-}
-
-bootIPM.mwIPM <- function (obj) {
-  obj$data <- obj$data_orig %>% group_by(site) %>% 
-                                sample_frac(replace=TRUE) %>% 
-                                ungroup()
-  obj %<>% setPars(compute = TRUE, update = FALSE) %>% 
-           setSite(compute = TRUE) %>%
-           computeMPM()
-
-  return(obj)
 }
 
 # Vars & Pars ----------------------
@@ -476,6 +477,8 @@ setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, 
     
     seedling.fit <- vector("list", 2)
     seedling.fit[[1]] <- f1
+    
+    # NOTE:  Doesn't need to be eval(parse(text = ...))!!!! Just make the function, silly...  will change later.
     seedling.fit[[2]] <- eval(parse(
       text = 
         "function(x, pars, perturb = rep(0,2)) {
@@ -530,6 +533,7 @@ setBudlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, u
         eval(parse(
           text = sprintf(
             "function(x, pars, perturb = rep(0,2)) {
+               pars <- pars + perturb
                N <- length(x)
                dx <- x[2]-x[1]
                y <- rep(0, N-1)
@@ -658,9 +662,15 @@ setBudlingsPerStemFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALS
     exp.model <- lm(log(bdlgs_per_stem) ~ log_herb_mean, data=merged)
     cat("done!\n")
 
-    budlings.per.stem.fit <- exp.model
-    budlings.per.stem.fit$site <- merged$site
-    
+    budlings.per.stem.fit <- vector("list", 3)
+    budlings.per.stem.fit[[1]] <- exp.model
+    budlings.per.stem.fit[[2]] <- merged$site
+    budlings.per.stem.fit[[3]] <- function (x, pars, perturb = rep(0,2)) {
+      pars <- pars + perturb
+      y <- exp(pars[1] + pars[2]*x)
+    }
+    names(budlings.per.stem.fit) <- c("fit","site","predict")
+
     if (saveresults) {
       save(budlings.per.stem.fit, file = mwROOT("data","calculated","budlingsPerStemFit.RData"))
     }
@@ -681,9 +691,7 @@ setFloweringMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   obj$matrices$F = t(c(outer(obj$vars$h_apical$x, obj$vars$log_herb_avg$x, function(x,y) {predict(obj$pars$flower.fit, newdata = data.frame(h_apical = x, log_herb_avg = y), type=obj$site, perturb=perturb)})))[rep(1,obj$N),]
 
   if (update) {
-    obj <- obj %>%
-      computeSexualKernel() %>% 
-      computeFullKernel()
+    obj <- obj %>% computeSexualKernel()
     obj <- computeMPM(obj)
   }
   
@@ -696,9 +704,7 @@ setSurvivalMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   obj$matrices$S = t(c(outer(obj$vars$h_apical$x, obj$vars$log_herb_avg$x, function(x,y) {predict(obj$pars$surv.fit, newdata = data.frame(h_apical = x, log_herb_avg = y), type=obj$site, perturb=perturb)})))[rep(1,obj$N),]
   
   if (update) {
-    obj <- obj %>%
-      computeSexualKernel() %>% 
-      computeFullKernel()
+    obj <- obj %>% computeSexualKernel()
     obj <- computeMPM(obj)
   }
   
@@ -729,9 +735,7 @@ setGrowthMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   # image.plot(h_apical, h_apical.next, t(G%*%H), col=topo.colors(100))
   
   if (update) {
-    obj <- obj %>%
-      computeSexualKernel() %>% 
-      computeFullKernel()
+    obj <- obj %>% computeSexualKernel()
     obj <- computeMPM(obj)
   }
   
@@ -754,9 +758,7 @@ setPodsMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   obj$matrices$P <- P
   
   if (update) {
-    obj <- obj %>%
-      computeSexualKernel() %>% 
-      computeFullKernel()
+    obj %<>% computeSexualKernel()
     obj <- computeMPM(obj)
   }
   
@@ -783,9 +785,9 @@ setHerbivoryMatrix.mwIPM <- function(obj, dist.herb = NA, update = TRUE) {
   obj$matrices$H <- H
   
   if (update) {
-    obj <- computeSexualKernel(obj)
-    obj <- computeClonalKernel(obj)
-    obj <- computeFullKernel(obj)
+    obj %<>% computeSexualKernel(obj, update = FALSE) %>%
+             computeClonalKernel(obj, update = FALSE) %>%
+             computeFullKernel(obj)
   }
   
   return(obj)
@@ -801,9 +803,7 @@ setSeedlingRecruitmentMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep
   obj$matrices$R <- R
   
   if (update) {
-    obj <- obj %>%
-      computeSexualKernel() %>% 
-      computeFullKernel()
+    obj %<>% computeSexualKernel()
     obj <- computeMPM(obj)
   }
   
@@ -812,7 +812,7 @@ setSeedlingRecruitmentMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep
 
 # Kernels ------------------------------
 
-computeSexualKernel.mwIPM <- function(obj, perturb = rep(0,2)) {
+computeSexualKernel.mwIPM <- function(obj, update = TRUE, perturb = rep(0,2)) {
   attach(obj$vars, warn.conflicts = FALSE)
   attach(obj$pars, warn.conflicts = FALSE)
   attach(obj$matrices, warn.conflicts = FALSE)
@@ -826,27 +826,40 @@ computeSexualKernel.mwIPM <- function(obj, perturb = rep(0,2)) {
   
   obj$kernels$Ks <- Ks
   
+  if (update) {
+    obj %<>% computeFullKernel()
+  }
+  
   return(obj)
 }
 
-computeClonalKernel.mwIPM <- function(obj, perturb = rep(0,2)) {
+computeClonalKernel.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   ## Budling Recruitment (same as Kc)
+  # perturb = c(budlings.per.stem, budlings)
   
   attach(obj$vars, warn.conflicts = FALSE)
   attach(obj$pars, warn.conflicts = FALSE)
   attach(obj$matrices, warn.conflicts = FALSE)
   
   mean.log_herb_avg <- sum(dist.herb*log_herb_avg$x)*log_herb_avg$dx
-  mean.buds.per.stem <- exp(predict(budlings.per.stem.fit, new = data.frame(log_herb_mean = mean.log_herb_avg)))
+  # mean.buds.per.stem <- exp(predict(budlings.per.stem.fit, new = data.frame(log_herb_mean = mean.log_herb_avg)))
+  
+  mean.buds.per.stem <- budlings.per.stem.fit$predict(mean.log_herb_avg,
+                                                      budlings.per.stem.fit$fit$coefficients,
+                                                      perturb[1:2])
   Kc <- t(t(mean.buds.per.stem*budling.fit[[obj$site]]$predict(h_apical$b,
                                                                budling.fit[[obj$site]]$fit$estimate,
-                                                               perturb)))%*%t(rep(1,obj$N))*h_apical$dx
+                                                               perturb[3:4])))%*%t(rep(1,obj$N))*h_apical$dx
   
   detach(obj$vars)
   detach(obj$pars)
   detach(obj$matrices)
   
   obj$kernels$Kc <- Kc
+  
+  if (update) {
+    obj %<>% computeFullKernel()
+  }
   
   return(obj)
 }
@@ -866,22 +879,22 @@ setSite.mwIPM <- function(obj, site = "Bertha", compute = FALSE) {
     if (site %in% c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")) {
       obj$site <- site
       
-      obj <- setVars(obj)
+      obj %<>% setVars()
       
-      obj <- obj %>% 
+      obj %<>% 
         setFloweringMatrix(update = FALSE) %>% 
         setSurvivalMatrix(update = FALSE) %>% 
         setGrowthMatrix(update = FALSE) %>% 
         setPodsMatrix(update = FALSE) %>%
         setHerbivoryMatrix(update=FALSE) %>% 
-        setSeedlingRecruitmentMatrix()
+        setSeedlingRecruitmentMatrix(update = FALSE)
       
-      obj <- obj %>%
-        computeSexualKernel() %>% 
-        computeClonalKernel() %>%
+      obj %<>%
+        computeSexualKernel(update = FALSE) %>% 
+        computeClonalKernel(update = FALSE) %>%
         computeFullKernel()
       
-      obj <- computeMPM(obj)
+      obj %<>% computeMPM()
     } else {
       stop(paste(site, "is not a valid site!  Please choose one of Bertha, BLD1, BLD2, PWR, SKY, or YTB."))
     }
@@ -898,7 +911,9 @@ computeMPM.mwIPM <- function(obj) {
   attach(obj$matrices, warn.conflicts = FALSE)
   
   mean.log_herb_avg <- sum(dist.herb*log_herb_avg$x)*log_herb_avg$dx
-  mean.buds.per.stem <- exp(predict(budlings.per.stem.fit, new = data.frame(log_herb_mean = mean.log_herb_avg)))
+  # mean.buds.per.stem <- exp(predict(budlings.per.stem.fit, new = data.frame(log_herb_mean = mean.log_herb_avg)))
+  mean.buds.per.stem <- budlings.per.stem.fit$predict(mean.log_herb_avg,
+                                                      budlings.per.stem.fit$fit$coefficients)
   
   Kss <- seedling.emergence[[obj$site]]*seeds.per.pod*(P*G*S*F)%*%H*log_herb_avg$dx*h_apical.next$dx*h_apical$dx
   alpha <- sum(Kss%*%t(t(seedling.fit$predict(h_apical$b, seedling.fit$fit$estimate))))

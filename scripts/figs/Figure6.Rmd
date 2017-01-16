@@ -59,11 +59,33 @@ if (compute) {
                                   )
                        )
                )
+  sexual_func <- function(x) {ipm %>% computeSexualKernel(perturb = x) %>% analyzeGrowthRate()}
+  results %<>% bind_rows(
+                tbl_df(data.frame(sensitivity = grad(sexual_func, rep(0,2)),
+                                  type = as.character("Sexual"),
+                                  name = c("seedling.emergence", 
+                                           "seeds.per.pod")
+                                  )
+                       )
+               )
+  
   } else {
     load(mwROOT("data","calculated","figure6.RData"))
+  clonal_func <- function(x) {ipm %>% computeClonalKernel(perturb = x) %>% analyzeGrowthRate()}
+  results %<>% bind_rows(
+                tbl_df(data.frame(sensitivity = grad(clonal_func, rep(0,4)),
+                                  type = c("Clonal", "Clonal", "Budlings", "Budlings"),
+                                  name = c("budlings.per.stem[exp(Intercept)]", 
+                                           "budlings.per.stem[exp(log_herb_avg)]",
+                                           "mean",
+                                           "sd")
+                                  )
+                       )
+               )
+    
     
   }
-  save(results, file=mwROOT("data","calculated","figure6.RData"))
+  # save(results, file=mwROOT("data","calculated","figure6.RData"))
 } else {
   # load(mwROOT("data","calculated","figure6.RData"))
 }

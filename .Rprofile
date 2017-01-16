@@ -5,6 +5,7 @@ library(dplyr)
 library(ggplot2)
 library(lme4)
 library(magrittr)
+library(rootSolve)
 library(numDeriv)
 
 # Used mainly in render functions
