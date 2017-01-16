@@ -69,8 +69,6 @@ if (compute) {
                        )
                )
   
-  } else {
-    load(mwROOT("data","calculated","figure6.RData"))
   clonal_func <- function(x) {ipm %>% computeClonalKernel(perturb = x) %>% analyzeGrowthRate()}
   results %<>% bind_rows(
                 tbl_df(data.frame(sensitivity = grad(clonal_func, rep(0,4)),
@@ -82,6 +80,19 @@ if (compute) {
                                   )
                        )
                )
+  
+  herbivory_func <- function(x) {ipm %>% setHerbivoryMatrix(perturb = x) %>% analyzeGrowthRate()}
+  results %<>% bind_rows(
+                tbl_df(data.frame(sensitivity = grad(herbivory_func, rep(0,3)),
+                                  type = c("Herbivory"),
+                                  name = c("pmunch", 
+                                           "mean",
+                                           "sd")
+                                  )
+                       )
+               )
+} else {
+    load(mwROOT("data","calculated","figure6.RData"))
     
     
   }

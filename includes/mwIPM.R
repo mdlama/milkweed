@@ -29,7 +29,7 @@ setFloweringMatrix <- function(obj, update, perturb) UseMethod("setFloweringMatr
 setSurvivalMatrix <- function(obj, update, perturb) UseMethod("setSurvivalMatrix")
 setPodsMatrix <- function(obj, update, perturb) UseMethod("setPodsMatrix")
 setGrowthMatrix <- function(obj, update, perturb) UseMethod("setGrowthMatrix")
-setHerbivoryMatrix <- function(obj, dist.herb, update) UseMethod("setHerbivoryMatrix")
+setHerbivoryMatrix <- function(obj, dist.herb, update, perturb) UseMethod("setHerbivoryMatrix")
 setSeedlingRecruitmentMatrix <- function(obj, update, perturb) UseMethod("setSeedlingRecruitmentMatrix")
 
 # Compute kernels from matrices
@@ -187,10 +187,6 @@ setVars.mwIPM <- function (obj) {
 }
 
 setPars.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
-  #
-  # For now, just load them from file here.  In the future, this should be done outside this function.
-  # The future is now.  Moving these to proper location.
-
   obj$pars <- list(dist.herb = NA)
   
   obj <- obj %>% setSeedsPerPodConst(compute = compute, 
@@ -572,10 +568,15 @@ setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE,
       if (i == 1) { # Bertha
         thissite <- obj$data %>% filter(!is.na(h_apical),
                                         !is.na(munched))
+        functext <- "function(x, pars, perturb = rep(0,3), justmunch = FALSE) {
+                       pars[1] <- pars[1] + perturb[1]\n
+                       pars[2:3] <- perturbTrans(pars[2:3], perturb[2:3])\n"
       } else { # Sites
         thissite <- obj$data %>% filter(site == sites[i],
                                         !is.na(h_apical),
                                         !is.na(munched))
+        functext <- "function(x, pars, perturb = rep(0,3), justmunch = FALSE) {
+                       pars <- pars + perturb\n"
       }
       pmunch <- sum(thissite$munched == 1)/nrow(thissite)
       herb_avg <- (thissite %>% filter(munched == 1))$herb_avg
@@ -587,34 +588,25 @@ setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE,
       munched.fit[[i]] <- vector("list", 3)
       munched.fit[[i]][[1]] <- f0
       munched.fit[[i]][[2]] <- pmunch
-      munched.fit[[i]][[3]] <-
-        eval(parse(
-          text = sprintf(
-            "function(x, justmunch=FALSE) {
-               N <- length(x)
-               dx <- x[2]-x[1]
-               z <- exp(x)-0.1
-               y <- rep(0, N)
-               for (j in 1:(N-1)) {
-                 y[j] = p%s(z[j+1], %g, %g) - p%s(z[j], %g, %g)
-               }
-               y <- (%g/(dx*sum(y)))*y
-               if (!justmunch) {
-                 y[1] <- y[1] + (1-%g)/dx
-               }
-               y <- y[1:(N-1)]
-            }",
-            munched.fit[[i]][[1]]$distname,
-            munched.fit[[i]][[1]]$estimate[1],
-            munched.fit[[i]][[1]]$estimate[2],
-            munched.fit[[i]][[1]]$distname,
-            munched.fit[[i]][[1]]$estimate[1],
-            munched.fit[[i]][[1]]$estimate[2],
-            munched.fit[[i]][[2]],
-            munched.fit[[i]][[2]]
-          )
-        ))
-      
+      munched.fit[[i]][[3]] <- 
+        eval(parse(text = paste0(functext,
+          sprintf("N <- length(x)
+                   dx <- x[2]-x[1]
+                   z <- exp(x)-0.1
+                   y <- rep(0, N)
+                   for (j in 1:(N-1)) {
+                     y[j] = p%s(z[j+1], pars[2], pars[3]) - p%s(z[j], pars[2], pars[3])
+                   }
+                   y <- (pars[1]/(dx*sum(y)))*y
+                   if (!justmunch) {
+                     y[1] <- y[1] + (1-pars[1])/dx
+                   }
+                   y <- y[1:(N-1)]
+                 }",
+                 munched.fit[[i]][[1]]$distname,
+                 munched.fit[[i]][[1]]$distname
+                 )
+        )))
       names(munched.fit[[i]]) <- c("fit", "pmunch", "predict")
     }
     
@@ -765,13 +757,16 @@ setPodsMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   return(obj)
 }
 
-setHerbivoryMatrix.mwIPM <- function(obj, dist.herb = NA, update = TRUE) {
+setHerbivoryMatrix.mwIPM <- function(obj, dist.herb = NA, update = TRUE, perturb = rep(0,3)) {
   # Herbivory matrix
   # N x N^2
   
   N <- obj$N
   if (any(is.na(dist.herb))) {
-    dist.herb <- obj$pars$munched.fit[[obj$site]]$predict(obj$vars$log_herb_avg$b)
+    dist.herb <- obj$pars$munched.fit[[obj$site]]$predict(obj$vars$log_herb_avg$b,
+                                                          c(ipm$pars$munched.fit[[obj$site]]$pmunch, 
+                                                            ipm$pars$munched.fit[[obj$site]]$fit$estimate),
+                                                          perturb)
   }
 
   H = matrix(rep(0,N^3), nrow = N^2)
@@ -785,9 +780,9 @@ setHerbivoryMatrix.mwIPM <- function(obj, dist.herb = NA, update = TRUE) {
   obj$matrices$H <- H
   
   if (update) {
-    obj %<>% computeSexualKernel(obj, update = FALSE) %>%
-             computeClonalKernel(obj, update = FALSE) %>%
-             computeFullKernel(obj)
+    obj %<>% computeSexualKernel(update = FALSE) %>%
+             computeClonalKernel(update = FALSE) %>%
+             computeFullKernel()
   }
   
   return(obj)
@@ -1096,36 +1091,54 @@ renderHerbivoryDistFit.mwIPM <- function(obj) {
   attach(obj$pars, warn.conflicts = FALSE)
   attach(obj$vars$log_herb_avg, warn.conflicts = FALSE)
   
-  y <- munched.fit[['BLD1']]$predict(b, justmunch=TRUE)
+  y <- munched.fit[['BLD1']]$predict(b, 
+                                     c(munched.fit[['BLD1']]$pmunch, 
+                                       munched.fit[['BLD1']]$fit$estimate),
+                                     justmunch=TRUE)
   plotdata <- data.frame(site = "BLD1",
                          x = x,
                          y = y)
   
-  y <- munched.fit[['BLD2']]$predict(b, justmunch=TRUE)
+  y <- munched.fit[['BLD2']]$predict(b,
+                                     c(munched.fit[['BLD2']]$pmunch, 
+                                       munched.fit[['BLD2']]$fit$estimate),
+                                     justmunch=TRUE)
   plotdata <- bind_rows(plotdata,
                         data.frame(site = "BLD2",
                                    x = x,
                                    y = y))
   
-  y <- munched.fit[['PWR']]$predict(b, justmunch=TRUE)
+  y <- munched.fit[['PWR']]$predict(b,
+                                    c(munched.fit[['PWR']]$pmunch, 
+                                      munched.fit[['PWR']]$fit$estimate),
+                                    justmunch=TRUE)
   plotdata <- bind_rows(plotdata,
                         data.frame(site = "PWR",
                                    x = x,
                                    y = y))
   
-  y <- munched.fit[['SKY']]$predict(b, justmunch=TRUE)
+  y <- munched.fit[['SKY']]$predict(b,
+                                    c(munched.fit[['SKY']]$pmunch, 
+                                      munched.fit[['SKY']]$fit$estimate),
+                                    justmunch=TRUE)
   plotdata <- bind_rows(plotdata,
                         data.frame(site = "SKY",
                                    x = x,
                                    y = y))
   
-  y <- munched.fit[['YTB']]$predict(b, justmunch=TRUE)
+  y <- munched.fit[['YTB']]$predict(b,
+                                    c(munched.fit[['YTB']]$pmunch, 
+                                      munched.fit[['YTB']]$fit$estimate),
+                                    justmunch=TRUE)
   plotdata <- bind_rows(plotdata,
                         data.frame(site = "YTB",
                                    x = x,
                                    y = y))
   
-  y <- munched.fit[['Bertha']]$predict(b, justmunch=TRUE)
+  y <- munched.fit[['Bertha']]$predict(b,
+                                       c(munched.fit[['Bertha']]$pmunch, 
+                                         munched.fit[['Bertha']]$fit$estimate),
+                                       justmunch=TRUE)
   plotdata <- bind_rows(plotdata,
                         data.frame(site = "Combined",
                                    x = x,
