@@ -43,7 +43,9 @@ setSite <- function(obj, site, compute) UseMethod("setSite")
 bootIPM <- function(obj) UseMethod("bootIPM")
 
 # Analyze growth rate
-analyzeGrowthRate <- function(x) UseMethod("analyzeGrowthRate")
+analyzeGrowthRate <- function(obj) UseMethod("analyzeGrowthRate")
+analyzeStandard <- function(obj) UseMethod("analyzeStandard")
+analyzeParameters <- function(obj, compute, saveresults) UseMethod("analyzeParameters")
 
 # Renderers
 renderFloweringFit <- function(obj) UseMethod("renderFloweringFit") 
@@ -53,6 +55,8 @@ renderHerbivoryDistFit <- function(obj) UseMethod("renderHerbivoryDistFit")
 # Helpers & Globals
 
 glmerCtrl <- glmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
+
+tfunc <- function(x, y)
 perturbTrans <- function(pars, perturb)
 
 # Constructor ----------------------
@@ -137,7 +141,9 @@ mwIPM <- function(x = list()) {
                       kernels = list(Ks = NA,
                                      Kc = NA,
                                      K = NA),
-                      MPM = NA))
+                      MPM = NA,
+                      analysis = list(standard = NA,
+                                      parameters = NA)))
   
   y <- structure(x, class = "mwIPM") %>% 
     setPars(compute = compute, saveresults = saveresults, update = FALSE) %>% 
@@ -764,8 +770,8 @@ setHerbivoryMatrix.mwIPM <- function(obj, dist.herb = NA, update = TRUE, perturb
   N <- obj$N
   if (any(is.na(dist.herb))) {
     dist.herb <- obj$pars$munched.fit[[obj$site]]$predict(obj$vars$log_herb_avg$b,
-                                                          c(ipm$pars$munched.fit[[obj$site]]$pmunch, 
-                                                            ipm$pars$munched.fit[[obj$site]]$fit$estimate),
+                                                          c(obj$pars$munched.fit[[obj$site]]$pmunch, 
+                                                            obj$pars$munched.fit[[obj$site]]$fit$estimate),
                                                           perturb)
   }
 
@@ -928,6 +934,146 @@ computeMPM.mwIPM <- function(obj) {
 
 analyzeGrowthRate.mwIPM <- function(obj) {
   return(Re(eigen(obj$kernels$K)$values[1]))
+}
+
+analyzeStandard.mwIPM <- function(obj) {
+  K <- obj$kernels$K
+  lam <- analyzeGrowthRate(obj)
+  w.eigen <- Re(eigen(K)$vectors[,1])
+  stable.dist <- w.eigen/(obj$vars$h_apical$dx*sum(w.eigen))
+  v.eigen <- Re(eigen(t(K))$vectors[,1])
+  repro.val <- v.eigen/v.eigen[1]
+  v.dot.w <- sum(stable.dist*repro.val)*obj$vars$h_apical$dx
+  sens <- outer(repro.val,stable.dist)/v.dot.w
+  elas <- matrix(as.vector(sens)*as.vector(K)/lam,nrow=ipm$N)
+  obj$analysis$standard <- list(lambda = lam,
+                                stable.dist = stable.dist,
+                                repro.val = repro.val,
+                                sens = sens,
+                                elas = elas)
+  return(obj)
+}
+
+analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE) {
+  if (!file.exists(mwROOT("data","calculated","parameterAnalysis.RData")) | (compute)) {
+    cat("Analyzing flowering fit...")
+    flowering_func <- function(x) {obj %>% setFloweringMatrix(perturb = x) %>% analyzeGrowthRate()}
+    analysis <- tbl_df(data.frame(sensitivity = grad(flowering_func,rep(0,4)),
+                                  pars = obj$pars$flower.fit$pars$unscaled["Bertha",],
+                                  type = as.character("Flowering"),
+                                  name = c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
+    )
+    )
+    cat("done!\n")
+    
+    cat("Analyzing survival fit...")
+    survival_func <- function(x) {obj %>% setSurvivalMatrix(perturb = x) %>% analyzeGrowthRate()}
+    analysis %<>% bind_rows(
+      tbl_df(data.frame(sensitivity = grad(survival_func, rep(0,4)),
+                        pars = obj$pars$surv.fit$pars$unscaled["Bertha",],
+                        type = as.character("Survival"),
+                        name = c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
+      )
+      )
+    )
+    cat("done!\n")
+    
+    cat("Analyzing growth fit...")
+    growth_func <- function(x) {obj %>% setGrowthMatrix(perturb = x) %>% analyzeGrowthRate()}
+    analysis %<>% bind_rows(
+      tbl_df(data.frame(sensitivity = grad(growth_func, rep(0,4)),
+                        pars = obj$pars$growth.fit$pars$unscaled["Bertha",],
+                        type = as.character("Growth"),
+                        name = c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
+      )
+      )
+    )
+    cat("done!\n")
+    
+    cat("Analyzing pods fit...")
+    pods_func <- function(x) {obj %>% setPodsMatrix(perturb = x) %>% analyzeGrowthRate()}
+    analysis %<>% bind_rows(
+      tbl_df(data.frame(sensitivity = grad(pods_func, rep(0,4)),
+                        pars = obj$pars$pods.fit$pars$unscaled["Bertha",],
+                        type = as.character("Pods"),
+                        name = c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
+      )
+      )
+    )
+    cat("done!\n")
+    
+    cat("Analyzing seedling distribution...")
+    seedling_func <- function(x) {obj %>% setSeedlingRecruitmentMatrix(perturb = x) %>% analyzeGrowthRate()}
+    analysis %<>% bind_rows(
+      tbl_df(data.frame(sensitivity = grad(seedling_func, rep(0,2)),
+                        pars = tfunc(x = obj$pars$seedling.fit$fit$estimate, y = c(0,0)),
+                        type = as.character("Seedlings"),
+                        name = c("mean", "sd")
+      )
+      )
+    )
+    cat("done!\n")
+    
+    cat("Analyzing seedling emergence and seeds-per-pod...")
+    sexual_func <- function(x) {obj %>% computeSexualKernel(perturb = x) %>% analyzeGrowthRate()}
+    analysis %<>% bind_rows(
+      tbl_df(data.frame(sensitivity = grad(sexual_func, rep(0,2)),
+                        pars = c(obj$pars$seedling.emergence["Bertha"], 
+                                 obj$pars$seeds.per.pod),
+                        type = as.character("Sexual"),
+                        name = c("seedling.emergence", 
+                                 "seeds.per.pod")
+      )
+      )
+    )
+    cat("done!\n")
+    
+    cat("Analyzing budlings-per-stem and budling distribution...")
+    clonal_func <- function(x) {obj %>% computeClonalKernel(perturb = x) %>% analyzeGrowthRate()}
+    analysis %<>% bind_rows(
+      tbl_df(data.frame(sensitivity = grad(clonal_func, rep(0,4)),
+                        pars = c(obj$pars$budlings.per.stem.fit$fit$coefficients,
+                                 obj$pars$budling.fit$Bertha$fit$estimate),
+                        type = c("Clonal", "Clonal", "Budlings", "Budlings"),
+                        name = c("budlings.per.stem[exp(Intercept)]", 
+                                 "budlings.per.stem[exp(log_herb_avg)]",
+                                 "mean",
+                                 "sd")
+      )
+      )
+    )
+    cat("done!\n")
+    
+    cat("Analyzing herbivory distribution...")
+    herbivory_func <- function(x) {obj %>% setHerbivoryMatrix(perturb = x) %>% analyzeGrowthRate()}
+    analysis %<>% bind_rows(
+      tbl_df(data.frame(sensitivity = grad(herbivory_func, rep(0,3)),
+                        pars = c(obj$pars$munched.fit$Bertha$pmunch,
+                                 tfunc(x = obj$pars$munched.fit$Bertha$fit$estimate, y = c(0,0))),
+                        type = c("Herbivory"),
+                        name = c("pmunch", 
+                                 "mean",
+                                 "sd")
+      )
+      )
+    )
+    cat("done!\n")
+    
+    analysis %<>% filter(pars != 0) %>%
+      mutate(lambda = ipm %>% analyzeGrowthRate(),
+             elasticity = sensitivity/(lambda/pars))
+    analysis$type <- factor(analysis$type)
+    
+    if (saveresults) {
+      save(analysis, file = mwROOT("data","calculated","parameterAnalysis.RData"))
+    }
+  } else {
+    load(mwROOT("data","calculated","parameterAnalysis.RData"))
+  }
+  
+  obj$analysis$parameters <- analysis
+  
+  return(obj)
 }
 
 # Renderers ------------------------------
@@ -1172,15 +1318,15 @@ renderHerbivoryDistFit.mwIPM <- function(obj) {
 
 # Helpers  ------------------------------
 
-perturbTrans <- function(pars, perturb = rep(0,2)) {
+tfunc <- function(x, y) {
   # In all cases that we care about (i.e. Bertha), log-normal is the only one requiring
   #   a transformation of the perturbation.
   # In the log-normal case, x is (location, scale), and y is (mean, sd).
-  tfunc <- function(x, y) {
-    c(F1 = exp(x[1] + 0.5*x[2]*x[2]) - y[1],
-      F2 = sqrt(exp(2*x[1] + x[2]*x[2])*(exp(x[2]*x[2])-1)) - y[2])
-  }
-  
+  c(F1 = exp(x[1] + 0.5*x[2]*x[2]) - y[1],
+    F2 = sqrt(exp(2*x[1] + x[2]*x[2])*(exp(x[2]*x[2])-1)) - y[2])
+}
+
+perturbTrans <- function(pars, perturb = rep(0,2)) {
   # Let's first get the mean and sd from the location and scale.
   MSD <- tfunc(x = pars, y = c(0,0))
   
