@@ -9,6 +9,7 @@ output:
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 source("../../.Rprofile")
+library(tidyr)
 ```
 
 ```{r}
@@ -18,80 +19,99 @@ if (compute) {
   ipm <- mwIPM()
   
   if (FALSE) {
-  flowering_func <- function(x) {ipm %>% setFloweringMatrix(perturb = x) %>% analyzeGrowthRate()}
-  results <- tbl_df(data.frame(sensitivity = grad(flowering_func,rep(0,4)),
-                               type = as.character("Flowering"),
-                               name = c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
-                               )
-                    )
-  
-  survival_func <- function(x) {ipm %>% setSurvivalMatrix(perturb = x) %>% analyzeGrowthRate()}
-  results %<>% bind_rows(
-                tbl_df(data.frame(sensitivity = grad(survival_func, rep(0,4)),
-                                  type = as.character("Survival"),
-                                  name = c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
-                                  )
-                       )
-               )
-  
-  growth_func <- function(x) {ipm %>% setGrowthMatrix(perturb = x) %>% analyzeGrowthRate()}
-  results %<>% bind_rows(
-                tbl_df(data.frame(sensitivity = grad(growth_func, rep(0,4)),
-                                  type = as.character("Growth"),
-                                  name = c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
-                                  )
-                       )
-               )
-  
-  pods_func <- function(x) {ipm %>% setPodsMatrix(perturb = x) %>% analyzeGrowthRate()}
-  results %<>% bind_rows(
-                tbl_df(data.frame(sensitivity = grad(pods_func, rep(0,4)),
-                                  type = as.character("Pods"),
-                                  name = c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
-                                  )
-                       )
-               )
-  seedling_func <- function(x) {ipm %>% setSeedlingRecruitmentMatrix(perturb = x) %>% analyzeGrowthRate()}
-  results %<>% bind_rows(
-                tbl_df(data.frame(sensitivity = grad(seedling_func, rep(0,2)),
-                                  type = as.character("Seedlings"),
-                                  name = c("mean", "sd")
-                                  )
-                       )
-               )
-  sexual_func <- function(x) {ipm %>% computeSexualKernel(perturb = x) %>% analyzeGrowthRate()}
-  results %<>% bind_rows(
-                tbl_df(data.frame(sensitivity = grad(sexual_func, rep(0,2)),
-                                  type = as.character("Sexual"),
-                                  name = c("seedling.emergence", 
-                                           "seeds.per.pod")
-                                  )
-                       )
-               )
-  
-  clonal_func <- function(x) {ipm %>% computeClonalKernel(perturb = x) %>% analyzeGrowthRate()}
-  results %<>% bind_rows(
-                tbl_df(data.frame(sensitivity = grad(clonal_func, rep(0,4)),
-                                  type = c("Clonal", "Clonal", "Budlings", "Budlings"),
-                                  name = c("budlings.per.stem[exp(Intercept)]", 
-                                           "budlings.per.stem[exp(log_herb_avg)]",
-                                           "mean",
-                                           "sd")
-                                  )
-                       )
-               )
-  
-  herbivory_func <- function(x) {ipm %>% setHerbivoryMatrix(perturb = x) %>% analyzeGrowthRate()}
-  results %<>% bind_rows(
-                tbl_df(data.frame(sensitivity = grad(herbivory_func, rep(0,3)),
-                                  type = c("Herbivory"),
-                                  name = c("pmunch", 
-                                           "mean",
-                                           "sd")
-                                  )
-                       )
-               )
-} else {
+    # Need this for logmean transformation
+    tfunc <- function(x, y) {
+      c(F1 = exp(x[1] + 0.5*x[2]*x[2]) - y[1],
+        F2 = sqrt(exp(2*x[1] + x[2]*x[2])*(exp(x[2]*x[2])-1)) - y[2])
+    }
+    
+    flowering_func <- function(x) {ipm %>% setFloweringMatrix(perturb = x) %>% analyzeGrowthRate()}
+    results <- tbl_df(data.frame(sensitivity = grad(flowering_func,rep(0,4)),
+                                 pars = ipm$pars$flower.fit$pars$unscaled["Bertha",],
+                                 type = as.character("Flowering"),
+                                 name = c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
+    )
+    )
+    
+    survival_func <- function(x) {ipm %>% setSurvivalMatrix(perturb = x) %>% analyzeGrowthRate()}
+    results %<>% bind_rows(
+      tbl_df(data.frame(sensitivity = grad(survival_func, rep(0,4)),
+                        pars = ipm$pars$surv.fit$pars$unscaled["Bertha",],
+                        type = as.character("Survival"),
+                        name = c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
+      )
+      )
+    )
+    
+    growth_func <- function(x) {ipm %>% setGrowthMatrix(perturb = x) %>% analyzeGrowthRate()}
+    results %<>% bind_rows(
+      tbl_df(data.frame(sensitivity = grad(growth_func, rep(0,4)),
+                        pars = ipm$pars$growth.fit$pars$unscaled["Bertha",],
+                        type = as.character("Growth"),
+                        name = c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
+      )
+      )
+    )
+    
+    pods_func <- function(x) {ipm %>% setPodsMatrix(perturb = x) %>% analyzeGrowthRate()}
+    results %<>% bind_rows(
+      tbl_df(data.frame(sensitivity = grad(pods_func, rep(0,4)),
+                        pars = ipm$pars$pods.fit$pars$unscaled["Bertha",],
+                        type = as.character("Pods"),
+                        name = c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
+      )
+      )
+    )
+    
+    seedling_func <- function(x) {ipm %>% setSeedlingRecruitmentMatrix(perturb = x) %>% analyzeGrowthRate()}
+    results %<>% bind_rows(
+      tbl_df(data.frame(sensitivity = grad(seedling_func, rep(0,2)),
+                        pars = tfunc(x = ipm$pars$seedling.fit$fit$estimate, y = c(0,0)),
+                        type = as.character("Seedlings"),
+                        name = c("mean", "sd")
+      )
+      )
+    )
+    
+    sexual_func <- function(x) {ipm %>% computeSexualKernel(perturb = x) %>% analyzeGrowthRate()}
+    results %<>% bind_rows(
+      tbl_df(data.frame(sensitivity = grad(sexual_func, rep(0,2)),
+                        pars = c(ipm$pars$seedling.emergence["Bertha"], 
+                                 ipm$pars$seeds.per.pod),
+                        type = as.character("Sexual"),
+                        name = c("seedling.emergence", 
+                                 "seeds.per.pod")
+      )
+      )
+    )
+    
+    clonal_func <- function(x) {ipm %>% computeClonalKernel(perturb = x) %>% analyzeGrowthRate()}
+    results %<>% bind_rows(
+      tbl_df(data.frame(sensitivity = grad(clonal_func, rep(0,4)),
+                        pars = c(ipm$pars$budlings.per.stem.fit$fit$coefficients,
+                                 ipm$pars$budling.fit$Bertha$fit$estimate),
+                        type = c("Clonal", "Clonal", "Budlings", "Budlings"),
+                        name = c("budlings.per.stem[exp(Intercept)]", 
+                                 "budlings.per.stem[exp(log_herb_avg)]",
+                                 "mean",
+                                 "sd")
+      )
+      )
+    )
+    
+    herbivory_func <- function(x) {ipm %>% setHerbivoryMatrix(perturb = x) %>% analyzeGrowthRate()}
+    results %<>% bind_rows(
+      tbl_df(data.frame(sensitivity = grad(herbivory_func, rep(0,3)),
+                        pars = c(ipm$pars$munched.fit$Bertha$pmunch,
+                                 tfunc(x = ipm$pars$munched.fit$Bertha$fit$estimate, y = c(0,0))),
+                        type = c("Herbivory"),
+                        name = c("pmunch", 
+                                 "mean",
+                                 "sd")
+      )
+      )
+    )
+  } else {
     load(mwROOT("data","calculated","figure6.RData"))
     
     
@@ -103,8 +123,91 @@ if (compute) {
 
 ```
 
-Save figure.
+```{r}
+results %<>% filter(pars != 0) %>%
+  mutate(lambda = ipm %>% analyzeGrowthRate(),
+         elasticity = sensitivity/(lambda/pars))
+results$type <- factor(results$type)
+new.levels <- c("Clonal", "Clonal", "Sexual", "Growth", "Herbivory", "Sexual", "Sexual", "Sexual", "Survival")
+results$newtype <- factor(new.levels[results$type])
+
+xlabs <- results %>% arrange(type) %>% select(name)
+```
+
+```{r, eval = F}
+psens <- results %>% 
+  filter(name != "seedling.emergence") %>% 
+  unite(label, type, name, sep="-", remove=FALSE) %>% 
+  ggplot(aes(x = label, 
+             y = sensitivity, 
+             color=newtype, 
+             fill=newtype)) + 
+  geom_bar(stat = "identity") + 
+  theme(axis.text.x=element_text(angle = -45, 
+                                 hjust = 0)) + 
+  scale_x_discrete(labels=xlabs$name)
+
+results$lambda <- ipm %>% analyzeGrowthRate()
+results %<>% mutate(elasticity = sensitivity/(lambda/pars))
+
+pelast <- results %>% 
+  unite(label, type, name, sep="-", remove=FALSE) %>% 
+  ggplot(aes(x = label, 
+             y = elasticity, 
+             color=newtype, 
+             fill=newtype)) + 
+  geom_bar(stat = "identity") + 
+  theme(axis.text.x=element_text(angle = -45, 
+                                 hjust = 0)) + 
+  scale_x_discrete(labels=xlabs$name)
+
+# ggsave(mwROOT("scripts","figs","Figure6.png"), height=4, width=6, device = "png", p)
+```
+
+```{r, eval=F}
+results_long <- results %>% gather(measure, value, sensitivity, elasticity)
+
+results_long$measure <- factor(results_long$measure, 
+                               levels = c("sensitivity", 
+                                          "elasticity"))
+
+myplot <- results_long %>% 
+  unite(label, type, name, sep="-", remove=FALSE) %>%
+  group_by(measure) %>%
+  ggplot(aes(x = label,
+             y = value,
+             color = newtype, 
+             fill = newtype)) +
+  geom_bar(stat = "identity") + 
+  scale_x_discrete(labels=xlabs$name) +
+  facet_grid(~ measure) +
+  coord_flip(ylim=c(-2,2))
+
+```
 
 ```{r}
-# ggsave(mwROOT("scripts","figs","Figure6.png"), height=4, width=6, device = "png", p)
+myplot <- results %>% 
+  unite(label, type, name, sep="-", remove=FALSE) %>%
+  ggplot(aes(x = label,
+             y = elasticity,
+             color = newtype, 
+             fill = newtype)) +
+  geom_bar(stat = "identity") + 
+  scale_x_discrete(labels=xlabs$name) +
+  coord_flip()
+```
+
+```{r}
+library(doParallel)
+
+numcl <- detectCores()-1
+cl <- makeCluster(numcl)
+registerDoParallel(cl)
+results <- tbl_df(foreach(i=1:20, .combine=bind_rows) %dopar% {
+  source("../../.Rprofile")
+  ipm %<>% bootIPM()
+  thisone <- ipm$data %>% group_by(site) %>% summarize(log_herb_avg = mean(log_herb_avg, na.rm=T), growth_rate = NA)
+  thisone$growth_rate <- sapply(sites[-1], function (x) {ipm %>% setSite(x) %>% analyzeGrowthRate()})
+  thisone
+})
 ```
