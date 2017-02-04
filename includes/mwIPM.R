@@ -484,7 +484,7 @@ setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, 
     seedling.fit[[2]] <- eval(parse(
       text = 
         "function(x, pars, perturb = rep(0,2)) {
-           pars <- perturbTrans(pars, perturb)
+           pars <- pars + perturb
            N <- length(x)
            dx <- x[2]-x[1]
            y <- rep(0, N-1)
@@ -961,7 +961,10 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE) {
     analysis <- tbl_df(data.frame(sensitivity = grad(flowering_func,rep(0,4)),
                                   pars = obj$pars$flower.fit$pars$unscaled["Bertha",],
                                   type = as.character("Flowering"),
-                                  name = c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
+                                  name = c("(Intercept)", 
+                                           "h_apical", 
+                                           "log_herb_avg", 
+                                           "h_apical:log_herb_avg")
     )
     )
     cat("done!\n")
@@ -972,7 +975,10 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE) {
       tbl_df(data.frame(sensitivity = grad(survival_func, rep(0,4)),
                         pars = obj$pars$surv.fit$pars$unscaled["Bertha",],
                         type = as.character("Survival"),
-                        name = c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
+                        name = c("(Intercept)", 
+                                 "h_apical", 
+                                 "log_herb_avg", 
+                                 "h_apical:log_herb_avg")
       )
       )
     )
@@ -1001,7 +1007,10 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE) {
       tbl_df(data.frame(sensitivity = grad(pods_func, rep(0,4)),
                         pars = obj$pars$pods.fit$pars$unscaled["Bertha",],
                         type = as.character("Pods"),
-                        name = c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
+                        name = c("(Intercept)", 
+                                 "h_apical", 
+                                 "log_herb_avg", 
+                                 "h_apical:log_herb_avg")
       )
       )
     )
@@ -1011,9 +1020,10 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE) {
     seedling_func <- function(x) {obj %>% setSeedlingRecruitmentMatrix(perturb = x) %>% analyzeGrowthRate()}
     analysis %<>% bind_rows(
       tbl_df(data.frame(sensitivity = grad(seedling_func, rep(0,2)),
-                        pars = tfunc(x = obj$pars$seedling.fit$fit$estimate, y = c(0,0)),
+                        pars = obj$pars$seedling.fit$fit$estimate,
                         type = as.character("Seedlings"),
-                        name = c("mean", "sd")
+                        name = c("meanlog", 
+                                 "sdlog")
       )
       )
     )
