@@ -56,21 +56,10 @@ renderHerbivoryDistFit <- function(obj) UseMethod("renderHerbivoryDistFit")
 
 glmerCtrl <- glmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
 
-tfunc <- function(x, y)
-perturbTrans <- function(pars, perturb)
+# tfunc <- function(x, y)
+# perturbTrans <- function(pars, perturb)
 
 # Constructor ----------------------
-
-bootIPM.mwIPM <- function (obj) {
-  obj$data <- obj$data_orig %>% group_by(site) %>% 
-                                sample_frac(replace=TRUE) %>% 
-                                ungroup()
-  obj %<>% setPars(compute = TRUE, update = FALSE) %>% 
-           setSite(compute = TRUE) %>%
-           computeMPM()
-
-  return(obj)
-}
 
 mwIPM <- function(x = list()) {
   #
@@ -151,6 +140,17 @@ mwIPM <- function(x = list()) {
     computeMPM()
   
   return(y)
+}
+
+bootIPM.mwIPM <- function (obj) {
+  obj$data <- obj$data_orig %>% group_by(site) %>% 
+                                sample_frac(replace=TRUE) %>% 
+                                ungroup()
+  obj %<>% setPars(compute = TRUE, update = FALSE) %>% 
+           setSite(compute = TRUE) %>%
+           computeMPM()
+
+  return(obj)
 }
 
 # Vars & Pars ----------------------
