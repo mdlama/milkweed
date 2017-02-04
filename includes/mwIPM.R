@@ -709,19 +709,19 @@ setSurvivalMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   return(obj)
 }
 
-setGrowthMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
+setGrowthMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,5)) {
   # Growth
   # N x N^2
 
   N <- obj$N
-  Mu <- c(outer(obj$vars$h_apical$x, obj$vars$log_herb_avg$x, function(x,y) {predict(obj$pars$growth.fit, newdata = data.frame(h_apical = x, log_herb_avg = y), type=obj$site, perturb=perturb)}))
+  Mu <- c(outer(obj$vars$h_apical$x, obj$vars$log_herb_avg$x, function(x,y) {predict(obj$pars$growth.fit, newdata = data.frame(h_apical = x, log_herb_avg = y), type=obj$site, perturb=perturb[1:4])}))
   G <- matrix(rep(0, N^3), nrow=N)
   for (i in (1:N^2)) {
     for (j in 1:N) {
-      G[j,i] = pnorm(obj$vars$h_apical.next$b[j+1], Mu[i], obj$pars$growth.fit$pars$sd[[obj$site]]) - pnorm(obj$vars$h_apical.next$b[j], Mu[i], obj$pars$growth.fit$pars$sd[[obj$site]])
+      G[j,i] = pnorm(obj$vars$h_apical.next$b[j+1], Mu[i], obj$pars$growth.fit$pars$sd[[obj$site]]+perturb[5]) - pnorm(obj$vars$h_apical.next$b[j], Mu[i], obj$pars$growth.fit$pars$sd[[obj$site]]+perturb[5])
     }
-    G[1,i] = G[1,i] + pnorm(obj$vars$h_apical.next$b[1], Mu[i], obj$pars$growth.fit$pars$sd[[obj$site]])
-    G[N,i] = G[N,i] + pnorm(obj$vars$h_apical.next$b[N+1], Mu[i], obj$pars$growth.fit$pars$sd[[obj$site]], lower.tail=FALSE)
+    G[1,i] = G[1,i] + pnorm(obj$vars$h_apical.next$b[1], Mu[i], obj$pars$growth.fit$pars$sd[[obj$site]]+perturb[5])
+    G[N,i] = G[N,i] + pnorm(obj$vars$h_apical.next$b[N+1], Mu[i], obj$pars$growth.fit$pars$sd[[obj$site]]+perturb[5], lower.tail=FALSE)
     G[,i] <- G[,i]/obj$vars$h_apical.next$dx
   }
   obj$matrices$G <- G
@@ -981,10 +981,15 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE) {
     cat("Analyzing growth fit...")
     growth_func <- function(x) {obj %>% setGrowthMatrix(perturb = x) %>% analyzeGrowthRate()}
     analysis %<>% bind_rows(
-      tbl_df(data.frame(sensitivity = grad(growth_func, rep(0,4)),
-                        pars = obj$pars$growth.fit$pars$unscaled["Bertha",],
+      tbl_df(data.frame(sensitivity = grad(growth_func, rep(0,5)),
+                        pars = c(obj$pars$growth.fit$pars$unscaled["Bertha",],
+                                 obj$pars$growth.fit$pars$sd["Bertha"]),
                         type = as.character("Growth"),
-                        name = c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
+                        name = c("(Intercept)", 
+                                 "h_apical", 
+                                 "log_herb_avg", 
+                                 "h_apical:log_herb_avg", 
+                                 "sd")
       )
       )
     )
