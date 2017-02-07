@@ -11,6 +11,7 @@ output:
 source("../../.Rprofile")
 library(tidyr)
 library(doParallel)
+library(latex2exp)
 ```
 
 ```{r}
@@ -48,28 +49,81 @@ plotdata <- results %>%
 new.levels <- c("Clonal", "Clonal", "Sexual", "Growth", "Herbivory", "Sexual", "Sexual", "Sexual", "Survival")
 plotdata$newtype <- factor(new.levels[plotdata$type])
 
-xlabs <- plotdata %>% arrange(type) %>% select(name)
+# ylabs <- plotdata %>% arrange(type) %>% select(name)
 ```
 
 ```{r}
+newlabelorder <- c("Clonal-(Intercept)", 
+                   "Clonal-log_herb_avg", 
+                   "Budlings-mean", 
+                   "Budlings-sd", 
+                   "Herbivory-pmunch", 
+                   "Herbivory-mean", 
+                   "Herbivory-sd", 
+                   "Flowering-(Intercept)", 
+                   "Flowering-h_apical", 
+                   "Flowering-log_herb_avg", 
+                   "Flowering-h_apical:log_herb_avg", 
+                   "Pods-(Intercept)", 
+                   "Pods-h_apical", 
+                   "Pods-log_herb_avg", 
+                   "Seedlings-mean", 
+                   "Seedlings-sd", 
+                   "Sexual-seedling.emergence", 
+                   "Sexual-seeds.per.pod", 
+                   "Growth-(Intercept)", 
+                   "Growth-h_apical", 
+                   "Growth-log_herb_avg", 
+                   "Growth-h_apical:log_herb_avg", 
+                   "Growth-sd", 
+                   "Survival-(Intercept)")
+
+fancypantslabels <- rev(newlabelorder)
+fancypantslabels[1] <- TeX('$\\alpha$')
+fancypantslabels[2] <- TeX('$\\beta_{\\bar{z}_{\\omega}}$')
+fancypantslabels[3] <- TeX('$\\mu$')
+fancypantslabels[4] <- TeX('$\\sigma$')
+fancypantslabels[5] <- TeX('$p_{\\omega}$')
+fancypantslabels[6] <- TeX('$\\mu$')
+fancypantslabels[7] <- TeX('$\\sigma$')
+fancypantslabels[8] <- TeX('$\\alpha$')
+fancypantslabels[9] <- TeX('$\\beta_{z_{h}}$')
+fancypantslabels[10] <- TeX('$\\beta_{z_{\\omega}}$')
+fancypantslabels[11] <- TeX('$\\beta_{z_{h}:z_{\\omega}}$')
+fancypantslabels[12] <- TeX('$\\alpha$')
+fancypantslabels[13] <- TeX('$\\beta_{z_{h}}$')
+fancypantslabels[14] <- TeX('$\\beta_{z_{\\omega}}$')
+fancypantslabels[15] <- TeX('$\\mu$')
+fancypantslabels[16] <- TeX('$\\sigma$')
+fancypantslabels[17] <- TeX('$\\alpha$')
+fancypantslabels[18] <- TeX('$\\alpha$')
+fancypantslabels[19] <- TeX('$\\alpha$')
+fancypantslabels[20] <- TeX('$\\beta_{z_{h}}$')
+fancypantslabels[21] <- TeX('$\\beta_{z_{\\omega}}$')
+fancypantslabels[22] <- TeX('$\\beta_{z_{h}:z_{\\omega}}$')
+fancypantslabels[23] <- TeX('$\\sigma$')
+fancypantslabels[24] <- TeX('$\\alpha$')
+
+newtypeorder <- c("Clonal", "Herbivory", "Sexual", "Growth", "Survival")
+
 myplot <- plotdata %>% 
-  unite(label, type, name, sep="-", remove=FALSE) %>%
-  ggplot(aes(x = label,
-             y = meanElasticity,
+  mutate(label = factor(label, levels = rev(newlabelorder))) %>%
+  mutate(newtype = factor(newtype, levels = newtypeorder)) %>%
+  ggplot(aes(x = meanElasticity,
+             y = label,
              color = newtype, 
              fill = newtype)) +
-  geom_hline(yintercept = 0, 
+  geom_vline(xintercept = 0, 
              linetype = 1,
              size = 0.2) +
   geom_point() + 
-  geom_errorbar(aes(ymin = meanElasticity - ci,
-                    ymax = meanElasticity + ci),
-                width = 0.3) + 
-  scale_x_discrete(labels=xlabs$name) +
-  coord_flip() +
+  geom_errorbarh(aes(xmin = meanElasticity - ci,
+                     xmax = meanElasticity + ci),
+                height = 0.3) + 
+  scale_y_discrete(labels=rev(fancypantslabels)) +
+  xlab("Parameter elasticity") +
+  ylab("") + 
   theme_bw()
-
-# geom_bar(stat = "identity") + 
 ```
 
 # Archive
