@@ -1,6 +1,6 @@
 ---
-title: "Figures for Sivan's Paper"
-date: "June 2, 2016"
+title: "Figure 1: Herbivory and apical height"
+date: '`r format(Sys.time(), '%d %B, %Y')`'
 output: 
   html_document:
     toc: true

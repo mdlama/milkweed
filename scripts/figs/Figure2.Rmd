@@ -1,6 +1,6 @@
 ---
-title: "Exploratory Figure 2: Distributions"
-date: "June 2, 2016"
+title: "Figure 2: Herbivory slope parameters across site"
+date: '`r format(Sys.time(), '%d %B, %Y')`'
 output: 
   html_document:
     toc: true
