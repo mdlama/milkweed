@@ -1,0 +1,81 @@
+---
+title: "Figure 5"
+output: 
+  html_document:
+    toc: true
+---
+
+# Initialization
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+source("../../.Rprofile")
+library(doParallel)
+```
+
+```{r}
+compute <- FALSE
+
+if (compute) {
+  sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
+  ipm <- mwIPM()
+  plotdata <- data.frame(log_herb_avg = ipm$vars$log_herb_avg$x,
+                         growth_rate = sapply(1:ipm$N, 
+                                              function (x) { 
+                                                ipm %>% 
+                                                  setHerbivoryMatrix(dist.herb = c(rep(0,x-1), 1/ipm$vars$log_herb_avg$dx, rep(0,ipm$N-x))) %>% 
+                                                  analyzeGrowthRate()
+                                              }))
+  
+  numcl <- detectCores()-1
+  cl <- makeCluster(numcl)
+  registerDoParallel(cl)
+  results <- tbl_df(foreach(i=1:20, .combine=bind_rows) %dopar% {
+    source("../../.Rprofile")
+    ipm %<>% bootIPM()
+    thisone <- ipm$data %>% group_by(site) %>% summarize(log_herb_avg = mean(log_herb_avg, na.rm=T), growth_rate = NA)
+    thisone$growth_rate <- sapply(sites[-1], function (x) {ipm %>% setSite(x) %>% analyzeGrowthRate()})
+    thisone
+  })
+  
+  save(plotdata, results, file=mwROOT("data","calculated","figure5.RData"))
+} else {
+  load(mwROOT("data","calculated","figure5.RData"))
+}
+
+# Bertha growth rate vs point-mass herbivory scores
+p <- plotdata %>% ggplot(aes(x = log_herb_avg,
+                             y = growth_rate)) +
+                  geom_line() + 
+                  geom_hline(aes(yintercept = 1.0), linetype = 3)
+
+# Site-specific bootstrapped data points with 95% confidence ellipse
+p <- p + geom_point(aes(x = log_herb_avg, 
+                        y = growth_rate, 
+                        color = site), size = 0.5,
+                    data=results) + 
+         stat_ellipse(aes(x = log_herb_avg, 
+                          y = growth_rate, 
+                          color = site), 
+                      data = results)
+
+# Change theme, scale, and labels
+p <- p + theme_bw() +
+         scale_x_continuous(limits = c(log(0.1), log(6.1))) + 
+         scale_y_continuous(limits = c(0.0, 1.7)) + 
+         xlab("ln(Herbivory Score)") +
+         ylab("Per Capita Growth Rate") + 
+         labs(color = "Sites") + 
+         theme(legend.background = element_rect(fill="lightgrey",
+                                                size=0.1,
+                                                linetype="solid"),
+               legend.key.size =  unit(0.18, "in"),
+               legend.position = c(0.885, 0.78))
+
+p
+```
+
+Save figure.
+
+```{r}
+ggsave(mwROOT("scripts","figs","Figure5.png"), height=4, width=6, device = "png", p)
+```

@@ -1,5 +1,5 @@
 ---
-title: "Figure 5"
+title: "Figure 6: Elasticity Analysis"
 output: 
   html_document:
     toc: true
@@ -9,73 +9,171 @@ output:
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 source("../../.Rprofile")
+library(tidyr)
 library(doParallel)
+library(latex2exp)
 ```
 
 ```{r}
 compute <- FALSE
 
 if (compute) {
-  sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
   ipm <- mwIPM()
-  plotdata <- data.frame(log_herb_avg = ipm$vars$log_herb_avg$x,
-                         growth_rate = sapply(1:ipm$N, 
-                                              function (x) { 
-                                                ipm %>% 
-                                                  setHerbivoryMatrix(dist.herb = c(rep(0,x-1), 1/ipm$vars$log_herb_avg$dx, rep(0,ipm$N-x))) %>% 
-                                                  analyzeGrowthRate()
-                                              }))
-  
   numcl <- detectCores()-1
-  cl <- makeCluster(numcl)
-  registerDoParallel(cl)
+  registerDoParallel(cores = numcl)
   results <- tbl_df(foreach(i=1:20, .combine=bind_rows) %dopar% {
     source("../../.Rprofile")
-    ipm %<>% bootIPM()
-    thisone <- ipm$data %>% group_by(site) %>% summarize(log_herb_avg = mean(log_herb_avg, na.rm=T), growth_rate = NA)
-    thisone$growth_rate <- sapply(sites[-1], function (x) {ipm %>% setSite(x) %>% analyzeGrowthRate()})
+    ipm %<>% bootIPM() %>% analyzeParameters(compute = TRUE)
+    thisone <- ipm$analysis$parameters %>% select(type, name, elasticity)
     thisone
   })
   
-  save(plotdata, results, file=mwROOT("data","calculated","figure5.RData"))
+  save(results, file=mwROOT("data","calculated","figure6.RData"))
 } else {
-  load(mwROOT("data","calculated","figure5.RData"))
+  load(mwROOT("data","calculated","figure6.RData"))
 }
-
-# Bertha growth rate vs point-mass herbivory scores
-p <- plotdata %>% ggplot(aes(x = log_herb_avg,
-                             y = growth_rate)) +
-                  geom_line() + 
-                  geom_hline(aes(yintercept = 1.0), linetype = 3)
-
-# Site-specific bootstrapped data points with 95% confidence ellipse
-p <- p + geom_point(aes(x = log_herb_avg, 
-                        y = growth_rate, 
-                        color = site), size = 0.5,
-                    data=results) + 
-         stat_ellipse(aes(x = log_herb_avg, 
-                          y = growth_rate, 
-                          color = site), 
-                      data = results)
-
-# Change theme, scale, and labels
-p <- p + theme_bw() +
-         scale_x_continuous(limits = c(log(0.1), log(6.1))) + 
-         scale_y_continuous(limits = c(0.0, 1.7)) + 
-         xlab("ln(Herbivory Score)") +
-         ylab("Per Capita Growth Rate") + 
-         labs(color = "Sites") + 
-         theme(legend.background = element_rect(fill="lightgrey",
-                                                size=0.1,
-                                                linetype="solid"),
-               legend.key.size =  unit(0.18, "in"),
-               legend.position = c(0.885, 0.78))
-
-p
+#unite(label, type, name, sep="-", remove=FALSE)
 ```
 
-Save figure.
+```{r}
+plotdata <- results %>% 
+  unite(label, type, name, sep="-", remove=FALSE) %>% 
+  group_by(label) %>% 
+  summarize(meanElasticity = mean(elasticity),
+            n = n(),
+            se = sd(elasticity)/sqrt(n),
+            ci = qt(0.975, n-1)*se,
+            type = last(type),
+            name = last(name))
+
+new.levels <- c("Clonal", "Clonal", "Sexual", "Growth", "Herbivory", "Sexual", "Sexual", "Sexual", "Survival")
+plotdata$newtype <- factor(new.levels[plotdata$type])
+
+# ylabs <- plotdata %>% arrange(type) %>% select(name)
+```
 
 ```{r}
-ggsave(mwROOT("scripts","figs","Figure5.png"), height=4, width=6, device = "png", p)
+newlabelorder <- c("Clonal-(Intercept)", 
+                   "Clonal-log_herb_avg", 
+                   "Budlings-mean", 
+                   "Budlings-sd", 
+                   "Herbivory-pmunch", 
+                   "Herbivory-mean", 
+                   "Herbivory-sd", 
+                   "Flowering-(Intercept)", 
+                   "Flowering-h_apical", 
+                   "Flowering-log_herb_avg", 
+                   "Flowering-h_apical:log_herb_avg", 
+                   "Pods-(Intercept)", 
+                   "Pods-h_apical", 
+                   "Pods-log_herb_avg", 
+                   "Seedlings-mean", 
+                   "Seedlings-sd", 
+                   "Sexual-seedling.emergence", 
+                   "Sexual-seeds.per.pod", 
+                   "Growth-(Intercept)", 
+                   "Growth-h_apical", 
+                   "Growth-log_herb_avg", 
+                   "Growth-h_apical:log_herb_avg", 
+                   "Growth-sd", 
+                   "Survival-(Intercept)")
+
+fancypantslabels <- rev(newlabelorder)
+fancypantslabels[1] <- TeX('$\\alpha$')
+fancypantslabels[2] <- TeX('$\\beta_{\\bar{z}_{\\omega}}$')
+fancypantslabels[3] <- TeX('$\\mu$')
+fancypantslabels[4] <- TeX('$\\sigma$')
+fancypantslabels[5] <- TeX('$p_{\\omega}$')
+fancypantslabels[6] <- TeX('$\\mu$')
+fancypantslabels[7] <- TeX('$\\sigma$')
+fancypantslabels[8] <- TeX('$\\alpha$')
+fancypantslabels[9] <- TeX('$\\beta_{z_{h}}$')
+fancypantslabels[10] <- TeX('$\\beta_{z_{\\omega}}$')
+fancypantslabels[11] <- TeX('$\\beta_{z_{h}:z_{\\omega}}$')
+fancypantslabels[12] <- TeX('$\\alpha$')
+fancypantslabels[13] <- TeX('$\\beta_{z_{h}}$')
+fancypantslabels[14] <- TeX('$\\beta_{z_{\\omega}}$')
+fancypantslabels[15] <- TeX('$\\mu$')
+fancypantslabels[16] <- TeX('$\\sigma$')
+fancypantslabels[17] <- TeX('$\\alpha$')
+fancypantslabels[18] <- TeX('$\\alpha$')
+fancypantslabels[19] <- TeX('$\\alpha$')
+fancypantslabels[20] <- TeX('$\\beta_{z_{h}}$')
+fancypantslabels[21] <- TeX('$\\beta_{z_{\\omega}}$')
+fancypantslabels[22] <- TeX('$\\beta_{z_{h}:z_{\\omega}}$')
+fancypantslabels[23] <- TeX('$\\sigma$')
+fancypantslabels[24] <- TeX('$\\alpha$')
+
+newtypeorder <- c("Clonal", "Herbivory", "Sexual", "Growth", "Survival")
+
+myplot <- plotdata %>% 
+  mutate(label = factor(label, levels = rev(newlabelorder))) %>%
+  mutate(newtype = factor(newtype, levels = newtypeorder)) %>%
+  ggplot(aes(x = meanElasticity,
+             y = label,
+             color = newtype, 
+             fill = newtype)) +
+  geom_vline(xintercept = 0, 
+             linetype = 1,
+             size = 0.2) +
+  geom_point() + 
+  geom_errorbarh(aes(xmin = meanElasticity - ci,
+                     xmax = meanElasticity + ci),
+                height = 0.3) + 
+  scale_y_discrete(labels=rev(fancypantslabels)) +
+  xlab("Parameter elasticity") +
+  ylab("") + 
+  theme_bw()
+```
+
+# Archive
+
+```{r, eval = F}
+psens <- results %>% 
+  filter(name != "seedling.emergence") %>% 
+  unite(label, type, name, sep="-", remove=FALSE) %>% 
+  ggplot(aes(x = label, 
+             y = sensitivity, 
+             color=newtype, 
+             fill=newtype)) + 
+  geom_bar(stat = "identity") + 
+  theme(axis.text.x=element_text(angle = -45, 
+                                 hjust = 0)) + 
+  scale_x_discrete(labels=xlabs$name)
+
+results$lambda <- ipm %>% analyzeGrowthRate()
+results %<>% mutate(elasticity = sensitivity/(lambda/pars))
+
+pelast <- results %>% 
+  unite(label, type, name, sep="-", remove=FALSE) %>% 
+  ggplot(aes(x = label, 
+             y = elasticity, 
+             color=newtype, 
+             fill=newtype)) + 
+  geom_bar(stat = "identity") + 
+  theme(axis.text.x=element_text(angle = -45, 
+                                 hjust = 0)) + 
+  scale_x_discrete(labels=xlabs$name)
+
+# ggsave(mwROOT("scripts","figs","Figure6.png"), height=4, width=6, device = "png", p)
+```
+
+```{r, eval=F}
+results_long <- results %>% gather(measure, value, sensitivity, elasticity)
+
+results_long$measure <- factor(results_long$measure, 
+                               levels = c("sensitivity", 
+                                          "elasticity"))
+
+myplot <- results_long %>% 
+  unite(label, type, name, sep="-", remove=FALSE) %>%
+  group_by(measure) %>%
+  ggplot(aes(x = label,
+             y = value,
+             color = newtype, 
+             fill = newtype)) +
+  geom_bar(stat = "identity") + 
+  scale_x_discrete(labels=xlabs$name) +
+  facet_grid(~ measure) +
+  coord_flip(ylim=c(-2,2))
 ```
