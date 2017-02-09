@@ -8,11 +8,12 @@ library(magrittr)
 library(rootSolve)
 library(numDeriv)
 
-# Used mainly in render functions
+# Used mainly in render functions and figure scripts
 library(RColorBrewer)   # For brewer.pal function
 library(scales)         # For hue_pal function
 library(plot3D)         # For mesh function
 library(gtable)         # For gtable_add_cols
+library(grid)           # For unit.pmax
 library(gridExtra)      # For grid.arrange
 
 mwROOT <- is_rstudio_project$make_fix_file()
