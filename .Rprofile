@@ -15,6 +15,7 @@ library(plot3D)         # For mesh function
 library(gtable)         # For gtable_add_cols
 library(grid)           # For unit.pmax
 library(gridExtra)      # For grid.arrange
+library(latex2exp)      # For latex expressions in plots
 
 mwROOT <- is_rstudio_project$make_fix_file()
 
