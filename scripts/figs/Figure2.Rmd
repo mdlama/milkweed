@@ -6,31 +6,9 @@ output:
     toc: true
 ---
 
-Load the Milkweed Model class.
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-source("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/mwMod.R")
-load("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/DataAnalysis/vitalFits.RData")
-```
-
-```{r, echo=FALSE, warning=FALSE, message=FALSE}
-library(dplyr)
-library(lme4)
-library(plot3D) # For mesh function
-library(ggplot2)
-library(grid)
-library(RColorBrewer)
-library(gtable)
-library(gridExtra)
-```
-
-Load the aggregate data set & necessary packages
-```{r}
-metadata=tbl_df(read.csv("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/Milkweed/DATA SETS/Data Frames/metadata13to15.csv"))
-
-# Where there was a plant in June and NA for height in Sept, make surv 0
-metadata <- metadata %>% mutate(surv = ifelse(is.na(surv) & is.na(h_apical.next) & !is.na(h_apical), 0, surv), 
-                                munched = ifelse(herb_avg > 0, 1, 0),
-                                log_herb_avg = log(0.1+herb_avg))
+source("../../.Rprofile")
+ipm <- mwIPM()
 ```
 
 ```{r}
@@ -41,10 +19,17 @@ metadata <- metadata %>% mutate(surv = ifelse(is.na(surv) & is.na(h_apical.next)
 #     sdh = attr(scaled$log_herb_avg, 'scaled:scale')
 # Then, seh_unscaled = seh_scaled*sdr/sdh - sea_scaled*sdr*mua/(sda*sdh).
 # Note that sea_scaled is zero when there is no interaction term.
-sitenames <- rownames(surv.fit$pars$unscaled[-1,])
-mydata <- tbl_df(data.frame())
 
-# Survival
+sitenames <- c("BLD1", "BLD2", "PWR", "SKY", "YTB")
+mydata <- tbl_df(data.frame())
+```
+
+# Translated conditional modes
+
+## Survival
+
+```{r}
+attach(ipm$pars)
 re <- ranef(surv.fit$mdl, condVar = TRUE, whichel = "site")[[1]]
 pv <- attr(re, "postVar")
 se <- sqrt(pv[2,2,])
@@ -61,20 +46,23 @@ mydata <- bind_rows(mydata, data.frame(rate = "Survival Probability",
                                        site = sitenames, 
                                        slope = surv.fit$pars$unscaled[-1,"log_herb_avg"],
                                        ci = ci))
+detach(ipm$pars)
+```
 
-# Flowering
+## Flowering
+```{r, warning=FALSE}
+attach(ipm$pars)
 ## No random effect
 
-metadata_usc <- metadata %>% filter(!is.na(h_apical),
-                                    !is.na(h_apical.next),
-                                    !is.na(herb_avg),
-                                    !is.na(fec.flower),
-                                    !is.na(surv),
-                                    h_apical.next > 50,
-                                    !(site == "YTB" & h_apical <= 50))
+h_apical <- ipm$data %>% 
+  filter(!is.na(h_apical),
+         !is.na(h_apical.next),
+         !is.na(herb_avg),
+         !is.na(fec.flower),
+         !is.na(surv)) %$%
+  h_apical
 
-qfadj <- c(0, 0, 0)
-qfadj <- flower.fit$pars$unscaled["Bertha", "h_apical:log_herb_avg"]*quantile(metadata_usc$h_apical, probs = c(0.05, 0.5, 0.95))
+qfadj <- flower.fit$pars$unscaled["Bertha", "h_apical:log_herb_avg"]*quantile(h_apical, probs = c(0.05, 0.5, 0.95))
 
 sdr <- 1
 mua <- attr(flower.fit$scaled$h_apical, "scaled:center")
@@ -88,19 +76,21 @@ mydata <- bind_rows(mydata, data.frame(rate = "Flowering Probability",
                                        site = sitenames,
                                        slope = flower.fit$pars$unscaled[-1,"log_herb_avg"] + qfadj[2],
                                        ci = rep(NA, 5)))
+detach(ipm$pars)
+```
 
-# Growth
+## Growth
+```{r}
+attach(ipm$pars)
+h_apical <- ipm$data %>% 
+  filter(!is.na(h_apical),
+         !is.na(h_apical.next),
+         !is.na(herb_avg),
+         fec.flower == 1,
+         surv == 1) %$%
+  h_apical
 
-metadata_usc <- metadata %>% filter(!is.na(h_apical),
-                                    !is.na(h_apical.next),
-                                    !is.na(herb_avg),
-                                    fec.flower == 1,
-                                    surv == 1,
-                                    h_apical.next > 50,
-                                    !(site == "YTB" & h_apical <= 50))
-
-qgadj <- c(0, 0, 0)
-qgadj <- growth.fit$pars$unscaled["Bertha", "h_apical:log_herb_avg"]*quantile(metadata_usc$h_apical, probs = c(0.05, 0.5, 0.95))
+qgadj <- growth.fit$pars$unscaled["Bertha", "h_apical:log_herb_avg"]*quantile(h_apical, probs = c(0.05, 0.5, 0.95))
 
 re <- ranef(growth.fit$mdl, condVar = TRUE, whichel = "site")[[1]]
 pv <- attr(re, "postVar")
@@ -119,8 +109,12 @@ mydata <- bind_rows(mydata, data.frame(rate = "Growth",
                                        site = sitenames, 
                                        slope = growth.fit$pars$unscaled[-1,"log_herb_avg"] + qgadj[2],
                                        ci = ci))
+detach(ipm$pars)
+```
 
-# Pods
+## Pods
+```{r}
+attach(ipm$pars)
 re <- ranef(pods.fit$mdl, condVar = TRUE, whichel = "site")[[1]]
 pv <- attr(re, "postVar")
 se <- sqrt(pv[3,3,])
@@ -138,16 +132,20 @@ mydata <- bind_rows(mydata, data.frame(rate = "Pod Production",
                                        site = sitenames, 
                                        slope = pods.fit$pars$unscaled[-1,"log_herb_avg"],
                                        ci = ci))
+detach(ipm$pars)
+```
 
 # Fixed effect vertical lines
+```{r}
+attach(ipm$pars)
 rdata <- data.frame(rate = c("Survival Probability",
                              "Flowering Probability",
                              "Growth",
                              "Pod Production"),
                     rslope = c(surv.fit$pars$unscaled["Bertha", "log_herb_avg"],
-                                   flower.fit$pars$unscaled["Bertha", "log_herb_avg"]+qfadj[2],
-                                   growth.fit$pars$unscaled["Bertha", "log_herb_avg"]+qgadj[2],
-                                   pods.fit$pars$unscaled["Bertha", "log_herb_avg"]))
+                               flower.fit$pars$unscaled["Bertha", "log_herb_avg"]+qfadj[2],
+                               growth.fit$pars$unscaled["Bertha", "log_herb_avg"]+qgadj[2],
+                               pods.fit$pars$unscaled["Bertha", "log_herb_avg"]))
 
 # Fixed effect transparent bars
 fdata <- data.frame(rate = c("Survival Probability",
@@ -166,111 +164,141 @@ lim_data <- data.frame(rate = c(rep("Survival Probability", 2),
                                 0+qfadj[2], 3.5+qfadj[2],
                                 -3+qgadj[2], 15+qgadj[2],
                                 -1, 0.2))
+detach(ipm$pars)
 ```
 
-This code creates a caterpillar plot in ggplot, similar to what dotplot does:
+# Render and save plot
 
-<http://stackoverflow.com/questions/13847936/in-r-plotting-random-effects-from-lmer-lme4-package-using-qqmath-or-dotplot>
-
-```{r}
-g <- ggplot(mydata, aes(x = slope, y = site)) +
-     geom_point() + 
-     facet_wrap(~ rate, scales = "free")
-g <- g + geom_errorbarh(aes(xmin = slope - ci, xmax = slope + ci), height=0)
-g <- g + geom_vline(data=rdata, aes(xintercept = rslope), linetype=2)
-g <- g + geom_rect(data=fdata, aes(x = NULL, y = NULL, xmin = fslope-ferr, xmax = fslope+ferr, ymin = 0, ymax = 6), fill = "black", alpha = 0.1)
-g <- g + geom_point(data=lim_data, aes(x = lims, y = 3), color = "black", alpha = 0.0)
-g <- g + theme_bw()
-g
-ggsave("../Figure2.png", width=9, device = "png", g)
-```
-
-Try another approach.  Apparently, facetting is supposed to be used ONLY when facets are on the same scale.  While they have created the `scales = "free"` option, it is really not good practice.  The alternate option is to simply use `grid.arrange`, which I will do now.
 ```{r}
 title.size <- 10
-sep <- ","
+```
 
+## Flowering
+
+```{r}
 type = "Flowering Probability"
-# sapply(-2:2, function(x) {paste0(x,"\n(",signif(x+qfadj[1]-qfadj[2],2),sep,signif(x+qfadj[3]-qfadj[2],2),")")})
-lab <- c(-2, -1, paste0(0,"\n(",signif(qfadj[1]-qfadj[2],2),sep,signif(qfadj[3]-qfadj[2],2),")"), 1, 2)
 pf <- mydata %>% filter(rate == type) %>%
-           ggplot(aes(x = slope, y = site)) + 
+           ggplot(aes(x = slope, 
+                      y = site)) + 
            geom_point() +
-           geom_vline(data=filter(rdata, rate==type), 
-                      aes(xintercept = rslope), linetype=2) + 
+           geom_vline(data=filter(rdata, rate == type), 
+                      aes(xintercept = rslope), 
+                      linetype=2) + 
            scale_x_continuous(limits = c(-2, 2)) +
            theme_bw() +
            ggtitle(type) +
-           theme(plot.title = element_text(family = "Trebuchet MS", size=title.size),
+           theme(plot.title = element_text(family = "Trebuchet MS", 
+                                           size = title.size,
+                                           hjust = 0.5),
                  axis.title.y = element_blank(),
                  axis.title.x = element_blank())
-pf <- pf + annotate("point", x = qfadj[1]-qfadj[2], y = 0.55, shape=25) +
-           annotate("point", x = qfadj[3]-qfadj[2], y = 0.55, shape=25, fill="black")
-# gf <- ggplotGrob(pf)
-# gf$layout$clip[gf$layout$name=="panel"] <- "off"
 
-#           geom_rect(data=filter(fdata, rate==type), 
-#                     aes(x = NULL, y = NULL, xmin = fslope-ferr, xmax = fslope+ferr, ymin = 0, ymax = 6), 
-#                     fill = "black", alpha = 0.1)
+pf <- pf + annotate("point", 
+                    x = qfadj[1]-qfadj[2], 
+                    y = 0.55, 
+                    shape=25) +
+           annotate("point", 
+                    x = qfadj[3]-qfadj[2], 
+                    y = 0.55, 
+                    shape=25, 
+                    fill="black")
 
+pf
+```
+
+## Growth
+```{r}
 type = "Growth"
-# sapply(c(-10,-5,0,5,10), function(x) {paste0(x,"\n(",signif(x+qgadj[1]-qgadj[2],2),sep,signif(x+qgadj[3]-qgadj[2],2),")")})
-lab <- c(-10, -5, paste0(0,"\n(",signif(qgadj[1]-qgadj[2],2),sep,signif(qgadj[3]-qgadj[2],2),")"), 5, 10)
 pg <- mydata %>% filter(rate == type) %>%
-           ggplot(aes(x = slope, y = site)) + 
+           ggplot(aes(x = slope, 
+                      y = site)) + 
            geom_point() +
-           geom_errorbarh(aes(xmin = slope - ci, xmax = slope + ci), height=0) +
-           geom_vline(data=filter(rdata, rate==type), 
-                      aes(xintercept = rslope), linetype=2) + 
+           geom_errorbarh(aes(xmin = slope - ci, 
+                              xmax = slope + ci), 
+                          height=0) +
+           geom_vline(data=filter(rdata, rate == type), 
+                      aes(xintercept = rslope), 
+                      linetype = 2) + 
            scale_x_continuous(limits = c(-10, 10)) + 
            theme_bw() +
            ggtitle(type) +
-           theme(plot.title = element_text(family = "Trebuchet MS", size=title.size),
+           theme(plot.title = element_text(family = "Trebuchet MS", 
+                                           size = title.size,
+                                           hjust = 0.5),
                  axis.title.y = element_blank(),
                  axis.text.y = element_blank(),
                  axis.ticks.y = element_blank(),
                  axis.title.x = element_blank())
-pg <- pg + annotate("point", x = qgadj[1]-qgadj[2], y = 0.55, shape=25) +
-           annotate("point", x = qgadj[3]-qgadj[2], y = 0.55, shape=25, fill="black")
 
-#            geom_rect(data=filter(fdata, rate==type), 
-#                      aes(x = NULL, y = NULL, xmin = fslope-ferr, xmax = fslope+ferr, ymin = 0, ymax = 6), 
-#                      fill = "black", alpha = 0.1) + 
+pg <- pg + annotate("point", 
+                    x = qgadj[1]-qgadj[2], 
+                    y = 0.55, 
+                    shape=25) +
+           annotate("point", 
+                    x = qgadj[3]-qgadj[2], 
+                    y = 0.55, 
+                    shape=25, 
+                    fill="black")
 
+pg
+```
+
+## Survival
+```{r}
 type = "Survival Probability"
 ps <- mydata %>% filter(rate == type) %>%
-           ggplot(aes(x = slope, y = site)) + 
+           ggplot(aes(x = slope, 
+                      y = site)) + 
            geom_point() +
-           geom_errorbarh(aes(xmin = slope - ci, xmax = slope + ci), height=0) +
-           geom_vline(data=filter(rdata, rate==type), 
-                      aes(xintercept = rslope), linetype=2) + 
+           geom_errorbarh(aes(xmin = slope - ci, 
+                              xmax = slope + ci), 
+                          height=0) +
+           geom_vline(data=filter(rdata, rate == type), 
+                      aes(xintercept = rslope), 
+                      linetype = 2) + 
            scale_x_continuous(limits = c(-2, 2)) +
            theme_bw() +
            ggtitle(type) +
-           theme(plot.title = element_text(family = "Trebuchet MS", size=title.size),
+           theme(plot.title = element_text(family = "Trebuchet MS", 
+                                           size = title.size,
+                                           hjust = 0.5),
                  axis.title.y = element_blank(),
                  axis.text.y = element_blank(),
                  axis.ticks.y = element_blank(),
                  axis.title.x = element_blank())
 
+ps
+```
+
+## Pods
+```{r}
 type = "Pod Production"
 pp <- mydata %>% filter(rate == type) %>%
-           ggplot(aes(x = slope, y = site)) + 
+           ggplot(aes(x = slope, 
+                      y = site)) + 
            geom_point() +
-           geom_errorbarh(aes(xmin = slope - ci, xmax = slope + ci), height=0) +
-           geom_vline(data=filter(rdata, rate==type), 
-                      aes(xintercept = rslope), linetype=2) + 
+           geom_errorbarh(aes(xmin = slope - ci, 
+                              xmax = slope + ci), 
+                          height = 0) +
+           geom_vline(data=filter(rdata, rate == type), 
+                      aes(xintercept = rslope), 
+                      linetype = 2) + 
            scale_x_continuous(limits = c(-1, 1)) +
            theme_bw() +
            ggtitle(type) +
-           theme(plot.title = element_text(family = "Trebuchet MS", size=title.size),
+           theme(plot.title = element_text(family = "Trebuchet MS", 
+                                           size = title.size,
+                                           hjust = 0.5),
                  axis.title.y = element_blank(),
                  axis.title.x = element_blank())
 
-#            geom_rect(data=filter(fdata, rate==type), 
-#                      aes(x = NULL, y = NULL, xmin = fslope-ferr, xmax = fslope+ferr, ymin = 0, ymax = 6), 
-#                      fill = "black", alpha = 0.1) + 
+pp
+```
 
-pall <- grid.arrange(pf, pg, pp, ps)
-ggsave("../Figure2.png", width=6, device = "png", pall)
+## All together now
+```{r}
+pall <- grid.arrange(pf, pg, pp, ps, 
+                     left="Site", 
+                     bottom=textGrob(TeX('$\\beta_{z_{\\omega}}$')))
+ggsave("Figure2.png", width=6, device = "png", pall)
 ```
