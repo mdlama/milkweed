@@ -16,6 +16,7 @@ library(gtable)         # For gtable_add_cols
 library(grid)           # For unit.pmax
 library(gridExtra)      # For grid.arrange
 library(latex2exp)      # For latex expressions in plots
+library(doParallel)     # For bootstrapping in Figures 4 and 5
 
 mwROOT <- is_rstudio_project$make_fix_file()
 
