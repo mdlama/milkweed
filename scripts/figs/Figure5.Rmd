@@ -185,6 +185,7 @@ t_seeds_per_pod <- annotate("text", x = xc, y = 7, label = "Seeds per pod", size
 t_growth <- annotate("text", x = xc, y = 4, label = "Growth", size = sz)
 t_survival <- annotate("text", x = xc, y = 1, label = "Ramet survival", size = sz)
 
+# Throw those puppies in...
 elastiplot <- elastiplot + 
   t_survival +
   r_growth + 
@@ -204,6 +205,7 @@ elastiplot <- elastiplot +
   r_bdlgs_per_stem +
   t_bdlgs_per_stem
 
+# Labels and such
 elastiplot <- elastiplot + 
   scale_y_discrete(labels = rev(fancypantslabels)) +
   xlab("Parameter elasticity") +
@@ -221,17 +223,13 @@ elastiplot <- elastiplot +
                                   margin = margin(b = 15, unit = "pt")))
 
 elastiplot
-
-# g1 <- ggplotGrob(elastiplot)
-# g1$layout$clip[g1$layout$name == "panel"] <- "off"
-# grid.draw(g1)
 ```
 
 ## Expanded herbivory elasticities
 
 ### Prep data for heatmap of expanded elasticities
 
-```{r}
+```{r, warning=FALSE}
 M <- mesh(ipm$vars$h_apical$x, ipm$vars$h_apical$x)
 
 plotdata <- tbl_df(data.frame(h_apical_t0 = as.vector(M$x),
@@ -282,16 +280,15 @@ pmunch_elastiplot <- pmunch_elastiplot +
 pmunch_elastiplot
 ```
 
-### Put em together, it just makes sense!
+## Put em together, it just makes sense!
 
-```{r}
+```{r, fig.width=8, fig.height=4}
 g1 <- ggplotGrob(elastiplot)
 g1 <- gtable_add_rows(g1, unit(0, "mm"))
 g1 <- gtable_add_rows(g1, unit(0, "mm"))
 g2 <- ggplotGrob(pmunch_elastiplot)
 g <- cbind(g1, g2, size="first")
-# g$widths <- unit.pmax(g1$widths, g2$widths)
- 
+
 p <- grid.arrange(g1, g2, ncol=2)
 ggsave("Figure5.png", width=8, height=4, device = "png", p)
 ```
