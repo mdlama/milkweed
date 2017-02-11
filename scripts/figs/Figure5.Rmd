@@ -1,5 +1,5 @@
 ---
-title: "Figure 6: Elasticity Analysis"
+title: "Figure 6: Elasticity analysis"
 output: 
   html_document:
     toc: true
@@ -9,11 +9,9 @@ output:
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 source("../../.Rprofile")
-library(tidyr)
-library(doParallel)
-library(latex2exp)
 ```
 
+# Bootstrap elasticities
 ```{r}
 compute <- FALSE
 
@@ -28,12 +26,15 @@ if (compute) {
     thisone
   })
   
-  save(results, file=mwROOT("data","calculated","figure6.RData"))
+  save(results, file=mwROOT("data","calculated","figure5.RData"))
 } else {
-  load(mwROOT("data","calculated","figure6.RData"))
+  load(mwROOT("data","calculated","figure5.RData"))
 }
-#unite(label, type, name, sep="-", remove=FALSE)
 ```
+
+# Plotting
+
+## Prep the plot data
 
 ```{r}
 plotdata <- results %>% 
@@ -46,13 +47,11 @@ plotdata <- results %>%
             type = last(type),
             name = last(name))
 
+# Group parameters for plotting
 new.levels <- c("Clonal", "Clonal", "Sexual", "Growth", "Herbivory", "Sexual", "Sexual", "Sexual", "Survival")
 plotdata$newtype <- factor(new.levels[plotdata$type])
 
-# ylabs <- plotdata %>% arrange(type) %>% select(name)
-```
-
-```{r}
+# Specify order of parameters in plot
 newlabelorder <- c("Clonal-(Intercept)", 
                    "Clonal-log_herb_avg", 
                    "Budlings-mean", 
@@ -78,6 +77,7 @@ newlabelorder <- c("Clonal-(Intercept)",
                    "Growth-sd", 
                    "Survival-(Intercept)")
 
+# Corresponding mathematical symbols to above parameters
 fancypantslabels <- rev(newlabelorder)
 fancypantslabels[1] <- TeX('$\\alpha$')
 fancypantslabels[2] <- TeX('$\\beta_{\\bar{z}_{\\omega}}$')
@@ -104,8 +104,12 @@ fancypantslabels[22] <- TeX('$\\beta_{z_{h}:z_{\\omega}}$')
 fancypantslabels[23] <- TeX('$\\sigma$')
 fancypantslabels[24] <- TeX('$\\alpha$')
 
+# Legend ordering
 newtypeorder <- c("Clonal", "Herbivory", "Sexual", "Growth", "Survival")
+```
 
+## Plot!
+```{r}
 myplot <- plotdata %>% 
   mutate(label = factor(label, levels = rev(newlabelorder))) %>%
   mutate(newtype = factor(newtype, levels = newtypeorder)) %>%
@@ -120,60 +124,22 @@ myplot <- plotdata %>%
   geom_errorbarh(aes(xmin = meanElasticity - ci,
                      xmax = meanElasticity + ci),
                 height = 0.3) + 
-  scale_y_discrete(labels=rev(fancypantslabels)) +
+  scale_y_discrete(labels = rev(fancypantslabels)) +
   xlab("Parameter elasticity") +
   ylab("") + 
-  theme_bw()
+  theme_bw() +
+  labs(color = "Parameter\nType",
+       fill = "Parameter\nType") + 
+  theme(legend.background = element_rect(fill="lightgrey",
+                                                size=0.1,
+                                                linetype="solid"),
+               legend.key.size = unit(0.18, "in"),
+               legend.position = c(0.85, 0.28))
+
+myplot
 ```
 
-# Archive
-
-```{r, eval = F}
-psens <- results %>% 
-  filter(name != "seedling.emergence") %>% 
-  unite(label, type, name, sep="-", remove=FALSE) %>% 
-  ggplot(aes(x = label, 
-             y = sensitivity, 
-             color=newtype, 
-             fill=newtype)) + 
-  geom_bar(stat = "identity") + 
-  theme(axis.text.x=element_text(angle = -45, 
-                                 hjust = 0)) + 
-  scale_x_discrete(labels=xlabs$name)
-
-results$lambda <- ipm %>% analyzeGrowthRate()
-results %<>% mutate(elasticity = sensitivity/(lambda/pars))
-
-pelast <- results %>% 
-  unite(label, type, name, sep="-", remove=FALSE) %>% 
-  ggplot(aes(x = label, 
-             y = elasticity, 
-             color=newtype, 
-             fill=newtype)) + 
-  geom_bar(stat = "identity") + 
-  theme(axis.text.x=element_text(angle = -45, 
-                                 hjust = 0)) + 
-  scale_x_discrete(labels=xlabs$name)
-
-# ggsave(mwROOT("scripts","figs","Figure6.png"), height=4, width=6, device = "png", p)
-```
-
-```{r, eval=F}
-results_long <- results %>% gather(measure, value, sensitivity, elasticity)
-
-results_long$measure <- factor(results_long$measure, 
-                               levels = c("sensitivity", 
-                                          "elasticity"))
-
-myplot <- results_long %>% 
-  unite(label, type, name, sep="-", remove=FALSE) %>%
-  group_by(measure) %>%
-  ggplot(aes(x = label,
-             y = value,
-             color = newtype, 
-             fill = newtype)) +
-  geom_bar(stat = "identity") + 
-  scale_x_discrete(labels=xlabs$name) +
-  facet_grid(~ measure) +
-  coord_flip(ylim=c(-2,2))
+Save figure.
+```{r}
+ggsave("Figure5.png", height=6, width=5, device = "png", myplot)
 ```
