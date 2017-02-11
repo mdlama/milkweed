@@ -9,9 +9,12 @@ output:
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 source("../../.Rprofile")
+ipm <- mwIPM()
 ```
 
-# Bootstrap elasticities
+# Analysis
+
+## Bootstrap elasticities
 ```{r}
 compute <- FALSE
 
@@ -32,9 +35,39 @@ if (compute) {
 }
 ```
 
+## Spread elasticity over kernel for herbivory parameters
+```{r}
+ipm %<>% analyzeStandard() %>% analyzeParameters()
+res <- ipm$analysis$parameters %>% 
+    filter(type == "Herbivory") %>% 
+    select(pars, elasticity)
+
+herbivory_func <- function(x) {
+  as.vector((ipm %>% setHerbivoryMatrix(perturb = x))$kernels$K)
+}
+
+J <- jacobian(herbivory_func, rep(0,3))
+
+# Loops!?  We don't need no stinkin loops...
+S1 <- ipm$analysis$standard$sens*matrix(J[,1], nrow=ipm$N)*ipm$vars$h_apical$dx # pmunch
+S2 <- ipm$analysis$standard$sens*matrix(J[,2], nrow=ipm$N)*ipm$vars$h_apical$dx # mean
+S3 <- ipm$analysis$standard$sens*matrix(J[,3], nrow=ipm$N)*ipm$vars$h_apical$dx # sd
+
+E1 <- ipm$analysis$standard$elas*(matrix(J[,1], nrow=ipm$N)/(ipm$kernels$K/res$pars[1]))*ipm$vars$h_apical$dx
+E2 <- ipm$analysis$standard$elas*(matrix(J[,2], nrow=ipm$N)/(ipm$kernels$K/res$pars[2]))*ipm$vars$h_apical$dx
+E3 <- ipm$analysis$standard$elas*(matrix(J[,3], nrow=ipm$N)/(ipm$kernels$K/res$pars[3]))*ipm$vars$h_apical$dx
+
+# Sanity check - sum of Ei should equal calculated elasticities
+abs(sum(sum(E1)) - res$elasticity[1])
+abs(sum(sum(E2)) - res$elasticity[2])
+abs(sum(sum(E3)) - res$elasticity[3])
+```
+
 # Plotting
 
-## Prep the plot data
+## Caterpillar plot of elasticities
+
+### Prep the plot data
 
 ```{r}
 plotdata <- results %>% 
@@ -78,6 +111,8 @@ newlabelorder <- c("Clonal-(Intercept)",
                    "Survival-(Intercept)")
 
 # Corresponding mathematical symbols to above parameters
+# These really ought to be done through plotmath notation:
+#   https://stat.ethz.ch/R-manual/R-devel/library/grDevices/html/plotmath.html
 fancypantslabels <- rev(newlabelorder)
 fancypantslabels[1] <- TeX('$\\alpha$')
 fancypantslabels[2] <- TeX('$\\beta_{\\bar{z}_{\\omega}}$')
@@ -108,9 +143,9 @@ fancypantslabels[24] <- TeX('$\\alpha$')
 newtypeorder <- c("Clonal", "Herbivory", "Sexual", "Growth", "Survival")
 ```
 
-## Plot!
+### Render elasticity caterpillar plot
 ```{r}
-myplot <- plotdata %>% 
+elastiplot <- plotdata %>% 
   mutate(label = factor(label, levels = rev(newlabelorder))) %>%
   mutate(newtype = factor(newtype, levels = newtypeorder)) %>%
   ggplot(aes(x = meanElasticity,
@@ -123,23 +158,140 @@ myplot <- plotdata %>%
   geom_point() + 
   geom_errorbarh(aes(xmin = meanElasticity - ci,
                      xmax = meanElasticity + ci),
-                height = 0.3) + 
+                height = 0.3)
+
+# Highlight rects for functional forms
+ym <- 0.25
+al <- 0.1
+r_growth <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 2-ym, ymax = 6+ym, fill = "black", alpha = al)
+r_seedlings <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 9-ym, ymax = 10+ym, fill = "black", alpha = al)
+r_pods <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 11-ym, ymax = 13+ym, fill = "black", alpha = al)
+r_flowering <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 14-ym, ymax = 17+ym, fill = "black", alpha = al)
+r_herbivory <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 18-ym, ymax = 20+ym, fill = "black", alpha = al)
+r_budlings <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 21-ym, ymax = 22+ym, fill = "black", alpha = al)
+r_bdlgs_per_stem <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 23-ym, ymax = 24+ym, fill = "black", alpha = al)
+
+# Functional form labels
+xc <- -0.15
+sz <- 2.5
+t_bdlgs_per_stem <- annotate("text", x = xc, y = 23.5, label = "Buds per stem", size = sz)
+t_budlings <- annotate("text", x = xc, y = 21.5, label = "Budling recruits", size = sz)
+t_herbivory <- annotate("text", x = xc, y = 19, label = "Herbivory", size = sz)
+t_flowering <- annotate("text", x = xc, y = 15.5, label = "Flowering", size = sz)
+t_pods <- annotate("text", x = xc, y = 12, label = "Pods", size = sz)
+t_seedlings <- annotate("text", x = xc, y = 9.5, label = "Seedling recruits", size = sz)
+t_seed_surv <- annotate("text", x = xc, y = 8, label = "Seed survival", size = sz)
+t_seeds_per_pod <- annotate("text", x = xc, y = 7, label = "Seeds per pod", size = sz)
+t_growth <- annotate("text", x = xc, y = 4, label = "Growth", size = sz)
+t_survival <- annotate("text", x = xc, y = 1, label = "Ramet survival", size = sz)
+
+elastiplot <- elastiplot + 
+  t_survival +
+  r_growth + 
+  t_growth +
+  t_seeds_per_pod +
+  t_seed_surv +
+  r_seedlings + 
+  t_seedlings +
+  r_pods +
+  t_pods +
+  r_flowering +
+  t_flowering +
+  r_herbivory +
+  t_herbivory +
+  r_budlings +
+  t_budlings +
+  r_bdlgs_per_stem +
+  t_bdlgs_per_stem
+
+elastiplot <- elastiplot + 
   scale_y_discrete(labels = rev(fancypantslabels)) +
   xlab("Parameter elasticity") +
-  ylab("") + 
+  ylab("Parameters") + 
   theme_bw() +
   labs(color = "Parameter\nType",
        fill = "Parameter\nType") + 
+  ggtitle("(a)") +
   theme(legend.background = element_rect(fill="lightgrey",
-                                                size=0.1,
-                                                linetype="solid"),
-               legend.key.size = unit(0.18, "in"),
-               legend.position = c(0.85, 0.28))
+                                         size=0.1,
+                                         linetype="solid"),
+        legend.key.size = unit(0.18, "in"),
+        legend.position = c(0.84, 0.25),
+        plot.title = element_text(hjust = 0,
+                                  margin = margin(b = 15, unit = "pt")))
 
-myplot
+elastiplot
+
+# g1 <- ggplotGrob(elastiplot)
+# g1$layout$clip[g1$layout$name == "panel"] <- "off"
+# grid.draw(g1)
 ```
 
-Save figure.
+## Expanded herbivory elasticities
+
+### Prep data for heatmap of expanded elasticities
+
 ```{r}
-ggsave("Figure5.png", height=6, width=5, device = "png", myplot)
+M <- mesh(ipm$vars$h_apical$x, ipm$vars$h_apical$x)
+
+plotdata <- tbl_df(data.frame(h_apical_t0 = as.vector(M$x),
+                              h_apical_t1 = as.vector(M$y),
+                              elasticity = as.vector(E1),
+                              pname = "p[omega]"))
+plotdata %<>% bind_rows(tbl_df(data.frame(h_apical_t0 = as.vector(M$x),
+                                          h_apical_t1 = as.vector(M$y),
+                                          elasticity = as.vector(E3),
+                                          pname = "sigma")))
+```
+
+### Render expanded elasticity plots for herbivory parameters
+
+```{r}
+maxval <- max(abs(c(as.vector(E1), as.vector(E3))))
+colorpal <- brewer.pal(3, "RdBu")
+
+pmunch_elastiplot <- ggplot(plotdata, aes(x = h_apical_t0, 
+                                          y = h_apical_t1, 
+                                          z = elasticity)) +
+  geom_raster(aes(fill = elasticity)) +
+  facet_grid(pname ~ ., labeller=label_parsed) +
+  geom_contour(colour = "black", alpha = 0.3) +
+  scale_fill_gradient2(low = "blue",
+                       mid = "white",
+                       high = "red",
+                       limits = c(-maxval,maxval))
+
+pmunch_elastiplot <- pmunch_elastiplot + 
+  theme(axis.line = element_blank()) + 
+  scale_x_continuous(limits = c(min(ipm$vars$h_apical$x), 
+                                max(ipm$vars$h_apical$x)), 
+                     expand = c(0, 0)) + 
+  scale_y_continuous(limits = c(min(ipm$vars$h_apical$x), 
+                                max(ipm$vars$h_apical$x)), 
+                     expand = c(0, 0)) + 
+  xlab("Apical height at year t (cm)") + 
+  ylab("Apical height at year t+1 (cm)") +
+  labs(fill = "Elasticity") +
+  theme_bw() +
+  ggtitle("(b)") +
+  theme(plot.title = element_text(hjust = 0,
+                                  margin = margin(b = 15, unit = "pt")),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+pmunch_elastiplot
+```
+
+### Put em together, it just makes sense!
+
+```{r}
+g1 <- ggplotGrob(elastiplot)
+g1 <- gtable_add_rows(g1, unit(0, "mm"))
+g1 <- gtable_add_rows(g1, unit(0, "mm"))
+g2 <- ggplotGrob(pmunch_elastiplot)
+g <- cbind(g1, g2, size="first")
+# g$widths <- unit.pmax(g1$widths, g2$widths)
+ 
+p <- grid.arrange(g1, g2, ncol=2)
+ggsave("Figure5.png", width=8, height=4, device = "png", p)
 ```
