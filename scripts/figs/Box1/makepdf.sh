@@ -1,5 +1,5 @@
 #!/bin/sh
-pdflatex $1
-pdfcrop $1.pdf
-rm $1.pdf
-mv $1-crop.pdf $1.pdf
+pdflatex Box1.tex
+pdfcrop Box1.pdf
+rm Box1.pdf
+mv Box1-crop.pdf Box1.pdf
