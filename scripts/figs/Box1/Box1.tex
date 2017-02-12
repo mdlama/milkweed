@@ -1,10 +1,15 @@
-\documentclass{article}
+\documentclass[10pt]{article}
 
-\usepackage{graphics}
+\addtolength{\oddsidemargin}{-.875in}
+\addtolength{\evensidemargin}{-.875in}
+\addtolength{\textwidth}{1.75in}
+
+\usepackage{graphicx}
 \usepackage[usenames,dvipsnames]{xcolor, colortbl} %used for font color
 \usepackage{amssymb} %maths
 \usepackage{amsmath} %maths
 \usepackage{pifont}
+\usepackage{framed}
 \usepackage[utf8]{inputenc} %useful to type directly diacritic characters
 \newcommand{\cmark}{\ding{51}}%
 \definecolor{mygray}{rgb}{0.85,0.85,0.85}
@@ -13,6 +18,22 @@
 \pagestyle{empty}
 \begin{document}
 
+\begin{framed}
+
+\begin{center}
+\includegraphics[width=5.5in]{LifeCycleDiagram.pdf}
+
+\begin{align*}
+n_{t+1}(z_{h}^{\prime\prime}) = \ & \underbrace{\rho_{B}(z_{h}^{\prime\prime})N_{\mathrm{buds/stem}}(\bar{z}_{\omega})\int\int \rho_{\omega}(z_{\omega})n_{t}(z_{h})\, dz_{h}dz_{\omega}}_\text{Clonal pathway} \ + \\
+  & \underbrace{p_{\mathrm{r}}\rho_{S}(z_{h}^{\prime\prime})N_{\mathrm{seeds/pod}}\int\int N_{\mathrm{pods}}\left(z_{h}^{\prime},z_{\omega}\right)n_{t+\tau}(z_{h}^{\prime},z_{\omega}) \,dz_{h}^{\prime}dz_{\omega}}_\text{Sexual pathway} \\
+n_{t+\tau}(z_{h}^{\prime},z_{\omega}) = \ & \int p_{\mathrm{s}} G(z_{h}^{\prime}\, | \, z_{h},z_{\omega})p_{\mathrm{f}}(z_{h},z_{\omega})\rho_{\omega}(z_{\omega})n_{t}(z_{h})\, dz_{h}
+\end{align*}
+
+\end{center}
+
+\vspace{0.35in}
+
+\centering
 \begin{tabular}{ |l|l|c| }
 \hline
 \rowcolor{mygray} 
@@ -29,5 +50,7 @@ $\rho_{S}(z_{h}^{\prime\prime})$ & Seed recruit distribution & $\ln N(\mu, \sigm
 $\rho_{B}(z_{h}^{\prime\prime})$ & Bud recruit distribution & $N(\mu, \sigma^2)$ \\
 \hline
 \end{tabular}
+
+\end{framed}
 
 \end{document}
