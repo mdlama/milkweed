@@ -4,5 +4,5 @@
 .Ruserdata
 includes/mwDist.R
 scripts/figs/old_figs
-scripts/figs/*.png
+*.png
 data/calculated
