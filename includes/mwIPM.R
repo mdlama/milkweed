@@ -56,6 +56,7 @@ renderHerbivoryDistFit <- function(obj) UseMethod("renderHerbivoryDistFit")
 
 glmerCtrl <- glmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
 
+# Keeping these commented here as a record
 # tfunc <- function(x, y)
 # perturbTrans <- function(pars, perturb)
 
