@@ -1,0 +1,136 @@
+---
+title: "Appendix - Figure 2: Distributions"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: true
+---
+
+# Initialization
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+source("../../../.Rprofile")
+ipm <- mwIPM()
+```
+
+# Plot Herbivory Distributions
+
+## Make data for plot
+
+```{r, warning=FALSE}
+N <- 1000
+bx <- seq(from = log(0.1), to = log(6.1), length.out = N+1)
+x <- 0.5*(bx[1:N] + bx[2:(N+1)])
+
+site_ind <- c('BLD1','BLD2','PWR','SKY','YTB','Bertha')
+plotdata <- do.call(rbind, lapply(site_ind, 
+                                  function (site) {
+                                    data.frame(site = site,
+                                               x = x,
+                                               y = ipm$pars$munched.fit[[site]]$predict(bx,
+                                                                                        c(ipm$pars$munched.fit[[site]]$pmunch, 
+                                                                                          ipm$pars$munched.fit[[site]]$fit$estimate),
+                                                                                        justmunch=TRUE))
+                                  })
+)
+
+levels(plotdata$site)[levels(plotdata$site)=="Bertha"] <- "Combined"
+```
+
+## Render the plot
+
+```{r}
+plot_herb <- plotdata %>% ggplot(aes(x = x, y = y, fill = site, colour = site)) + 
+  geom_line() + 
+  geom_area(position = "identity", alpha = 0.3)
+
+plot_herb <- plot_herb + theme_bw() +
+  xlab("ln(Herbivory Score)") +
+  ylab("Probability Density") +
+  scale_x_continuous(limits = c(log(0.1), log(6.1))) + 
+  scale_fill_manual(values = c(hue_pal()(5), NA)) + 
+  scale_color_manual(values = c(hue_pal()(5), "black")) +
+  labs(colour="Sites", fill="Sites") +
+  theme(legend.background = element_rect(fill="lightgrey",
+                                         size=0.1,
+                                         linetype="solid"),
+        legend.key.size =  unit(0.18, "in"),
+        legend.position = c(0.885, 0.72))
+
+plot_herb <- plot_herb + ggtitle("(a)") + 
+  theme(plot.title = element_text(hjust = 0, margin=margin(b = 15, unit = "pt")))
+
+plot_herb
+```
+
+# Plot Budling and Seedling Distributions
+
+## Make data for plot
+
+```{r, warning=FALSE}
+N <- 1000
+bx <- seq(from = 0, to = 160, length.out = N+1)
+x <- 0.5*(bx[1:N] + bx[2:(N+1)])
+
+# First add budling distributions
+site_ind <- c('BLD1','BLD2','PWR','SKY','YTB','Bertha')
+plotdata <- do.call(rbind, lapply(site_ind, 
+                                  function (site) {
+                                    data.frame(site = site,
+                                               x = x,
+                                               y = ipm$pars$budling.fit[[site]]$predict(bx,
+                                                                                        ipm$pars$budling.fit[[site]]$fit$estimate))
+                                  })
+)
+
+# Now add seedling distributions
+plotdata <- bind_rows(plotdata,
+                      data.frame(site = "Seedlings",
+                                 x = x,
+                                 y = ipm$pars$seedling.fit$predict(bx, 
+                                                                   ipm$pars$seedling.fit$fit$estimate)))
+
+plotdata$site <- factor(plotdata$site, levels = c('BLD1','BLD2','PWR','SKY','YTB','Bertha','Seedlings'))
+
+levels(plotdata$site)[levels(plotdata$site)=="Bertha"] <- "Combined"
+
+#plotdata$site <- factor(plotdata$site, levels = c('BLD1','BLD2','PWR','SKY','YTB','Combined','Seedlings'))
+```
+
+## Render the plot
+
+```{r}
+plot_recr <- plotdata %>% ggplot(aes(x = x, 
+                                     y = y, 
+                                     fill = site, 
+                                     colour = site,
+                                     linetype = site)) + 
+  geom_line() + 
+  geom_area(position = "identity", alpha = 0.3)
+
+plot_recr <- plot_recr + theme_bw() +
+  xlab("Apical Height (cm)") +
+  ylab("Probability Density") +
+  scale_x_continuous(limits = c(0, 160)) +
+  scale_fill_manual(values = c(hue_pal()(5), NA, NA)) + 
+  scale_color_manual(values = c(hue_pal()(5), "black", "black")) + 
+  scale_linetype_manual(values = c(1,1,1,1,1,1,2)) +
+  labs(colour="Sites", fill="Sites", linetype="Sites") +
+  theme(legend.background = element_rect(fill="lightgrey",
+                                         size=0.1,
+                                         linetype="solid"),
+        legend.key.size =  unit(0.2, "in"),
+        legend.position = c(0.875, 0.65))
+
+plot_recr <- plot_recr + ggtitle("(b)") + 
+  theme(plot.title = element_text(hjust = 0, margin=margin(b = 15, unit = "pt")))
+
+plot_recr
+```
+
+# Render and save final plot
+
+```{r}
+pall <- grid.arrange(plot_herb, plot_recr, ncol=2)
+ggsave("AppendixFigure2.png", height=4, width=12, device = "png", pall)
+```
