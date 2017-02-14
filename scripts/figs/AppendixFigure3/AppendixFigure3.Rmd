@@ -1,0 +1,88 @@
+---
+title: "Appendix - Figure 3: Herbivory versus apical height"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: true
+---
+
+# Initialization
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+source("../../../.Rprofile")
+ipm <- mwIPM()
+```
+
+# First - Probability of being eaten
+
+```{r, warning=FALSE}
+pmunch <- glm(munched ~ h_apical, data=ipm$data, family=binomial())
+summary(pmunch)
+
+ind <- order(pmunch$model$h_apical)
+fitplotdata <- data.frame(h_apical = sort(pmunch$model$h_apical),
+                          munched = pmunch$fitted.values[ind])
+
+pa <- ipm$data %>% ggplot(aes(x = h_apical, 
+                                  y = munched)) + 
+  geom_jitter(height = 0.1,
+              alpha = 0.3) +
+  geom_line(data = fitplotdata,
+            colour = "red",
+            size = 0.8) +
+  theme_bw() +
+  xlab("Apical Height (cm)") + 
+  ylab("Probability of herbivory")
+
+pa
+```
+
+# Second - Probability of log_herb_avg as a function of apical height given being eaten
+
+```{r, warning=FALSE}
+mydata <- ipm$data %>% 
+  filter(munched == 1) %>%
+  select(h_apical, log_herb_avg)
+
+linmdl <- lm(log_herb_avg ~ h_apical, data = mydata)
+expmdl <- lm(log(log_herb_avg-log(0.1)) ~ h_apical, data = mydata)
+AIC(linmdl, expmdl)
+
+ind <- order(linmdl$model$h_apical)
+fitplotdata <- data.frame(h_apical = sort(linmdl$model$h_apical),
+                          log_herb_avg = linmdl$fitted.values[ind],
+                          model = "linear")
+
+ind <- order(expmdl$model$h_apical)
+sx <- sort(expmdl$model$h_apical)
+fitplotdata %<>% bind_rows(fitplotdata,
+                           data.frame(h_apical = sx,
+                                      log_herb_avg = log(0.1) + 
+                                        exp(expmdl$coefficients['(Intercept)'] + expmdl$coefficients['h_apical']*sx),
+                                      model = "exponential"))
+
+pb <- mydata %>% ggplot(aes(x = h_apical,
+                            y = log_herb_avg)) +
+  geom_point(alpha = 0.3) +
+  geom_line(aes(colour = model),
+            data = fitplotdata,
+            size = 0.8) +
+  theme_bw() +
+  xlab("Apical Height (cm)") +
+  ylab("Ln(Herbivory Score)") +
+  labs(colour = "Model") + 
+  theme(legend.background = element_rect(fill="lightgrey",
+                                         size=0.1,
+                                         linetype="solid"),
+        legend.key.size =  unit(0.2, "in"),
+        legend.position = c(0.835, 0.88))
+
+pb
+```
+
+# Merge!
+
+```{r, warning=FALSE}
+pall <- grid.arrange(pa, pb, ncol=2)
+ggsave("AppendixFigure3.png", height=4, width=8, device = "png", pall)
+```
