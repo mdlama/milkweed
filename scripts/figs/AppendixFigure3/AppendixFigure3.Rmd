@@ -32,7 +32,10 @@ pa <- ipm$data %>% ggplot(aes(x = h_apical,
             size = 0.8) +
   theme_bw() +
   xlab("Apical Height (cm)") + 
-  ylab("Probability of herbivory")
+  ylab("Probability of herbivory") +
+  ggtitle("(a)") +
+  theme(plot.title = element_text(hjust = 0,
+                                  margin = margin(b = 15, unit = "pt")))
 
 pa
 ```
@@ -71,11 +74,14 @@ pb <- mydata %>% ggplot(aes(x = h_apical,
   xlab("Apical Height (cm)") +
   ylab("Ln(Herbivory Score)") +
   labs(colour = "Model") + 
+  ggtitle("(b)") +
   theme(legend.background = element_rect(fill="lightgrey",
                                          size=0.1,
                                          linetype="solid"),
         legend.key.size =  unit(0.2, "in"),
-        legend.position = c(0.835, 0.88))
+        legend.position = c(0.835, 0.88),
+        plot.title = element_text(hjust = 0,
+                                  margin = margin(b = 15, unit = "pt")))
 
 pb
 ```
