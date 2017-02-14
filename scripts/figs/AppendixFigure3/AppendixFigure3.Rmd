@@ -79,7 +79,7 @@ pb <- mydata %>% ggplot(aes(x = h_apical,
                                          size=0.1,
                                          linetype="solid"),
         legend.key.size =  unit(0.2, "in"),
-        legend.position = c(0.835, 0.88),
+        legend.position = c(0.835, 0.865),
         plot.title = element_text(hjust = 0,
                                   margin = margin(b = 15, unit = "pt")))
 
