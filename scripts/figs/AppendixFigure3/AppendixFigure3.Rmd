@@ -10,85 +10,147 @@ output:
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 source("../../../.Rprofile")
-ipm <- mwIPM()
+stemdata <- tbl_df(read.csv(mwROOT("data","stemdata.csv")))
+stemdata$year <- factor(stemdata$year)
 ```
 
-# First - Probability of being eaten
+# Fit a random effects model on probability of getting eaten ($\mathrm{p}_{\omega}$)
 
+First, let's get the data ready.  We need to normalize the data (mean 0 and standard deviation 1).
+```{r}
+stemdata_usc <- stemdata %>% filter(!is.na(h_apical),
+                                    !is.na(h_apical.next),
+                                    !is.na(herb_avg),
+                                    !is.na(fec.flower),
+                                    !is.na(surv))
+
+stemdata_sc <- stemdata_usc %>% mutate_each(funs(as.numeric(scale(.))), 
+                                            h_apical, 
+                                            log_herb_avg)
+
+# Get scaling parameters (really just mean and sd)
+h_apical_sc <- scale(stemdata_usc$h_apical)
+log_herb_avg_sc <- scale(stemdata_usc$log_herb_avg)
+
+glmerCtrl <- glmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
+```
+
+Let's choose random effects first - we'll focus on intercept and slope on apical height, ignoring herbivory slopes.
 ```{r, warning=FALSE}
-pmunch <- glm(munched ~ h_apical, data=ipm$data, family=binomial())
-summary(pmunch)
+# Random effects first
+herbivory.reg.mdl1 <- glmer(munched ~ h_apical + (h_apical|site/transect) + (h_apical|year), data=stemdata_sc, nAGQ=1, family=binomial(), control = glmerCtrl)
 
-ind <- order(pmunch$model$h_apical)
-fitplotdata <- data.frame(h_apical = sort(pmunch$model$h_apical),
-                          munched = pmunch$fitted.values[ind])
+herbivory.reg.mdl2 <- glmer(munched ~ h_apical + (1|site/transect) + (h_apical|year), data=stemdata_sc, nAGQ=1, family=binomial(), control = glmerCtrl)
 
-pa <- ipm$data %>% ggplot(aes(x = h_apical, 
-                                  y = munched)) + 
-  geom_jitter(height = 0.1,
-              alpha = 0.3) +
-  geom_line(data = fitplotdata,
-            colour = "red",
-            size = 0.8) +
+herbivory.reg.mdl3 <- glmer(munched ~ h_apical + (h_apical|year), data=stemdata_sc, nAGQ=1, family=binomial(), control = glmerCtrl)
+
+herbivory.reg.mdl4 <- glmer(munched ~ h_apical + (1|year), data=stemdata_sc, nAGQ=1, family=binomial(), control = glmerCtrl)
+
+herbivory.reg.mdl5 <- glmer(munched ~ h_apical + (1|site/transect) + (1|year), data=stemdata_sc, nAGQ=1, family=binomial(), control = glmerCtrl)
+
+aictab(list(herbivory.reg.mdl1, 
+            herbivory.reg.mdl2, 
+            herbivory.reg.mdl3,
+            herbivory.reg.mdl4,
+            herbivory.reg.mdl5))
+
+herbivory.reg.winner <- herbivory.reg.mdl2
+```
+Winner is model with site as a random effect on intercept only, and year as a random effect on intercept and apical height.  
+```
+munched ~ h_apical + (1|site/transect) + (h_apical|year)
+```
+Let's check the fixed effects.  In this case, we just want to compare Model #2 to the model with no apical height.
+```{r, warning=FALSE}
+herbivory.reg.noapical <- glmer(munched ~ 1 + (1|site/transect) + (h_apical|year), data=stemdata_sc, nAGQ=1, family=binomial(), control = glmerCtrl)
+
+aictab(list(herbivory.reg.winner, 
+            herbivory.reg.noapical),
+       modnames=c("Height", "No Height"))
+```
+
+As the model with no apical height is comparable, we use the simpler model.  Thus, we move forward under the assumption that apical height does not predict probability of being eaten.
+
+Let's look at a plot to help us see the variation across site and year.
+
+```{r}
+binomial_smooth <- function(...) {
+  geom_smooth(method = "glm", method.args = list(family = "binomial"), ...)
+}
+
+pa <- stemdata_usc %>% ggplot(aes(x = h_apical, 
+                                 y = munched)) + 
+  geom_jitter(alpha = 0.3,
+              height = 0.1) +
+  facet_grid(year ~ site) +
+  binomial_smooth() +
   theme_bw() +
-  xlab("Apical Height (cm)") + 
-  ylab("Probability of herbivory") +
-  ggtitle("(a)") +
+  xlab("Apical Height (cm)") +
+  ylab("Probability of being eaten") +
+  ggtitle("(a)") + 
   theme(plot.title = element_text(hjust = 0,
                                   margin = margin(b = 15, unit = "pt")))
-
+     
 pa
 ```
 
-# Second - Probability of log_herb_avg as a function of apical height given being eaten
+# Fit a random effects model on herbivory magnitude
+
+Same approach as above, i.e. let's select random effects first.  This time, going by Zuur, we need to specify `REML=T`.  Also note that we need to condition the data to only those stems that experience herbivory (`filter(munched == 1)`).
 
 ```{r, warning=FALSE}
-mydata <- ipm$data %>% 
+herbivory.reg.mdl1 <- lmer(log_herb_avg ~ h_apical + (h_apical|site/transect) + (h_apical|year), data=stemdata_sc %>% filter(munched == 1), REML=T)
+
+herbivory.reg.mdl2 <- lmer(log_herb_avg ~ h_apical + (1|site/transect) + (h_apical|year), data=stemdata_sc %>% filter(munched == 1), REML=T)
+
+herbivory.reg.mdl3 <- lmer(log_herb_avg ~ h_apical + (h_apical|site/transect) + (1|year), data=stemdata_sc %>% filter(munched == 1), REML=T)
+
+herbivory.reg.mdl4 <- lmer(log_herb_avg ~ h_apical + (h_apical|year), data=stemdata_sc %>% filter(munched == 1), REML=T)
+
+herbivory.reg.mdl5 <- lmer(log_herb_avg ~ h_apical + (h_apical|site/transect), data=stemdata_sc %>% filter(munched == 1), REML=T)
+
+aictab(list(herbivory.reg.mdl1, 
+            herbivory.reg.mdl2,
+            herbivory.reg.mdl3,
+            herbivory.reg.mdl4,
+            herbivory.reg.mdl5))
+```
+
+Looks like the "full" model for random effects.  Now on to fixed effects.  For the model selection part, we set `REML=F`.  Note the need to recompute for the random effects winner.
+```{r, warning=FALSE}
+herbivory.reg.winner <- lmer(log_herb_avg ~ h_apical + (h_apical|site/transect) + (h_apical|year), data=stemdata_sc %>% filter(munched == 1), REML=F)
+
+herbivory.reg.noapical <- lmer(log_herb_avg ~ 1 + (h_apical|site/transect) + (h_apical|year), data=stemdata_sc %>% filter(munched == 1), REML=F)
+
+aictab(list(herbivory.reg.winner, 
+            herbivory.reg.noapical),
+       modnames = c("Height", "No Height"))
+```
+
+Similar to probability of being eaten, it appears that the model with no apical height is comparable to the model with apical height.  For parsimony, we will assume that apical height does not predict magnitude of herbivory.  
+
+Let's look at a plot for some visual intuition.
+
+```{r}
+pb <- stemdata_usc %>% 
   filter(munched == 1) %>%
-  select(h_apical, log_herb_avg)
-
-linmdl <- lm(log_herb_avg ~ h_apical, data = mydata)
-expmdl <- lm(log(log_herb_avg-log(0.1)) ~ h_apical, data = mydata)
-AIC(linmdl, expmdl)
-
-ind <- order(linmdl$model$h_apical)
-fitplotdata <- data.frame(h_apical = sort(linmdl$model$h_apical),
-                          log_herb_avg = linmdl$fitted.values[ind],
-                          model = "linear")
-
-ind <- order(expmdl$model$h_apical)
-sx <- sort(expmdl$model$h_apical)
-fitplotdata %<>% bind_rows(fitplotdata,
-                           data.frame(h_apical = sx,
-                                      log_herb_avg = log(0.1) + 
-                                        exp(expmdl$coefficients['(Intercept)'] + expmdl$coefficients['h_apical']*sx),
-                                      model = "exponential"))
-
-pb <- mydata %>% ggplot(aes(x = h_apical,
-                            y = log_herb_avg)) +
+  ggplot(aes(x = h_apical, 
+             y = log_herb_avg)) + 
+  facet_grid(year ~ site) +
   geom_point(alpha = 0.3) +
-  geom_line(aes(colour = model),
-            data = fitplotdata,
-            size = 0.8) +
+  geom_smooth(method = "lm") +
   theme_bw() +
   xlab("Apical Height (cm)") +
   ylab("Ln(Herbivory Score)") +
-  labs(colour = "Model") + 
-  ggtitle("(b)") +
-  theme(legend.background = element_rect(fill="lightgrey",
-                                         size=0.1,
-                                         linetype="solid"),
-        legend.key.size =  unit(0.2, "in"),
-        legend.position = c(0.835, 0.865),
-        plot.title = element_text(hjust = 0,
+  ggtitle("(b)") + 
+  theme(plot.title = element_text(hjust = 0,
                                   margin = margin(b = 15, unit = "pt")))
-
+     
 pb
 ```
 
-# Merge!
-
-```{r, warning=FALSE}
-pall <- grid.arrange(pa, pb, ncol=2)
-ggsave("AppendixFigure3.png", height=4, width=8, device = "png", pall)
+Now we combine both plots and save.
+```{r}
+p <- grid.arrange(pa, pb, ncol=1)
+ggsave("AppendixFigure3.png", width=6, height=8, device = "png", p)
 ```
