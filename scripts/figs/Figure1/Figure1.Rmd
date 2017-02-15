@@ -7,7 +7,7 @@ output:
 ---
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-source("../../.Rprofile")
+source("../../../.Rprofile")
 ipm <- mwIPM()
 ```
 
@@ -137,7 +137,10 @@ log_herb_avg <- ipm$data %>%
          fec.flower == 1,
          surv == 1) %$%
   log_herb_avg
-M <- mesh(ipm$vars$h_apical$x, ipm$vars$log_herb_avg$x)
+
+x <- seq(from = 0, to = 160, length.out = 100)
+y <- seq(from = -2.5, to = 2, length.out = 100)
+M <- mesh(x, y)
 ```
 
 ### Top
