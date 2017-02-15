@@ -7,7 +7,7 @@ output:
 ---
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-source("../../.Rprofile")
+source("../../../.Rprofile")
 ipm <- mwIPM()
 ```
 
