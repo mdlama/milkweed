@@ -8,77 +8,46 @@ output: html_document
 We use the `fdistrplus` package (https://cran.r-project.org/web/packages/fitdistrplus/vignettes/paper2JSS.pdf)
 
 ```{r, warning=FALSE, message=FALSE}
-library(fitdistrplus)
-library(dplyr)
+source("../../.Rprofile")
 ```
 
 Read, filter and transform data.
 ```{r}
-metadata=tbl_df(read.csv("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/Milkweed/DATA SETS/Data Frames/metadata13to15.csv"))
-
-# Use 2 mm cutoff from BLD1 
-# Why are we not using listed transects below again??
-metadat <- metadata %>% mutate(seedling = ifelse(is.na(stem_width),NA,ifelse(stem_width <= 2.0,1,0))) %>%
-                        filter(!(transect %in% c(0, 44, 48, 64, 72, 74)))
+metadata <- tbl_df(read.csv(mwROOT("data","stemdata.csv")))
 ```
 
 Fits of h_apical for seedlings.
 ```{r}
-h_apical <- (metadat %>% filter(seedling == 1))$h_apical
+h_apical <- metadata %>% 
+  filter(seedling == 1) %$%
+  h_apical
 
-f1 <- fitdist(h_apical, "lnorm")
-f2 <- fitdist(h_apical, "gamma")
-f3 <- fitdist(h_apical, "exp")
-f4 <- fitdist(h_apical, "weibull")
+distnames <- c("norm", "lnorm", "gamma", "exp", "weibull")
+
+f0 <- fitdist(h_apical, distnames[1])
+f1 <- fitdist(h_apical, distnames[2])
+f2 <- fitdist(h_apical, distnames[3])
+f3 <- fitdist(h_apical, distnames[4])
+f4 <- fitdist(h_apical, distnames[5])
 ```
 
 Plot results.
 ```{r}
-par(mfrow=c(2,2))
-plot.legend <- c("lognormal", "gamma", "exp", "weibull")
-denscomp(list(f1, f2, f3, f4), legendtext = plot.legend)
-cdfcomp(list(f1, f2, f3, f4), legendtext = plot.legend)
-qqcomp(list(f1, f2, f3, f4), legendtext = plot.legend)
-ppcomp(list(f1, f2, f3, f4), legendtext = plot.legend)
-par(mfrow=c(1,1))
+plot_diagnostics <- function(...) {
+  par(mfrow=c(2,2))
+  denscomp(list(...), legendtext = distnames)
+  cdfcomp(list(...), legendtext = distnames)
+  qqcomp(list(...), legendtext = distnames)
+  ppcomp(list(...), legendtext = distnames)
+  par(mfrow=c(1,1))
+}
+
+plot_diagnostics(f0, f1, f2, f3, f4)
 ```
 
 Goodness-of-fit measures.
 ```{r}
-gofstat(list(f1, f2, f3, f4), fitnames = plot.legend)
+gofstat(list(f0, f1, f2, f3, f4), fitnames = distnames)
 ```
 
-Here are the estimates.
-```{r}
-seedling.fit <- vector("list", 2)
-seedling.fit[[1]] <- f1
-
-# Two ways to take care of missing probability.  Choosing to spread as opposed to adding to endpoints.  Other technique commented out here.
-# y[N] <- y[N] + p%s(x[N], %g, %g, lower.tail=FALSE)
-seedling.fit[[2]] <- eval(parse(text = sprintf("function(x) {
-  N <- length(x)
-  dx <- x[2]-x[1]  
-  y <- rep(0, N-1)
-  for (j in 1:(N-1)) {
-    y[j] = p%s(x[j+1], %g, %g) - p%s(x[j], %g, %g)
-  }
-  y <- y/(dx*sum(y))
-  }", seedling.fit[[1]]$distname, seedling.fit[[1]]$estimate[1], seedling.fit[[1]]$estimate[2], 
-  seedling.fit[[1]]$distname, seedling.fit[[1]]$estimate[1], seedling.fit[[1]]$estimate[2]
-  )))
-names(seedling.fit) <- c("fit", "predict")
-```
-
-Plot results to make sure I know what I'm doing.
-```{r}
-x <- seq(from=0, to=160, length.out=100)
-y <- seedling.fit$predict(x)
-
-hist(h_apical, freq=FALSE, ylim=c(0,0.05))
-lines(0.5*(x[1:99]+x[2:100]),y,col='red')
-```
-
-Save results.
-```{r}
-save(seedling.fit, file = "seedlingFit.RData")
-```
+Looks like gamma is the best fit, but lognormal distribution is somewhat close.  We'll go with lognormal for ease in implementing parameter perturbation and elasticity analysis.

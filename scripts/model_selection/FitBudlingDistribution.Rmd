@@ -16,7 +16,7 @@ sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
 
 Read, filter and transform data.
 ```{r}
-metadata=tbl_df(read.csv(mwROOT("data","stemdata.csv")))
+metadata <- tbl_df(read.csv(mwROOT("data","stemdata.csv")))
 
 h_apical <- metadata %>% 
   filter(seedling == 0,
