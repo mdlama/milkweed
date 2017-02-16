@@ -1,4 +1,3 @@
-library(stats)  # To avoid non-masking of stats filter function.  Need to move to package workflow.
 library(fitdistrplus)
 library(rprojroot)
 library(tidyr)
@@ -31,4 +30,6 @@ mwROOT <- is_rstudio_project$make_fix_file()
   cat("\nWelcome at", date(), "\n")
 }
 
-.First()
+#### -- Packrat Autoloader (version 0.4.8-1) -- ####
+source("packrat/init.R")
+#### -- End Packrat Autoloader -- ####
