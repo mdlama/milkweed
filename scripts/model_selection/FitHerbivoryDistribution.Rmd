@@ -10,14 +10,12 @@ output:
 We use the `fdistrplus` package (https://cran.r-project.org/web/packages/fitdistrplus/vignettes/paper2JSS.pdf)
 
 ```{r, warning=FALSE, message=FALSE}
-library(fitdistrplus)
-library(dplyr)
-library(lattice)
+source("../../.Rprofile")
 ```
 
 Read, filter and transform data.
-```{r}
-metadata=read.csv("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/Milkweed/DATA SETS/Data Frames/metadata13to15.csv")
+```{r, eval=F}
+metadata=read.csv("~/Google Drive/ipmwam/Papers/SivansPaper/Milkweed/DATA SETS/Data Frames/metadata13to15.csv")
 
 # Where there was a plant in June and NA for height in Sept, make surv 0
 metadata <- metadata %>% mutate(surv = ifelse(is.na(surv) & is.na(h_apical.next) & !is.na(h_apical), 0, surv), 
@@ -29,6 +27,13 @@ metadata <- metadata %>% mutate(surv = ifelse(is.na(surv) & is.na(h_apical.next)
                                 !is.na(surv),
                                 h_apical.next > 50,
                                 !(site == "YTB" & h_apical <= 50))
+```
+
+```{r}
+metadata <- tbl_df(read.csv(mwROOT("data","stemdata.csv")))
+
+metadata %<>% filter(!is.na(h_apical),
+                     !is.na(munched))
 ```
 
 # Bertha
@@ -151,18 +156,29 @@ for (i in 2:6) {
 }
 ```
 
-Now plot.
-```{r, echo=FALSE}
-histogram(~ log(0.1+herb_avg)|site, data=metadata, type = c("density"), munched.fit = munched.fit, panel = function(x,y) {
-  bmyx <- seq(from = log(0.1), to = log(6.1), length.out=101)
-  myx <- 0.5*(bmyx[1:100] + bmyx[2:101])
-  pn <- packet.number()
-  panel.histogram(x, breaks=20)
-  panel.lines(myx, munched.fit[[pn+1]]$predict(bmyx), col="red", lwd=2)
-})
-```
+```{r, warning=FALSE}
+herb_predict <- function(x, fit, group) {
+  fit[[group]]$predict(c(x, x[length(x)]+x[2]-x[1]))
+}
 
-Save results to file.
-```{r}
-save(munched.fit, file = "munchedFit.RData")
+x <- seq(from = log(0.1), to = log(6.1), length.out = 101)
+curves <- do.call(rbind, lapply(sites[-1],
+                                function(site) {
+                                  data.frame(site = site,
+                                             x = x,
+                                             y = herb_predict(x, munched.fit, site))
+                                }
+))
+
+p <- metadata %>% ggplot(aes(x = log(0.1+herb_avg))) +
+  geom_histogram(aes(y = ..density..),
+                 binwidth = 0.1) +
+  geom_line(aes(x = x, 
+                y = y), 
+            data = curves, 
+            colour = "red") +
+  facet_wrap(~ site) +
+  coord_cartesian(ylim=c(0, 2))
+
+p
 ```
