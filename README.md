@@ -18,21 +18,21 @@ This repository contains the code for the above publication as an RStudio Projec
  6. After Step 5 is complete, just this once, type `source(".Rprofile")` in the R console.  This will make sure all necessary libraries are loaded.  *Note that this command needs to be run only after the very first time this project is opened.*
  7. You should now be able to run all commands and scripts located in the `scripts` directory.  
  
- ## How to create the IPM
- You can create the IPM with the command
+## How to create the IPM
+You can create the IPM with the command
  
- ```
- ipm <- mwIPM()
- ```
+```
+ipm <- mwIPM()
+```
  
- The IPM will be built, and resulting computations saved in the `data/calculated` directory to avoid unnecessary computations in the future.  If at any time you would like to recompute the IPM, you can pass `compute=TRUE` as an argument in a list:
+The IPM will be built, and resulting computations saved in the `data/calculated` directory to avoid unnecessary computations in the future.  If at any time you would like to recompute the IPM, you can pass `compute=TRUE` as an argument in a list:
  
- ```
- ipm <- mwIPM(list(compute = TRUE))
- ```
+```
+ipm <- mwIPM(list(compute = TRUE))
+```
  
- This will by default not overwrite any previously saved computations in the `data/calculated` directory.  To save the results of the computations, you can pass `saveresults=TRUE` as an additional argument in a list:
+This will by default not overwrite any previously saved computations in the `data/calculated` directory.  To save the results of the computations, you can pass `saveresults=TRUE` as an additional argument in a list:
  
- ```
- ipm <- mwIPM(list(compute = TRUE, saveresults = TRUE))
- ```
+```
+ipm <- mwIPM(list(compute = TRUE, saveresults = TRUE))
+```
