@@ -88,7 +88,7 @@ mwIPM <- function(x = list()) {
     compute <- x$compute
   }
   if (all(names(x) != "saveresults")) {
-    saveresults = FALSE
+    saveresults = (length(list.files(mwROOT("data","calculated"), pattern=".RData")) == 0)
   } else if (!is.logical(x$saveresults)) {
     stop(paste("Variable 'saveresults' must be TRUE or FALSE."))
   } else {
