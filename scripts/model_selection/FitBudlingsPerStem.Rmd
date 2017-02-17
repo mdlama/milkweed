@@ -1,107 +1,103 @@
 ---
 title: "Fit Budlings per Stem"
-author: "M. Drew LaMar"
-date: "June 11, 2016"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
   html_document:
     toc: true
 ---
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-library(dplyr)
-library(lme4)
+source("../../.Rprofile")
 ```
 
 Load data.
 ```{r}
-metadat=tbl_df(read.csv("~/Google Drive/Project :: ipmwam/Papers/SivansPaper/Milkweed/DATA SETS/Data Frames/metadata13to15.csv"))
-
-# Use 2 mm cutoff from BLD1 
-# Why are we not using listed transects below again??
-# metadat <- metadata %>% mutate(seedling = ifelse(is.na(stem_width),NA,ifelse(stem_width <= 2.0,1,0)),
-#                                log_herb_avg = log(0.1+herb_avg)) %>%
-#                         filter(!(transect %in% c(0, 44, 48, 64, 72, 74)))
+stemdata <- tbl_df(read.csv(mwROOT("data","stemdata.csv")))
 ```
 
 Compute budlings per stem.
 ```{r}
-metadat_gp <- metadat %>% group_by(year, transect) %>% 
-                          summarize(N_seedlings = sum(seedling, na.rm=T), 
-                                    N_total = sum(aliveJune, na.rm=T), 
-                                    N_budlings = N_total - N_seedlings,
-                                    herb_mean = mean(herb_avg, na.rm=T),
-                                    log_herb_mean = mean(log_herb_avg, na.rm=T),
-                                    herb_sd = sd(herb_avg, na.rm=T),
-                                    herb_cv = herb_sd/herb_mean,
-                                    herb_VMR = (herb_sd^2)/herb_mean,
-                                    site = first(site))
+data_gp <- stemdata %>% group_by(year, transect) %>% 
+  summarize(N_seedlings = sum(seedling, na.rm=T), 
+            N_total = sum(aliveJune, na.rm=T), 
+            N_budlings = N_total - N_seedlings,
+            log_herb_mean = mean(log_herb_avg, na.rm=T),
+            site = first(site))
 
-metadat2013_2014 <- metadat_gp %>% filter(year %in% 2013:2014) %>% 
-                                   group_by(transect) %>% 
-                                   summarize(buds_per_stem = last(N_budlings)/first(N_total),
-                                             herb_mean = first(herb_mean),
-                                             log_herb_mean = first(log_herb_mean),
-                                             herb_cv = first(herb_cv),
-                                             herb_sd = first(herb_sd),
-                                             herb_VMR = first(herb_VMR),
-                                             year = first(year),
-                                             Nf = first(N_total),
-                                             Nl = last(N_total),
-                                             site = first(site))
+data13_14 <- data_gp %>% filter(year %in% 2013:2014) %>% 
+  group_by(transect) %>% 
+  summarize(bdlgs_per_stem = last(N_budlings)/first(N_total),
+            log_herb_mean = first(log_herb_mean),
+            site = first(site))
 
-metadat2014_2015 <- metadat_gp %>% filter(year %in% 2014:2015 & transect != 70) %>%
-                                   group_by(transect) %>% 
-                                   summarize(buds_per_stem = last(N_budlings)/first(N_total),
-                                             herb_mean = first(herb_mean),
-                                             log_herb_mean = first(log_herb_mean),
-                                             herb_sd = first(herb_sd),
-                                             herb_cv = first(herb_cv),
-                                             herb_VMR = first(herb_VMR),
-                                             year = first(year),
-                                             Nf = first(N_total),
-                                             Nl = last(N_total),
-                                             site = first(site))
+data14_15 <- data_gp %>% filter(year %in% 2014:2015 & transect != 70) %>%
+  group_by(transect) %>% 
+  summarize(bdlgs_per_stem = last(N_budlings)/first(N_total),
+            log_herb_mean = first(log_herb_mean),
+            site = first(site))
 
-fulldat <- bind_rows(metadat2013_2014, metadat2014_2015)
+fulldat <- bind_rows(data13_14, data14_15)
 ```
 
-Technically, there is an independence issue with transects, so we average over transects.
+Let's average over transects.
 
 ```{r}
 merged <- fulldat %>% group_by(transect) %>% 
-                      summarize(herb_mean = mean(herb_mean), 
-                                log_herb_mean = mean(log_herb_mean),
-                                buds_per_stem = mean(buds_per_stem),
-                                site = first(site))
+  summarize(log_herb_mean = mean(log_herb_mean),
+            bdlgs_per_stem = mean(bdlgs_per_stem),
+            site = first(site))
 ```
 
 Model fits.
 ```{r}
-exp.model <- lm(log(buds_per_stem) ~ log_herb_mean, data=merged)
-lin.model <- lm(buds_per_stem ~ log_herb_mean, data=merged)
+exp.model <- lm(log(bdlgs_per_stem) ~ log_herb_mean, data=merged)
+lin.model <- lm(bdlgs_per_stem ~ log_herb_mean, data=merged)
 AIC(lin.model, exp.model)
-
-budlings.per.stem.fit <- exp.model
-budlings.per.stem.fit$site <- merged$site
 ```
 
-Plots.
+Both models are rather similar - in this case we will go with the exponential model, as it makes more biological sense (it won't go negative!!!)
 ```{r}
+fit <- exp.model 
+
+plotdata <- data.frame(log_herb_avg = fit$model$log_herb_mean, 
+                       buds_per_stem = exp(fit$model$`log(bdlgs_per_stem)`),
+                       site = merged$site)
+
+p <- plotdata %>% ggplot(aes(x = log_herb_avg, 
+                             y = buds_per_stem,
+                             color = site)) + 
+                  geom_point()
+
 xpts <- seq(from=log(0.1), to=log(6.1), length.out = 1000)
-ylinpts <- predict(lin.model, new = data.frame(log_herb_mean = xpts))
-yexppts <- predict(exp.model, new = data.frame(log_herb_mean = xpts))
-plot(merged$log_herb_mean, merged$buds_per_stem, col = merged$site, xlim=c(log(0.1),log(6.1)), ylim=c(0,2))
-lines(xpts, exp(yexppts), col="red")
-lines(xpts, ylinpts, col="blue")
-```
+ypts <- predict(fit, 
+                new = data.frame(log_herb_mean = xpts), 
+                level=0.95,
+                interval="confidence",
+                se.fit=TRUE)
+plotdata <- data.frame(log_herb_avg = xpts, 
+                       buds_per_stem = exp(ypts$fit[,"fit"]),
+                       lwr = exp(ypts$fit[,"lwr"]),
+                       upr = exp(ypts$fit[,"upr"]),
+                       site = NA)
 
-Save results.
-```{r}
-save(budlings.per.stem.fit, file = "budlingsPerStemFit.RData")
-```
+p <- p + geom_line(data = plotdata, 
+                   color = "black", 
+                   linetype = "solid") +
+         geom_ribbon(data = plotdata, 
+                     aes(ymin=lwr, 
+                         ymax=upr), 
+                     alpha = 0.2) + 
+         scale_y_continuous(limits = c(0, 2.8))
+         
+p <- p + theme_bw() +
+         xlab("ln(Herbivory Score)") +
+         ylab("Per capita clonal reproduction\n (sprouts/stem)") +
+         labs(color="Sites") + 
+         theme(legend.background = element_rect(fill="lightgrey",
+                                                size=0.1,
+                                                linetype="solid"),
+               legend.key.size =  unit(0.2, "in"),
+               legend.position = c(0.875, 0.65))
 
-An attempt at a mixed model for this gives a zero variance from site, transect, and/or year.  Thus, we will use aggregate data for all sites in simulations.  Here's an example of the mixed model fits illustrating the issue.
-```{r}
-lmer(buds_per_stem ~ log_herb_mean + (1|site/transect), data=fulldat)
-lmer(log(buds_per_stem) ~ log_herb_mean + (1|site/transect), data=fulldat)
+p
 ```
