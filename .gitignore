@@ -8,5 +8,4 @@ scripts/figs/Box1/Box1.aux
 scripts/figs/Box1/Box1.log
 scripts/figs/Box1/Box1.pdf
 *.png
-data/calculated
 packrat/lib*/
