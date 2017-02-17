@@ -218,6 +218,7 @@ local({
 })
 #### -- End Packrat Autoloader -- ####
 
+# Load libraries ----
 library(fitdistrplus)
 library(rprojroot)
 library(tidyr)
@@ -249,3 +250,4 @@ mwROOT <- is_rstudio_project$make_fix_file()
   source(mwROOT("includes","mwIPM.R"))
   cat("\nWelcome at", date(), "\n")
 }
+.First()
