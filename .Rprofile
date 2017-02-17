@@ -1,3 +1,7 @@
+#### -- Packrat Autoloader (version 0.4.8-1) -- ####
+source("packrat/init.R")
+#### -- End Packrat Autoloader -- ####
+
 library(fitdistrplus)
 library(rprojroot)
 library(tidyr)
@@ -29,7 +33,3 @@ mwROOT <- is_rstudio_project$make_fix_file()
   source(mwROOT("includes","mwIPM.R"))
   cat("\nWelcome at", date(), "\n")
 }
-
-#### -- Packrat Autoloader (version 0.4.8-1) -- ####
-source("packrat/init.R")
-#### -- End Packrat Autoloader -- ####
