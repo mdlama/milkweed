@@ -19,10 +19,7 @@ stemdata$year <- factor(stemdata$year)
 First, let's get the data ready.  We need to normalize the data (mean 0 and standard deviation 1).
 ```{r}
 stemdata_usc <- stemdata %>% filter(!is.na(h_apical),
-                                    !is.na(h_apical.next),
-                                    !is.na(herb_avg),
-                                    !is.na(fec.flower),
-                                    !is.na(surv))
+                                    !is.na(herb_avg))
 
 stemdata_sc <- stemdata_usc %>% mutate_each(funs(as.numeric(scale(.))), 
                                             h_apical, 
@@ -54,9 +51,15 @@ aictab(list(herbivory.reg.mdl1,
             herbivory.reg.mdl4,
             herbivory.reg.mdl5))
 
+bictab(list(herbivory.reg.mdl1, 
+            herbivory.reg.mdl2, 
+            herbivory.reg.mdl3,
+            herbivory.reg.mdl4,
+            herbivory.reg.mdl5))
+
 herbivory.reg.winner <- herbivory.reg.mdl2
 ```
-Winner is model with site as a random effect on intercept only, and year as a random effect on intercept and apical height.  
+Winner is model with site as a random effect on intercept only, and year as a random effect on intercept and apical height (going with BIC).
 ```
 munched ~ h_apical + (1|site/transect) + (h_apical|year)
 ```
@@ -65,6 +68,10 @@ Let's check the fixed effects.  In this case, we just want to compare Model #2 t
 herbivory.reg.noapical <- glmer(munched ~ 1 + (1|site/transect) + (h_apical|year), data=stemdata_sc, nAGQ=1, family=binomial(), control = glmerCtrl)
 
 aictab(list(herbivory.reg.winner, 
+            herbivory.reg.noapical),
+       modnames=c("Height", "No Height"))
+
+bictab(list(herbivory.reg.winner, 
             herbivory.reg.noapical),
        modnames=c("Height", "No Height"))
 ```
@@ -114,6 +121,12 @@ aictab(list(herbivory.reg.mdl1,
             herbivory.reg.mdl3,
             herbivory.reg.mdl4,
             herbivory.reg.mdl5))
+
+bictab(list(herbivory.reg.mdl1, 
+            herbivory.reg.mdl2,
+            herbivory.reg.mdl3,
+            herbivory.reg.mdl4,
+            herbivory.reg.mdl5))
 ```
 
 Looks like the "full" model for random effects.  Now on to fixed effects.  For the model selection part, we set `REML=F`.  Note the need to recompute for the random effects winner.
@@ -123,6 +136,10 @@ herbivory.reg.winner <- lmer(log_herb_avg ~ h_apical + (h_apical|site/transect) 
 herbivory.reg.noapical <- lmer(log_herb_avg ~ 1 + (h_apical|site/transect) + (h_apical|year), data=stemdata_sc %>% filter(munched == 1), REML=F)
 
 aictab(list(herbivory.reg.winner, 
+            herbivory.reg.noapical),
+       modnames = c("Height", "No Height"))
+
+bictab(list(herbivory.reg.winner, 
             herbivory.reg.noapical),
        modnames = c("Height", "No Height"))
 ```
