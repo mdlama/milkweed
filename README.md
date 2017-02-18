@@ -39,10 +39,10 @@ ipm <- mwIPM(list(compute = TRUE, saveresults = TRUE))
 
 [Figure 1](scripts/figs/Figure1/Figure1.html)
 
-[Figure 2](scripts/figs/Figure1/Figure2.html)
+[Figure 2](scripts/figs/Figure2/Figure2.html)
 
-[Figure 3](scripts/figs/Figure1/Figure3.html)
+[Figure 3](scripts/figs/Figure3/Figure3.html)
 
-[Figure 4](scripts/figs/Figure1/Figure4.html)
+[Figure 4](scripts/figs/Figure4/Figure4.html)
 
-[Figure 5](scripts/figs/Figure1/Figure5.html)
+[Figure 5](scripts/figs/Figure5/Figure5.html)
