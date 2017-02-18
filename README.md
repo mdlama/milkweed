@@ -45,3 +45,10 @@ ipm <- mwIPM(list(compute = TRUE, saveresults = TRUE))
  - [Appendix: Figure 2](scripts/figs/AppendixFigure2/AppendixFigure2.html)
  - [Appendix: Figure 3](scripts/figs/AppendixFigure3/AppendixFigure3.html)
  - [Appendix: Figure 4](scripts/figs/AppendixFigure4/AppendixFigure4.html)
+
+# Model selection scripts
+
+ - [Herbivory Distributions](scripts/model_selection/FitHerbivoryDistribution.html)
+ - [Sprout Distributions](scripts/model_selection/FitBudlingDistribution.html)
+ - [Seedling Distribution](scripts/model_selection/FitSeedlingDistribution.html)
+ - [Sprouts-per-stem Distribution](scripts/model_selection/FitBudlingsPerStem.html)
