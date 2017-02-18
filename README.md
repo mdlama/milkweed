@@ -17,19 +17,19 @@
 # How to create the IPM
 You can create the IPM with the command
  
-```
+```r
 ipm <- mwIPM()
 ```
  
 The IPM will be built, and resulting computations saved in the `data/calculated` directory to avoid unnecessary computations in the future.  If at any time you would like to recompute the IPM, you can pass `compute=TRUE` as an argument in a list:
  
-```
+```r
 ipm <- mwIPM(list(compute = TRUE))
 ```
  
 This will by default not overwrite any previously saved computations in the `data/calculated` directory.  To save the results of the computations, you can pass `saveresults=TRUE` as an additional argument in a list:
  
-```
+```r
 ipm <- mwIPM(list(compute = TRUE, saveresults = TRUE))
 ```
 
