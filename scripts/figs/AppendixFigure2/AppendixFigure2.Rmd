@@ -130,7 +130,7 @@ plot_recr
 
 # Render and save final plot
 
-```{r}
+```{r, fig.width=12, fig.height=4}
 pall <- grid.arrange(plot_herb, plot_recr, ncol=2)
 ggsave("AppendixFigure2.png", height=4, width=12, device = "png", pall)
 ```
