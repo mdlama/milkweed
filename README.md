@@ -1,5 +1,3 @@
-This repository contains the code for the above publication as an RStudio Project.
-
 # Installation
 
  1. Download and install [R](https://www.r-project.org/) and [RStudio](https://www.rstudio.com/products/rstudio/download/).
