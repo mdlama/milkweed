@@ -19,7 +19,8 @@ metadata <- tbl_df(read.csv(mwROOT("data","stemdata.csv")))
 Fits of h_apical for seedlings.
 ```{r}
 h_apical <- metadata %>% 
-  filter(seedling == 1) %$%
+  filter(seedling == 1,
+         !is.na(h_apical)) %$%
   h_apical
 
 distnames <- c("norm", "lnorm", "gamma", "exp", "weibull")

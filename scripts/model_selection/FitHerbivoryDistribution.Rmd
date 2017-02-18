@@ -13,22 +13,7 @@ We use the `fdistrplus` package (https://cran.r-project.org/web/packages/fitdist
 source("../../.Rprofile")
 ```
 
-Read, filter and transform data.
-```{r, eval=F}
-metadata=read.csv("~/Google Drive/ipmwam/Papers/SivansPaper/Milkweed/DATA SETS/Data Frames/metadata13to15.csv")
-
-# Where there was a plant in June and NA for height in Sept, make surv 0
-metadata <- metadata %>% mutate(surv = ifelse(is.na(surv) & is.na(h_apical.next) & !is.na(h_apical), 0, surv), 
-                                munched = ifelse(herb_avg > 0, 1, 0)) %>% 
-                         filter(!is.na(h_apical),
-                                !is.na(h_apical.next),
-                                !is.na(herb_avg),
-                                !is.na(fec.flower),
-                                !is.na(surv),
-                                h_apical.next > 50,
-                                !(site == "YTB" & h_apical <= 50))
-```
-
+Read and filter.
 ```{r}
 metadata <- tbl_df(read.csv(mwROOT("data","stemdata.csv")))
 
@@ -178,7 +163,10 @@ p <- metadata %>% ggplot(aes(x = log(0.1+herb_avg))) +
             data = curves, 
             colour = "red") +
   facet_wrap(~ site) +
-  coord_cartesian(ylim=c(0, 2))
+  coord_cartesian(ylim=c(0, 2)) +
+  theme_bw() +
+  xlab("Ln(Herbivory Score)") +
+  ylab("Density")
 
 p
 ```
