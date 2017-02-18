@@ -1,5 +1,5 @@
 ---
-title: "Figure 6: Elasticity analysis"
+title: "Figure 5: Elasticity analysis"
 output: 
   html_document:
     toc: true
