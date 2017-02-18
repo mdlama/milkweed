@@ -36,3 +36,5 @@ This will by default not overwrite any previously saved computations in the `dat
 ```
 ipm <- mwIPM(list(compute = TRUE, saveresults = TRUE))
 ```
+
+[Figure 1](milkweed/scripts/figs/Figure1/Figure1.html)
