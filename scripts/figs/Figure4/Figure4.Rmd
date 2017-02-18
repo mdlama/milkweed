@@ -43,7 +43,7 @@ if (compute) {
     numcl <- detectCores()-1
     registerDoParallel(cores = numcl)
     results <- tbl_df(foreach(i=1:20, .combine=bind_rows) %dopar% {
-      source("../../.Rprofile")
+      source("../../../.Rprofile")
       coreProcess(ipm, sites)
     })
   } else {

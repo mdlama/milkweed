@@ -56,10 +56,8 @@ attach(ipm$pars)
 
 h_apical <- ipm$data %>% 
   filter(!is.na(h_apical),
-         !is.na(h_apical.next),
-         !is.na(herb_avg),
-         !is.na(fec.flower),
-         !is.na(surv)) %$%
+         !is.na(log_herb_avg),
+         !is.na(fec.flower)) %$%
   h_apical
 
 qfadj <- flower.fit$pars$unscaled["Bertha", "h_apical:log_herb_avg"]*quantile(h_apical, probs = c(0.05, 0.5, 0.95))
@@ -186,7 +184,7 @@ pf <- mydata %>% filter(rate == type) %>%
                       linetype=2) + 
            scale_x_continuous(limits = c(-2, 2)) +
            theme_bw() +
-           ggtitle(type) +
+           ggtitle(paste("(a)", type)) +
            theme(plot.title = element_text(family = "Trebuchet MS", 
                                            size = title.size,
                                            hjust = 0.5),
@@ -221,7 +219,7 @@ pg <- mydata %>% filter(rate == type) %>%
                       linetype = 2) + 
            scale_x_continuous(limits = c(-10, 10)) + 
            theme_bw() +
-           ggtitle(type) +
+           ggtitle(paste("(b)", type)) +
            theme(plot.title = element_text(family = "Trebuchet MS", 
                                            size = title.size,
                                            hjust = 0.5),
@@ -258,7 +256,7 @@ ps <- mydata %>% filter(rate == type) %>%
                       linetype = 2) + 
            scale_x_continuous(limits = c(-2, 2)) +
            theme_bw() +
-           ggtitle(type) +
+           ggtitle(paste("(d)", type)) +
            theme(plot.title = element_text(family = "Trebuchet MS", 
                                            size = title.size,
                                            hjust = 0.5),
@@ -285,7 +283,7 @@ pp <- mydata %>% filter(rate == type) %>%
                       linetype = 2) + 
            scale_x_continuous(limits = c(-1, 1)) +
            theme_bw() +
-           ggtitle(type) +
+           ggtitle(paste("(c)", type)) +
            theme(plot.title = element_text(family = "Trebuchet MS", 
                                            size = title.size,
                                            hjust = 0.5),
