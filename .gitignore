@@ -4,8 +4,8 @@
 .Ruserdata
 includes/mwDist.R
 scripts/figs/old_figs
-scripts/figs/Box1/Box1.aux
-scripts/figs/Box1/Box1.log
-scripts/figs/Box1/Box1.pdf
+scripts/figs/Figure1_Model/Figure1_Model.aux
+scripts/figs/Figure1_Model/Figure1_Model.log
+scripts/figs/Figure1_Model/Figure1_Model.pdf
 *.png
 packrat/lib*/
