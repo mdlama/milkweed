@@ -37,11 +37,11 @@ ipm <- mwIPM(list(compute = TRUE, saveresults = TRUE))
 
 # Figure scripts
 
- - [Figure 1](scripts/figs/Figure1/Figure1.html)
- - [Figure 2](scripts/figs/Figure2/Figure2.html)
- - [Figure 3](scripts/figs/Figure3/Figure3.html)
- - [Figure 4](scripts/figs/Figure4/Figure4.html)
- - [Figure 5](scripts/figs/Figure5/Figure5.html)
+ - [Figure 2: Flowering and growth](scripts/figs/Figure2_FloweringAndGrowth/Figure2_FloweringAndGrowth.html)
+ - [Figure 3: Herbivory slope parameters across sites](scripts/figs/Figure3_HerbSlopePars/Figure3_HerbSlopePars.html)
+ - [Figure 4: Clonal growth versus herbivory](scripts/figs/Figure4_ClonalGrowthVsHerb/Figure4_ClonalGrowthVsHerb.html)
+ - [Figure 5: Population growth versus herbivory](scripts/figs/Figure5_PopGrowthVsHerb/Figure5_PopGrowthVsHerb.html)
+ - [Figure 6: Elasticity analysis](scripts/figs/Figure6_ElasticityAnalysis/Figure6_ElasticityAnalysis.html)
  - [Appendix: Figure 2](scripts/figs/AppendixFigure2/AppendixFigure2.html)
  - [Appendix: Figure 3](scripts/figs/AppendixFigure3/AppendixFigure3.html)
  - [Appendix: Figure 4](scripts/figs/AppendixFigure4/AppendixFigure4.html)
