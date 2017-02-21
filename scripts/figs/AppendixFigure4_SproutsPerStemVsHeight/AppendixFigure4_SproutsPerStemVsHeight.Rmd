@@ -57,5 +57,5 @@ myplot <- merged %>% ggplot(aes(x = h_apical,
 
 myplot
 
-ggsave("AppendixFigure4.png", height=4, width=6, device = "png", myplot)
+ggsave("AppendixFigure4_SproutsPerStemVsHeight.png", height=4, width=6, device = "png", myplot)
 ```
