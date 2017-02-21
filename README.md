@@ -42,9 +42,9 @@ ipm <- mwIPM(list(compute = TRUE, saveresults = TRUE))
  - [Figure 4: Clonal growth versus herbivory](scripts/figs/Figure4_ClonalGrowthVsHerb/Figure4_ClonalGrowthVsHerb.html)
  - [Figure 5: Population growth versus herbivory](scripts/figs/Figure5_PopGrowthVsHerb/Figure5_PopGrowthVsHerb.html)
  - [Figure 6: Elasticity analysis](scripts/figs/Figure6_ElasticityAnalysis/Figure6_ElasticityAnalysis.html)
- - [Appendix: Figure 2](scripts/figs/AppendixFigure2/AppendixFigure2.html)
- - [Appendix: Figure 3](scripts/figs/AppendixFigure3/AppendixFigure3.html)
- - [Appendix: Figure 4](scripts/figs/AppendixFigure4/AppendixFigure4.html)
+ - [Appendix Figure 2: Recruitment and herbivory distributions](scripts/figs/AppendixFigure2_RecruitAndHerbDist/AppendixFigure2_RecruitAndHerbDist.html)
+ - [Appendix Figure 3: Herbivory versus apical height](scripts/figs/AppendixFigure3_HerbVsHeight/AppendixFigure3_HerbVsHeight.html)
+ - [Appendix Figure 4: Sprouts per stem versus apical height](scripts/figs/AppendixFigure4_SproutsPerStemVsHeight/AppendixFigure4_SproutsPerStemVsHeight.html)
 
 # Model selection scripts
 
