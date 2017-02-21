@@ -1,5 +1,5 @@
 ---
-title: "Figure 3: Clonal growth versus herbivory"
+title: "Figure 4: Clonal growth versus herbivory"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
   html_document:
@@ -72,5 +72,5 @@ detach(ipm$pars)
 Save figure.
 
 ```{r}
-ggsave("Figure3.png", height=4, width=6, device = "png", p)
+ggsave("Figure4_ClonalGrowthVsHerb.png", height=4, width=6, device = "png", p)
 ```

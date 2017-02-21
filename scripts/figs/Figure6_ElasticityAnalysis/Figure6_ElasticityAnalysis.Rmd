@@ -1,5 +1,6 @@
 ---
-title: "Figure 5: Elasticity analysis"
+title: "Figure 6: Elasticity analysis"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
   html_document:
     toc: true
@@ -289,5 +290,5 @@ g2 <- ggplotGrob(pmunch_elastiplot)
 g <- cbind(g1, g2, size="first")
 
 p <- grid.arrange(g1, g2, ncol=2)
-ggsave("Figure5.png", width=8, height=4, device = "png", p)
+ggsave("Figure6_ElasticityAnalysis.png", width=8, height=4, device = "png", p)
 ```

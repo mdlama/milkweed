@@ -1,5 +1,5 @@
 ---
-title: "Figure 2: Herbivory slope parameters across site"
+title: "Figure 3: Herbivory slope parameters across site"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
   html_document:
@@ -298,5 +298,5 @@ pp
 pall <- grid.arrange(pf, pg, pp, ps, 
                      left="Site", 
                      bottom=textGrob(TeX('$\\beta_{z_{\\omega}}$')))
-ggsave("Figure2.png", width=6, device = "png", pall)
+ggsave("Figure3_HerbSlopePars.png", width=6, device = "png", pall)
 ```

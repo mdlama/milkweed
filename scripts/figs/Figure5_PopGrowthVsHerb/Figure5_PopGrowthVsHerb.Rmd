@@ -1,5 +1,6 @@
 ---
-title: "Figure 4: Population growth versus herbivory"
+title: "Figure 5: Population growth versus herbivory"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
   html_document:
     toc: true
@@ -96,5 +97,5 @@ p
 
 Save figure.
 ```{r}
-ggsave("Figure4.png", height=4, width=6, device = "png", p)
+ggsave("Figure5_PopGrowthVsHerb.png", height=4, width=6, device = "png", p)
 ```

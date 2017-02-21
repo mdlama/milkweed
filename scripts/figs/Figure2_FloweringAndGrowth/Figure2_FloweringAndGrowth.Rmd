@@ -1,5 +1,5 @@
 ---
-title: "Figure 1: Herbivory and apical height"
+title: "Figure 2: Flowering and Growth"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
   html_document:
@@ -248,5 +248,5 @@ gg <- rbind(g3, g4, size="first")
 gg$widths <- unit.pmax(g3$widths, g4$widths)
 
 p <- grid.arrange(g, gg, ncol=2)
-ggsave("Figure1.png", width=7, height=5, device = "png", p)
+ggsave("Figure2_FloweringAndGrowth.png", width=7, height=5, device = "png", p)
 ```
