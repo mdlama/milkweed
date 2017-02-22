@@ -5,7 +5,7 @@ This repository contains the code for the above publication as an RStudio Projec
  - Download and install [R](https://www.r-project.org/) and [RStudio](https://www.rstudio.com/products/rstudio/download/).
  - Download the code as a [ZIP archive](https://github.com/mdlama/milkweed/archive/master.zip) or in a terminal with the command `git clone https://github.com/mdlama/milkweed ./milkweed` 
  - Navigate to the resulting directory on your computer.  *If you downloaded from the ZIP archive, you might have to first unzip the `milkweed-master.zip` file if it doesn't happen automatically.*
- - Open the file `pubdat.Rproj`.  RStudio should open the project and begin installing all necessary R packages.  You should see the following
+ - Open the file `milkweed.Rproj`.  RStudio should open the project and begin installing all necessary R packages.  You should see the following
  
  ```
  Packrat is not installed in the local library -- attempting to bootstrap an installation...
