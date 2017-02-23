@@ -7,7 +7,7 @@ Package: AICcmodavg
 Source: CRAN
 Version: 2.1-0
 Hash: aeb7af0f14bfee21d4c3feb88d708c72
-Requires: MASS, Matrix, VGAM, lattice, nlme, unmarked, xtable
+Requires: MASS, Matrix, VGAM, lattice, nlme, survival, unmarked, xtable
 
 Package: BH
 Source: CRAN
@@ -130,7 +130,7 @@ Package: fitdistrplus
 Source: CRAN
 Version: 1.0-8
 Hash: 6413b89b1a7bff7fe0e5e2719d94749e
-Requires: MASS
+Requires: MASS, survival
 
 Package: foreach
 Source: CRAN
@@ -343,6 +343,12 @@ Source: CRAN
 Version: 1.1.0
 Hash: 4d21d0063b37a17ea18eaec6acd29bf3
 Requires: magrittr, stringi
+
+Package: survival
+Source: CRAN
+Version: 2.40-1
+Hash: 6c0779308f30f29df842fe8dfa725593
+Requires: Matrix
 
 Package: tibble
 Source: CRAN
