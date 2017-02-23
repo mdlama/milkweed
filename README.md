@@ -5,7 +5,7 @@ This repository contains the code for the above publication as an RStudio Projec
  - Download and install [R](https://www.r-project.org/) and [RStudio](https://www.rstudio.com/products/rstudio/download/).
  - Download the code as a [ZIP archive](https://github.com/mdlama/milkweed/archive/master.zip) or in a terminal with the command `git clone https://github.com/mdlama/milkweed ./milkweed` 
  - Navigate to the resulting directory on your computer.  *If you downloaded from the ZIP archive, you might have to first unzip the `milkweed-master.zip` file if it doesn't happen automatically.*
- - Open the file `pubdat.Rproj`.  RStudio should open the project and begin installing all necessary R packages.  You should see the following
+ - Open the file `milkweed.Rproj`.  RStudio should open the project and begin installing all necessary R packages.  You should see the following
  
  ```
  Packrat is not installed in the local library -- attempting to bootstrap an installation...
@@ -42,9 +42,9 @@ ipm <- mwIPM(list(compute = TRUE, saveresults = TRUE))
  - [Figure 4: Clonal growth versus herbivory](scripts/figs/Figure4_ClonalGrowthVsHerb/Figure4_ClonalGrowthVsHerb.html)
  - [Figure 5: Population growth versus herbivory](scripts/figs/Figure5_PopGrowthVsHerb/Figure5_PopGrowthVsHerb.html)
  - [Figure 6: Elasticity analysis](scripts/figs/Figure6_ElasticityAnalysis/Figure6_ElasticityAnalysis.html)
- - [Appendix: Figure 2](scripts/figs/AppendixFigure2/AppendixFigure2.html)
- - [Appendix: Figure 3](scripts/figs/AppendixFigure3/AppendixFigure3.html)
- - [Appendix: Figure 4](scripts/figs/AppendixFigure4/AppendixFigure4.html)
+ - [Appendix Figure 2: Recruitment and herbivory distributions](scripts/figs/AppendixFigure2_RecruitAndHerbDist/AppendixFigure2_RecruitAndHerbDist.html)
+ - [Appendix Figure 3: Herbivory versus apical height](scripts/figs/AppendixFigure3_HerbVsHeight/AppendixFigure3_HerbVsHeight.html)
+ - [Appendix Figure 4: Sprouts per stem versus apical height](scripts/figs/AppendixFigure4_SproutsPerStemVsHeight/AppendixFigure4_SproutsPerStemVsHeight.html)
 
 # Model selection scripts
 
