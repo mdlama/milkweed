@@ -7,7 +7,7 @@ external.packages:
 local.repos: 
 load.external.packages.on.startup: TRUE
 ignored.packages: 
-quiet.package.installation: TRUE
+quiet.package.installation: FALSE
 snapshot.recommended.packages: FALSE
 snapshot.fields:
     Imports
