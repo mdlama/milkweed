@@ -17,7 +17,7 @@ ipm <- mwIPM()
 Bootstrap the data to get 95% confidence ellipses for average herbivory and lambda over each site.
 ```{r}
 compute <- FALSE
-parallel <- FALSE
+parallel <- TRUE
 
 if (!file.exists(mwROOT("data","calculated","figure5.RData")) | (compute)) {
   sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
