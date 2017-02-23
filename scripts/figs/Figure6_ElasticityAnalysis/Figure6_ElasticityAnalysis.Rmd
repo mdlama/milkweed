@@ -19,7 +19,7 @@ ipm <- mwIPM()
 ```{r}
 compute <- FALSE
 
-if (compute) {
+if (!file.exists(mwROOT("data","calculated","figure6.RData")) | (compute)) {
   numcl <- detectCores()-1
   registerDoParallel(cores = numcl)
   results <- tbl_df(foreach(i=1:20, .combine=bind_rows) %dopar% {
@@ -29,9 +29,9 @@ if (compute) {
     thisone
   })
   
-  save(results, file=mwROOT("data","calculated","figure5.RData"))
+  save(results, file=mwROOT("data","calculated","figure6.RData"))
 } else {
-  load(mwROOT("data","calculated","figure5.RData"))
+  load(mwROOT("data","calculated","figure6.RData"))
 }
 ```
 

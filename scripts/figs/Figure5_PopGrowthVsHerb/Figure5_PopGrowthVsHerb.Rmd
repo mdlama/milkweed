@@ -10,7 +10,6 @@ output:
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 source("../../../.Rprofile")
-library(doParallel)
 ipm <- mwIPM()
 ```
 
@@ -20,7 +19,7 @@ Bootstrap the data to get 95% confidence ellipses for average herbivory and lamb
 compute <- FALSE
 parallel <- FALSE
 
-if (compute) {
+if (!file.exists(mwROOT("data","calculated","figure5.RData")) | (compute)) {
   sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
   plotdata <- data.frame(log_herb_avg = ipm$vars$log_herb_avg$x,
                          growth_rate = sapply(1:ipm$N, 
@@ -51,9 +50,9 @@ if (compute) {
     results <- do.call(rbind, lapply(1:20, function (x) {coreProcess(ipm, sites)}))
   }
   
-  save(plotdata, results, file=mwROOT("data","calculated","figure4.RData"))
+  save(plotdata, results, file=mwROOT("data","calculated","figure5.RData"))
 } else {
-  load(mwROOT("data","calculated","figure4.RData"))
+  load(mwROOT("data","calculated","figure5.RData"))
 }
 ```
 
