@@ -21,18 +21,11 @@ require(gtable)         # For gtable_add_cols
 require(grid)           # For unit.pmax
 require(gridExtra)      # For grid.arrange
 require(latex2exp)      # For latex expressions in plots
-require(doParallel)     # For bootstrapping in Figures 4 and 5
+require(doParallel)     # For bootstrapping in Figures 5 and 6
 
 if (require(rprojroot)) {
   mwROOT <- is_rstudio_project$make_fix_file()
-  
-  # Weird need to put the sourcing in a function.  If not, only the first source command works.
-  # Also, have to actually call the .First function as it won't be called otherwise.  Maybe because
-  #   .First doesn't work as expected as a project .Rprofile?
-  .First <- function() {
-    source(mwROOT("includes","mwMod.R"))
-    source(mwROOT("includes","mwIPM.R"))
-    cat("\nWelcome at", date(), "\n")
-  }
-  .First()
+  source(mwROOT("includes","mwMod.R"))
+  source(mwROOT("includes","mwIPM.R"))
+  cat("\nWelcome at", date(), "\n")
 }
