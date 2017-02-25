@@ -34,7 +34,6 @@ local({
     try(unloadNamespace("packrat"), silent = TRUE)
 
   if (suppressWarnings(requireNamespace("packrat", quietly = TRUE, lib.loc = libDir))) {
-
     # Check 'print.banner.on.startup' -- when NA and RStudio, don't print
     print.banner <- packrat::get_opts("print.banner.on.startup")
     if (print.banner == "auto" && is.na(Sys.getenv("RSTUDIO", unset = NA))) {
@@ -42,6 +41,7 @@ local({
     } else {
       print.banner <- FALSE
     }
+    unpacked <<- TRUE
     return(packrat::on(print.banner = print.banner))
   }
 
@@ -213,5 +213,5 @@ local({
     Sys.unsetenv("RSTUDIO_PACKRAT_BOOTSTRAP")
 
   }
-
+  
 })
