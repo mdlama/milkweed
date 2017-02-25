@@ -41,7 +41,6 @@ local({
     } else {
       print.banner <- FALSE
     }
-    unpacked <<- TRUE
     return(packrat::on(print.banner = print.banner))
   }
 
