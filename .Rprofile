@@ -218,27 +218,27 @@ local({
 #### -- End Packrat Autoloader -- ####
 
 # Load libraries ----
-require(fitdistrplus, warn.conflicts = FALSE)
-require(tidyr, warn.conflicts = FALSE)
-require(dplyr, warn.conflicts = FALSE)
-require(ggplot2, warn.conflicts = FALSE)
-require(lme4, warn.conflicts = FALSE)
-require(AICcmodavg, warn.conflicts = FALSE)
-require(magrittr, warn.conflicts = FALSE)
-require(rootSolve, warn.conflicts = FALSE)
-require(numDeriv, warn.conflicts = FALSE)
+require(fitdistrplus, quietly = TRUE, warn.conflicts = FALSE)
+require(tidyr, quietly = TRUE, warn.conflicts = FALSE)
+require(dplyr, quietly = TRUE, warn.conflicts = FALSE)
+require(ggplot2, quietly = TRUE, warn.conflicts = FALSE)
+require(lme4, quietly = TRUE, warn.conflicts = FALSE)
+require(AICcmodavg, quietly = TRUE, warn.conflicts = FALSE)
+require(magrittr, quietly = TRUE, warn.conflicts = FALSE)
+require(rootSolve, quietly = TRUE, warn.conflicts = FALSE)
+require(numDeriv, quietly = TRUE, warn.conflicts = FALSE)
 
 # Used mainly in render functions and figure scripts
-require(RColorBrewer, warn.conflicts = FALSE)   # For brewer.pal function
-require(scales, warn.conflicts = FALSE)         # For hue_pal function
-require(plot3D, warn.conflicts = FALSE)         # For mesh function
-require(gtable, warn.conflicts = FALSE)         # For gtable_add_cols
-require(grid, warn.conflicts = FALSE)           # For unit.pmax
-require(gridExtra, warn.conflicts = FALSE)      # For grid.arrange
-require(latex2exp, warn.conflicts = FALSE)      # For latex expressions in plots
-require(doParallel, warn.conflicts = FALSE)     # For bootstrapping in Figures 5 and 6
+require(RColorBrewer, quietly = TRUE, warn.conflicts = FALSE)   # For brewer.pal function
+require(scales, quietly = TRUE, warn.conflicts = FALSE)         # For hue_pal function
+require(plot3D, quietly = TRUE, warn.conflicts = FALSE)         # For mesh function
+require(gtable, quietly = TRUE, warn.conflicts = FALSE)         # For gtable_add_cols
+require(grid, quietly = TRUE, warn.conflicts = FALSE)           # For unit.pmax
+require(gridExtra, quietly = TRUE, warn.conflicts = FALSE)      # For grid.arrange
+require(latex2exp, quietly = TRUE, warn.conflicts = FALSE)      # For latex expressions in plots
+require(doParallel, quietly = TRUE, warn.conflicts = FALSE)     # For bootstrapping in Figures 5 and 6
 
-if (require(rprojroot, warn.conflicts = FALSE)) {
+if (require(rprojroot, quietly = TRUE, warn.conflicts = FALSE)) {
   mwROOT <- is_rstudio_project$make_fix_file()
   source(mwROOT("includes","mwMod.R"))
   source(mwROOT("includes","mwIPM.R"))
