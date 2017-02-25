@@ -25,14 +25,14 @@ require(doParallel)     # For bootstrapping in Figures 4 and 5
 
 if (require(rprojroot)) {
   mwROOT <- is_rstudio_project$make_fix_file()
+  
+  # Weird need to put the sourcing in a function.  If not, only the first source command works.
+  # Also, have to actually call the .First function as it won't be called otherwise.  Maybe because
+  #   .First doesn't work as expected as a project .Rprofile?
+  .First <- function() {
+    source(mwROOT("includes","mwMod.R"))
+    source(mwROOT("includes","mwIPM.R"))
+    cat("\nWelcome at", date(), "\n")
+  }
+  .First()
 }
-
-# Weird need to put the sourcing in a function.  If not, only the first source command works.
-# Also, have to actually call the .First function as it won't be called otherwise.  Maybe because
-#   .First doesn't work as expected as a project .Rprofile?
-.First <- function() {
-  source(mwROOT("includes","mwMod.R"))
-  source(mwROOT("includes","mwIPM.R"))
-  cat("\nWelcome at", date(), "\n")
-}
-.First()
