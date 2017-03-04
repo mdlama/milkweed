@@ -59,11 +59,12 @@ p <- p + theme_bw() +
          xlab("ln(Herbivory Score)") +
          ylab("Per capita clonal reproduction\n (sprouts/stem)") +
          labs(color="Sites") + 
+         scale_x_continuous(limits = c(-2.0, 0.0)) + 
          theme(legend.background = element_rect(fill="lightgrey",
                                                 size=0.1,
                                                 linetype="solid"),
                legend.key.size =  unit(0.2, "in"),
-               legend.position = c(0.875, 0.65))
+               legend.position = c(0.875, 0.75))
 
 p
 detach(ipm$pars)
