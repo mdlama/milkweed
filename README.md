@@ -3,11 +3,16 @@
   display: none !important;
 }
 
+.site-footer {
+  display: none !important;
+}
+
 .mybtn {
     display: inline-block;
     margin-bottom: 1rem;
-    color: rgba(0, 0, 0, 0.7);
-    background-color: rgba(0, 0, 0, 0.08);
+    padding: 5px 8px;
+    color: rgba(255, 255, 255, 1.0);
+    background-color: rgba(98, 138, 44, 1);
     border-color: rgba(0, 0, 0, 0.2);
     border-style: solid;
     border-width: 1px;
