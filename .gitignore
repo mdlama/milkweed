@@ -2,6 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
+README.html
 includes/mwDist.R
 scripts/figs/old_figs
 scripts/figs/Figure1_Model/Figure1_Model.aux
