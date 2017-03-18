@@ -11,6 +11,10 @@
   display: none !important;
 }
 
+.wrapper {
+    text-align: center;
+}
+
 .mybtn {
     display: inline-block;
     margin-bottom: 1rem;
@@ -21,6 +25,7 @@
     border-style: solid;
     border-width: 1px;
     border-radius: 0.3rem;
+    position: absolute;
 }
 </style>
 
@@ -28,6 +33,8 @@
 <h4 style="margin-top:1rem;">"Herbivory decreases population growth of common milkweed (Asclepias syriaca) through negative effects on clonal reproduction"</h4>
 *by Sivan S. Yair, Abigail A. R. Kula, M. Drew LaMar, and Harmony J. Dalgleish*
 
+<div class="wrapper">
 <a href="https://mdlama.github.io/milkweed-yair/" class="mybtn">
 Visit website
 </a>
+</div>
