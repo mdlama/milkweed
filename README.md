@@ -2,5 +2,6 @@
 #### "Herbivory decreases population growth of common milkweed (Asclepias syriaca) through negative effects on clonal reproduction"
 *by Sivan S. Yair, Abigail A. R. Kula, M. Drew LaMar, and Harmony J. Dalgleish*
 
-<a class="btn" href="https://mdlama.github.io/milkweed-yair/">
+<a href="https://mdlama.github.io/milkweed-yair/" class="btn">
+Visit website
 </a>
