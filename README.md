@@ -7,6 +7,10 @@
   display: none !important;
 }
 
+.project-tagline {
+  display: none !important;
+}
+
 .mybtn {
     display: inline-block;
     margin-bottom: 1rem;
