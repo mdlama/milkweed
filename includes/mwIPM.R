@@ -45,7 +45,7 @@ bootIPM <- function(obj) UseMethod("bootIPM")
 # Analyze growth rate
 analyzeGrowthRate <- function(obj) UseMethod("analyzeGrowthRate")
 analyzeStandard <- function(obj) UseMethod("analyzeStandard")
-analyzeParameters <- function(obj, compute, saveresults) UseMethod("analyzeParameters")
+analyzeParameters <- function(obj, compute, saveresults, params) UseMethod("analyzeParameters")
 
 # Renderers
 renderFloweringFit <- function(obj) UseMethod("renderFloweringFit") 
@@ -953,125 +953,149 @@ analyzeStandard.mwIPM <- function(obj) {
   return(obj)
 }
 
-analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE) {
+analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, params = "all") {
   if (!file.exists(mwROOT("data","calculated","parameterAnalysis.RData")) | (compute)) {
-    cat("Analyzing flowering fit...")
-    flowering_func <- function(x) {obj %>% setFloweringMatrix(perturb = x) %>% analyzeGrowthRate()}
-    analysis <- tbl_df(data.frame(sensitivity = grad(flowering_func,rep(0,4)),
-                                  pars = obj$pars$flower.fit$pars$unscaled["Bertha",],
-                                  type = as.character("Flowering"),
-                                  name = c("(Intercept)", 
-                                           "h_apical", 
-                                           "log_herb_avg", 
-                                           "h_apical:log_herb_avg")
-    )
-    )
-    cat("done!\n")
+    # Initialize to empty data frame
+    analysis <- tbl_df(data.frame(sensitivity = NULL,
+                                  pars = NULL,
+                                  type = NULL,
+                                  name = NULL))
     
-    cat("Analyzing survival fit...")
-    survival_func <- function(x) {obj %>% setSurvivalMatrix(perturb = x) %>% analyzeGrowthRate()}
-    analysis %<>% bind_rows(
-      tbl_df(data.frame(sensitivity = grad(survival_func, rep(0,4)),
-                        pars = obj$pars$surv.fit$pars$unscaled["Bertha",],
-                        type = as.character("Survival"),
-                        name = c("(Intercept)", 
-                                 "h_apical", 
-                                 "log_herb_avg", 
-                                 "h_apical:log_herb_avg")
+    if (("all" %in% params) | ("Flowering" %in% params)) {
+      cat("Analyzing flowering fit...")
+      flowering_func <- function(x) {obj %>% setFloweringMatrix(perturb = x) %>% analyzeGrowthRate()}
+      analysis %<>% bind_rows(
+        tbl_df(data.frame(sensitivity = grad(flowering_func,rep(0,4)),
+                          pars = obj$pars$flower.fit$pars$unscaled["Bertha",],
+                          type = as.character("Flowering"),
+                          name = c("(Intercept)", 
+                                   "h_apical", 
+                                   "log_herb_avg", 
+                                   "h_apical:log_herb_avg")
+        )
+        )
       )
-      )
-    )
-    cat("done!\n")
+      cat("done!\n")
+    }
     
-    cat("Analyzing growth fit...")
-    growth_func <- function(x) {obj %>% setGrowthMatrix(perturb = x) %>% analyzeGrowthRate()}
-    analysis %<>% bind_rows(
-      tbl_df(data.frame(sensitivity = grad(growth_func, rep(0,5)),
-                        pars = c(obj$pars$growth.fit$pars$unscaled["Bertha",],
-                                 obj$pars$growth.fit$pars$sd["Bertha"]),
-                        type = as.character("Growth"),
-                        name = c("(Intercept)", 
-                                 "h_apical", 
-                                 "log_herb_avg", 
-                                 "h_apical:log_herb_avg", 
-                                 "sd")
+    if (("all" %in% params) | ("Survival" %in% params)) {
+      cat("Analyzing survival fit...")
+      survival_func <- function(x) {obj %>% setSurvivalMatrix(perturb = x) %>% analyzeGrowthRate()}
+      analysis %<>% bind_rows(
+        tbl_df(data.frame(sensitivity = grad(survival_func, rep(0,4)),
+                          pars = obj$pars$surv.fit$pars$unscaled["Bertha",],
+                          type = as.character("Survival"),
+                          name = c("(Intercept)", 
+                                   "h_apical", 
+                                   "log_herb_avg", 
+                                   "h_apical:log_herb_avg")
+        )
+        )
       )
+      cat("done!\n")
+    }
+
+    if (("all" %in% params) | ("Growth" %in% params)) {
+      cat("Analyzing growth fit...")
+      growth_func <- function(x) {obj %>% setGrowthMatrix(perturb = x) %>% analyzeGrowthRate()}
+      analysis %<>% bind_rows(
+        tbl_df(data.frame(sensitivity = grad(growth_func, rep(0,5)),
+                          pars = c(obj$pars$growth.fit$pars$unscaled["Bertha",],
+                                   obj$pars$growth.fit$pars$sd["Bertha"]),
+                          type = as.character("Growth"),
+                          name = c("(Intercept)", 
+                                   "h_apical", 
+                                   "log_herb_avg", 
+                                   "h_apical:log_herb_avg", 
+                                   "sd")
+        )
+        )
       )
-    )
-    cat("done!\n")
+      cat("done!\n")
+    }
+
+    if (("all" %in% params) | ("Pods" %in% params)) {    
+      cat("Analyzing pods fit...")
+      pods_func <- function(x) {obj %>% setPodsMatrix(perturb = x) %>% analyzeGrowthRate()}
+      analysis %<>% bind_rows(
+        tbl_df(data.frame(sensitivity = grad(pods_func, rep(0,4)),
+                          pars = obj$pars$pods.fit$pars$unscaled["Bertha",],
+                          type = as.character("Pods"),
+                          name = c("(Intercept)", 
+                                   "h_apical", 
+                                   "log_herb_avg", 
+                                   "h_apical:log_herb_avg")
+        )
+        )
+      )
+      cat("done!\n")
+    }
+
+    if (("all" %in% params) | ("Seedlings" %in% params)) {    
+      cat("Analyzing seedling distribution...")
+      seedling_func <- function(x) {obj %>% setSeedlingRecruitmentMatrix(perturb = x) %>% analyzeGrowthRate()}
+      analysis %<>% bind_rows(
+        tbl_df(data.frame(sensitivity = grad(seedling_func, rep(0,2)),
+                          pars = tfunc(x = obj$pars$seedling.fit$fit$estimate, y = c(0,0)),
+                          type = as.character("Seedlings"),
+                          name = c("mean", 
+                                   "sd")
+        )
+        )
+      )
+      cat("done!\n")
+    }
     
-    cat("Analyzing pods fit...")
-    pods_func <- function(x) {obj %>% setPodsMatrix(perturb = x) %>% analyzeGrowthRate()}
-    analysis %<>% bind_rows(
-      tbl_df(data.frame(sensitivity = grad(pods_func, rep(0,4)),
-                        pars = obj$pars$pods.fit$pars$unscaled["Bertha",],
-                        type = as.character("Pods"),
-                        name = c("(Intercept)", 
-                                 "h_apical", 
-                                 "log_herb_avg", 
-                                 "h_apical:log_herb_avg")
+    if (("all" %in% params) | ("Sexual" %in% params)) {
+      cat("Analyzing seedling emergence and seeds-per-pod...")
+      sexual_func <- function(x) {obj %>% computeSexualKernel(perturb = x) %>% analyzeGrowthRate()}
+      analysis %<>% bind_rows(
+        tbl_df(data.frame(sensitivity = grad(sexual_func, rep(0,2)),
+                          pars = c(obj$pars$seedling.emergence["Bertha"], 
+                                   obj$pars$seeds.per.pod),
+                          type = as.character("Sexual"),
+                          name = c("seedling.emergence", 
+                                   "seeds.per.pod")
+        )
+        )
       )
-      )
-    )
-    cat("done!\n")
+      cat("done!\n")
+    }
     
-    cat("Analyzing seedling distribution...")
-    seedling_func <- function(x) {obj %>% setSeedlingRecruitmentMatrix(perturb = x) %>% analyzeGrowthRate()}
-    analysis %<>% bind_rows(
-      tbl_df(data.frame(sensitivity = grad(seedling_func, rep(0,2)),
-                        pars = tfunc(x = obj$pars$seedling.fit$fit$estimate, y = c(0,0)),
-                        type = as.character("Seedlings"),
-                        name = c("mean", 
-                                 "sd")
+    if (("all" %in% params) | ("Clonal" %in% params)) {
+      cat("Analyzing budlings-per-stem and budling distribution...")
+      clonal_func <- function(x) {obj %>% computeClonalKernel(perturb = x) %>% analyzeGrowthRate()}
+      analysis %<>% bind_rows(
+        tbl_df(data.frame(sensitivity = grad(clonal_func, rep(0,4)),
+                          pars = c(obj$pars$budlings.per.stem.fit$fit$coefficients,
+                                   obj$pars$budling.fit$Bertha$fit$estimate),
+                          type = c("Clonal", "Clonal", "Budlings", "Budlings"),
+                          name = c("(Intercept)", 
+                                   "log_herb_avg",
+                                   "mean",
+                                   "sd")
+        )
+        )
       )
+      cat("done!\n")
+    }
+
+    if (("all" %in% params) | ("Herbivory" %in% params)) {    
+      cat("Analyzing herbivory distribution...")
+      herbivory_func <- function(x) {obj %>% setHerbivoryMatrix(perturb = x) %>% analyzeGrowthRate()}
+      analysis %<>% bind_rows(
+        tbl_df(data.frame(sensitivity = grad(herbivory_func, rep(0,3)),
+                          pars = c(obj$pars$munched.fit$Bertha$pmunch,
+                                   tfunc(x = obj$pars$munched.fit$Bertha$fit$estimate, y = c(0,0))),
+                          type = c("Herbivory"),
+                          name = c("pmunch", 
+                                   "mean",
+                                   "sd")
+        )
+        )
       )
-    )
-    cat("done!\n")
-    
-    cat("Analyzing seedling emergence and seeds-per-pod...")
-    sexual_func <- function(x) {obj %>% computeSexualKernel(perturb = x) %>% analyzeGrowthRate()}
-    analysis %<>% bind_rows(
-      tbl_df(data.frame(sensitivity = grad(sexual_func, rep(0,2)),
-                        pars = c(obj$pars$seedling.emergence["Bertha"], 
-                                 obj$pars$seeds.per.pod),
-                        type = as.character("Sexual"),
-                        name = c("seedling.emergence", 
-                                 "seeds.per.pod")
-      )
-      )
-    )
-    cat("done!\n")
-    
-    cat("Analyzing budlings-per-stem and budling distribution...")
-    clonal_func <- function(x) {obj %>% computeClonalKernel(perturb = x) %>% analyzeGrowthRate()}
-    analysis %<>% bind_rows(
-      tbl_df(data.frame(sensitivity = grad(clonal_func, rep(0,4)),
-                        pars = c(obj$pars$budlings.per.stem.fit$fit$coefficients,
-                                 obj$pars$budling.fit$Bertha$fit$estimate),
-                        type = c("Clonal", "Clonal", "Budlings", "Budlings"),
-                        name = c("(Intercept)", 
-                                 "log_herb_avg",
-                                 "mean",
-                                 "sd")
-      )
-      )
-    )
-    cat("done!\n")
-    
-    cat("Analyzing herbivory distribution...")
-    herbivory_func <- function(x) {obj %>% setHerbivoryMatrix(perturb = x) %>% analyzeGrowthRate()}
-    analysis %<>% bind_rows(
-      tbl_df(data.frame(sensitivity = grad(herbivory_func, rep(0,3)),
-                        pars = c(obj$pars$munched.fit$Bertha$pmunch,
-                                 tfunc(x = obj$pars$munched.fit$Bertha$fit$estimate, y = c(0,0))),
-                        type = c("Herbivory"),
-                        name = c("pmunch", 
-                                 "mean",
-                                 "sd")
-      )
-      )
-    )
-    cat("done!\n")
+      cat("done!\n")
+    }
     
     analysis %<>% filter(pars != 0) %>%
       mutate(lambda = ipm %>% analyzeGrowthRate(),
