@@ -488,7 +488,9 @@ setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, 
            for (j in 1:(N-1)) {
              y[j] = plnorm(x[j+1], pars[1], pars[2]) - plnorm(x[j], pars[1], pars[2])
            }
-           y <- y/(dx*sum(y))
+           y[1] <- y[1] + plnorm(x[1], pars[1], pars[2])
+           y[N-1] <- y[N-1] + plnorm(x[N], pars[1], pars[2], lower.tail = FALSE)
+           y <- y/dx
          }
     names(seedling.fit) <- c("fit", "predict")
     
