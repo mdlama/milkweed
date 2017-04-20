@@ -540,8 +540,12 @@ setBudlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, u
                for (j in 1:(N-1)) {
                  y[j] = p%s(x[j+1], pars[1], pars[2]) - p%s(x[j], pars[1], pars[2])
                }
-               y <- y/(dx*sum(y))
+               y[1] <- y[1] + p%s(x[1], pars[1], pars[2])
+               y[N-1] <- y[N-1] + p%s(x[N], pars[1], pars[2], lower.tail = FALSE)
+               y <- y/dx
             }",
+            budling.fit[[i]][[1]]$distname,
+            budling.fit[[i]][[1]]$distname,
             budling.fit[[i]][[1]]$distname,
             budling.fit[[i]][[1]]$distname
           )
