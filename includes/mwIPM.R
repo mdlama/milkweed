@@ -29,7 +29,7 @@ setFloweringMatrix <- function(obj, update, perturb) UseMethod("setFloweringMatr
 setSurvivalMatrix <- function(obj, update, perturb) UseMethod("setSurvivalMatrix")
 setPodsMatrix <- function(obj, update, perturb) UseMethod("setPodsMatrix")
 setGrowthMatrix <- function(obj, update, perturb) UseMethod("setGrowthMatrix")
-setHerbivoryMatrix <- function(obj, dist.herb, update, perturb) UseMethod("setHerbivoryMatrix")
+setHerbivoryMatrix <- function(obj, dist.herb, update, perturb, distpars) UseMethod("setHerbivoryMatrix")
 setSeedlingRecruitmentMatrix <- function(obj, update, perturb) UseMethod("setSeedlingRecruitmentMatrix")
 
 # Compute kernels from matrices
@@ -45,7 +45,7 @@ bootIPM <- function(obj) UseMethod("bootIPM")
 # Analyze growth rate
 analyzeGrowthRate <- function(obj) UseMethod("analyzeGrowthRate")
 analyzeStandard <- function(obj) UseMethod("analyzeStandard")
-analyzeParameters <- function(obj, compute, saveresults, params) UseMethod("analyzeParameters")
+analyzeParameters <- function(obj, compute, saveresults, params, distpars) UseMethod("analyzeParameters")
 
 # Renderers
 renderFloweringFit <- function(obj) UseMethod("renderFloweringFit") 
@@ -57,7 +57,8 @@ renderHerbivoryDistFit <- function(obj) UseMethod("renderHerbivoryDistFit")
 glmerCtrl <- glmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
 
 # Keeping these commented here as a record
-# tfunc <- function(x, y)
+# ParsToMoms <- function(x)
+# MomsToPars <- function(y)
 # perturbTrans <- function(pars, perturb)
 
 # Constructor ----------------------
@@ -479,10 +480,7 @@ setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, 
     seedling.fit <- vector("list", 2)
     seedling.fit[[1]] <- f1
     
-    # NOTE:  Doesn't need to be eval(parse(text = ...))!!!! Just make the function, silly...  will change later.
-    seedling.fit[[2]] <- eval(parse(
-      text = 
-        "function(x, pars, perturb = rep(0,2)) {
+    seedling.fit[[2]] <- function(x, pars, perturb = rep(0,2)) {
            pars <- perturbTrans(pars, perturb)
            N <- length(x)
            dx <- x[2]-x[1]
@@ -491,8 +489,7 @@ setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, 
              y[j] = plnorm(x[j+1], pars[1], pars[2]) - plnorm(x[j], pars[1], pars[2])
            }
            y <- y/(dx*sum(y))
-         }"
-    ))
+         }
     names(seedling.fit) <- c("fit", "predict")
     
     if (saveresults) {
@@ -553,9 +550,9 @@ setBudlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, u
     if (saveresults) {
       save(budling.fit, file = mwROOT("data","calculated","budlingDistFit.RData"))
     }
-} else {
-  load(mwROOT("data","calculated","budlingDistFit.RData"))
-}
+  } else {
+    load(mwROOT("data","calculated","budlingDistFit.RData"))
+  }
   
   obj$pars$budling.fit <- budling.fit
   
@@ -565,7 +562,7 @@ setBudlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, u
 setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
   if (!file.exists(mwROOT("data","calculated","herbivoryDistFit.RData")) | (compute)) {
     sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
-    mdls <- c("lnorm", "lnorm", "lnorm", "lnorm", "lnorm", "gamma")
+    mdls <- c("lnorm", "lnorm", "lnorm", "lnorm", "lnorm", "lnorm")
     munched.fit <- vector('list', 6)
     names(munched.fit) <- sites
     
@@ -573,16 +570,18 @@ setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE,
       if (i == 1) { # Bertha
         thissite <- obj$data %>% filter(!is.na(h_apical),
                                         !is.na(munched))
-        functext <- "function(x, pars, perturb = rep(0,3), justmunch = FALSE) {
-                       pars[1] <- pars[1] + perturb[1]\n
-                       pars[2:3] <- perturbTrans(pars[2:3], perturb[2:3])\n"
       } else { # Sites
         thissite <- obj$data %>% filter(site == sites[i],
                                         !is.na(h_apical),
                                         !is.na(munched))
-        functext <- "function(x, pars, perturb = rep(0,3), justmunch = FALSE) {
-                       pars <- pars + perturb\n"
       }
+      functext <- 
+        sprintf(
+          paste0("function(x, pars, perturb = rep(0,3), distpars = FALSE, justmunch = FALSE) {
+               pars[1] <- pars[1] + perturb[1]
+               pars[2:3] <- perturbTrans(pars[2:3], perturb[2:3], type = ifelse(!distpars, '%s', 'id'))\n"),
+          mdls[i]
+        )
       pmunch <- sum(thissite$munched == 1)/nrow(thissite)
       herb_avg <- (thissite %>% filter(munched == 1))$herb_avg
       
@@ -762,7 +761,7 @@ setPodsMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   return(obj)
 }
 
-setHerbivoryMatrix.mwIPM <- function(obj, dist.herb = NA, update = TRUE, perturb = rep(0,3)) {
+setHerbivoryMatrix.mwIPM <- function(obj, dist.herb = NA, update = TRUE, perturb = rep(0,3), distpars = FALSE) {
   # Herbivory matrix
   # N x N^2
   
@@ -771,7 +770,8 @@ setHerbivoryMatrix.mwIPM <- function(obj, dist.herb = NA, update = TRUE, perturb
     dist.herb <- obj$pars$munched.fit[[obj$site]]$predict(obj$vars$log_herb_avg$b,
                                                           c(obj$pars$munched.fit[[obj$site]]$pmunch, 
                                                             obj$pars$munched.fit[[obj$site]]$fit$estimate),
-                                                          perturb)
+                                                          perturb,
+                                                          distpars = distpars)
   }
 
   H = matrix(rep(0,N^3), nrow = N^2)
@@ -953,7 +953,7 @@ analyzeStandard.mwIPM <- function(obj) {
   return(obj)
 }
 
-analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, params = "all") {
+analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, params = "all", distpars = FALSE) {
   if (!file.exists(mwROOT("data","calculated","parameterAnalysis.RData")) | (compute)) {
     # Initialize to empty data frame
     analysis <- tbl_df(data.frame(sensitivity = NULL,
@@ -966,7 +966,7 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
       flowering_func <- function(x) {obj %>% setFloweringMatrix(perturb = x) %>% analyzeGrowthRate()}
       analysis %<>% bind_rows(
         tbl_df(data.frame(sensitivity = grad(flowering_func,rep(0,4)),
-                          pars = obj$pars$flower.fit$pars$unscaled["Bertha",],
+                          pars = obj$pars$flower.fit$pars$unscaled[obj$site,],
                           type = as.character("Flowering"),
                           name = c("(Intercept)", 
                                    "h_apical", 
@@ -983,7 +983,7 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
       survival_func <- function(x) {obj %>% setSurvivalMatrix(perturb = x) %>% analyzeGrowthRate()}
       analysis %<>% bind_rows(
         tbl_df(data.frame(sensitivity = grad(survival_func, rep(0,4)),
-                          pars = obj$pars$surv.fit$pars$unscaled["Bertha",],
+                          pars = obj$pars$surv.fit$pars$unscaled[obj$site,],
                           type = as.character("Survival"),
                           name = c("(Intercept)", 
                                    "h_apical", 
@@ -1000,8 +1000,8 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
       growth_func <- function(x) {obj %>% setGrowthMatrix(perturb = x) %>% analyzeGrowthRate()}
       analysis %<>% bind_rows(
         tbl_df(data.frame(sensitivity = grad(growth_func, rep(0,5)),
-                          pars = c(obj$pars$growth.fit$pars$unscaled["Bertha",],
-                                   obj$pars$growth.fit$pars$sd["Bertha"]),
+                          pars = c(obj$pars$growth.fit$pars$unscaled[obj$site,],
+                                   obj$pars$growth.fit$pars$sd[obj$site]),
                           type = as.character("Growth"),
                           name = c("(Intercept)", 
                                    "h_apical", 
@@ -1019,7 +1019,7 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
       pods_func <- function(x) {obj %>% setPodsMatrix(perturb = x) %>% analyzeGrowthRate()}
       analysis %<>% bind_rows(
         tbl_df(data.frame(sensitivity = grad(pods_func, rep(0,4)),
-                          pars = obj$pars$pods.fit$pars$unscaled["Bertha",],
+                          pars = obj$pars$pods.fit$pars$unscaled[obj$site,],
                           type = as.character("Pods"),
                           name = c("(Intercept)", 
                                    "h_apical", 
@@ -1036,7 +1036,10 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
       seedling_func <- function(x) {obj %>% setSeedlingRecruitmentMatrix(perturb = x) %>% analyzeGrowthRate()}
       analysis %<>% bind_rows(
         tbl_df(data.frame(sensitivity = grad(seedling_func, rep(0,2)),
-                          pars = tfunc(x = obj$pars$seedling.fit$fit$estimate, y = c(0,0)),
+                          pars = ParsToMoms(x = obj$pars$seedling.fit$fit$estimate,
+                                            type = ifelse(!distpars, 
+                                                          obj$pars$seedling.fit$fit$distname,
+                                                          "id")),
                           type = as.character("Seedlings"),
                           name = c("mean", 
                                    "sd")
@@ -1051,7 +1054,7 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
       sexual_func <- function(x) {obj %>% computeSexualKernel(perturb = x) %>% analyzeGrowthRate()}
       analysis %<>% bind_rows(
         tbl_df(data.frame(sensitivity = grad(sexual_func, rep(0,2)),
-                          pars = c(obj$pars$seedling.emergence["Bertha"], 
+                          pars = c(obj$pars$seedling.emergence[obj$site], 
                                    obj$pars$seeds.per.pod),
                           type = as.character("Sexual"),
                           name = c("seedling.emergence", 
@@ -1068,7 +1071,7 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
       analysis %<>% bind_rows(
         tbl_df(data.frame(sensitivity = grad(clonal_func, rep(0,4)),
                           pars = c(obj$pars$budlings.per.stem.fit$fit$coefficients,
-                                   obj$pars$budling.fit$Bertha$fit$estimate),
+                                   obj$pars$budling.fit[[obj$site]]$fit$estimate),
                           type = c("Clonal", "Clonal", "Budlings", "Budlings"),
                           name = c("(Intercept)", 
                                    "log_herb_avg",
@@ -1082,11 +1085,14 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
 
     if (("all" %in% params) | ("Herbivory" %in% params)) {    
       cat("Analyzing herbivory distribution...")
-      herbivory_func <- function(x) {obj %>% setHerbivoryMatrix(perturb = x) %>% analyzeGrowthRate()}
+      herbivory_func <- function(x) {obj %>% setHerbivoryMatrix(perturb = x, distpars = distpars) %>% analyzeGrowthRate()}
       analysis %<>% bind_rows(
         tbl_df(data.frame(sensitivity = grad(herbivory_func, rep(0,3)),
-                          pars = c(obj$pars$munched.fit$Bertha$pmunch,
-                                   tfunc(x = obj$pars$munched.fit$Bertha$fit$estimate, y = c(0,0))),
+                          pars = c(obj$pars$munched.fit[[obj$site]]$pmunch,
+                                   ParsToMoms(x = obj$pars$munched.fit[[obj$site]]$fit$estimate,
+                                              type = ifelse(!distpars,
+                                                            obj$pars$munched.fit[[obj$site]]$fit$distname,
+                                                            "id"))),
                           type = c("Herbivory"),
                           name = c("pmunch", 
                                    "mean",
@@ -1356,19 +1362,76 @@ renderHerbivoryDistFit.mwIPM <- function(obj) {
 
 # Helpers  ------------------------------
 
-tfunc <- function(x, y) {
-  # In all cases that we care about (i.e. Bertha), log-normal is the only one requiring
-  #   a transformation of the perturbation.
-  # In the log-normal case, x is (location, scale), and y is (mean, sd).
-  c(F1 = exp(x[1] + 0.5*x[2]*x[2]) - y[1],
-    F2 = sqrt(exp(2*x[1] + x[2]*x[2])*(exp(x[2]*x[2])-1)) - y[2])
+ParsToMoms <- function(x, type = "lnorm") {
+  if (type == "lnorm") {
+    y <- c(y1 = exp(x[1] + 0.5*x[2]*x[2]),
+           y2 = sqrt(exp(2*x[1] + x[2]*x[2])*(exp(x[2]*x[2])-1)))
+    names(y) <- c("mean","sd")
+  } else if (type == "gamma") {
+    y <- c(y1 = x[1]/x[2],
+           y2 = sqrt(x[1])/x[2])
+    names(y) <- c("mean","sd")
+  } else {
+    y <- x
+    names(y) <- names(x)
+  }
+  return(y)
 }
 
-perturbTrans <- function(pars, perturb = rep(0,2)) {
-  # Let's first get the mean and sd from the location and scale.
-  MSD <- tfunc(x = pars, y = c(0,0))
-  
-  # Now we perturb the mean and sd and use multiroot to find the new
-  #   location and scale, using the old location and scale as the initial state.
-  tpars <- multiroot(tfunc, pars, y = MSD+perturb)$root
+jacParsToMoms <- function(x, type = "lnorm") {
+  if (type == "lnorm") {
+    CV <- x[2]/x[1]
+    a <- 1 + CV*CV
+    b <- sqrt(log(a))
+    J <- (1/(x[1]*a))*diag(c(1,CV/b))%*%matrix(c(a+CV*CV, -1*CV, -1*CV, 1), byrow=T, nrow=2)
+    rownames(J) <- c("mu", "sd")
+    colnames(J) <- c("m", "s")
+  } else {
+    J <- diag(2)
+    rownames(J) <- c("mu", "sd")
+    colnames(J) <- c("mu", "sd")
+  }
+  return(J)
+}
+
+MomsToPars <- function(y, type = "lnorm") {
+  if (type == "lnorm") {
+    x <- c(x1 = log(y[1]/sqrt(1 + (y[2]/y[1])^2)),
+           x2 = sqrt(log(1 + (y[2]/y[1])^2)))
+    names(x) <- c("meanlog","sdlog")
+  } else if (type == "gamma") {
+    x <- c(x1 = (y[1]/y[2])^2,
+           x2 = y[1]/(y[2]*y[2]))
+    names(x) <- c("shape","rate")
+  } else {
+    x <- y
+    names(x) <- names(y)
+  }
+  return(x)
+}
+
+jacMomsToPars <- function(y, type = "lnorm") {
+  if (type == "lnorm") {
+    J <- exp(y[1] + y[2]*y[2]/2)*diag(c(1,sqrt(exp(y[2]*y[2])-1)))%*%matrix(c(1,1,1,1+1/(1-exp(-1*y[2]*y[2]))), byrow=T, nrow=2)%*%diag(c(1,y[2]))
+    rownames(J) <- c("m", "s")
+    colnames(J) <- c("mu", "sd")
+  } else {
+    J <- diag(2)
+    rownames(J) <- c("m", "s")
+    colnames(J) <- c("m", "s")
+  }
+  return(J)
+}
+
+perturbTrans <- function(pars, perturb = rep(0,2), type = "lnorm") {
+  if (type == "lnorm") {
+    MSD <- ParsToMoms(x = pars, type)
+    tpars <- MomsToPars(y = MSD+perturb, type)
+  } else if (type == "gamma") {
+    MSD <- ParsToMoms(x = pars, type)
+    tpars <- MomsToPars(y = MSD+perturb, type)
+  } else {
+    tpars <- pars + perturb
+  }
+  return(tpars)
 }
