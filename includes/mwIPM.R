@@ -603,16 +603,20 @@ setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE,
           sprintf("N <- length(x)
                    dx <- x[2]-x[1]
                    z <- exp(x)-0.1
-                   y <- rep(0, N)
+                   y <- rep(0, N-1)
                    for (j in 1:(N-1)) {
                      y[j] = p%s(z[j+1], pars[2], pars[3]) - p%s(z[j], pars[2], pars[3])
                    }
-                   y <- (pars[1]/(dx*sum(y)))*y
+                   y[1] <- y[1] + p%s(z[1], pars[2], pars[3])
+                   y[N-1] <- y[N-1] + p%s(z[N], pars[2], pars[3], lower.tail = FALSE)
+                   y <- pars[1]*y
                    if (!justmunch) {
-                     y[1] <- y[1] + (1-pars[1])/dx
+                     y[1] <- y[1] + (1-pars[1])
                    }
-                   y <- y[1:(N-1)]
+                   y <- y/dx
                  }",
+                 munched.fit[[i]][[1]]$distname,
+                 munched.fit[[i]][[1]]$distname,
                  munched.fit[[i]][[1]]$distname,
                  munched.fit[[i]][[1]]$distname
                  )
