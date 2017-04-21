@@ -95,6 +95,17 @@ mwIPM <- function(x = list()) {
   } else {
     saveresults <- x$saveresults
   }
+  if (all(names(x) != "mdlargs")) {
+    x$mdlargs <- list(method = 'exp',
+                      input = 'meanonly')
+  } else {
+    if (all(names(x$mdlargs) != "method")) {
+      x$mdlargs$method = "exp"
+    }
+    if (all(names(x$mdlargs) != "input")) {
+      x$mdlargs$input = "meanonly"
+    }
+  }
   x <- x[which(!(names(x) %in% c("compute","saveresults")))]
   
   x <- append(x, list(data_orig = x$data,
@@ -664,16 +675,27 @@ setBudlingsPerStemFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALS
                                     bdlgs_per_stem = mean(bdlgs_per_stem),
                                     site = first(site))
     
-    cat("Calculating budlings per stem fit...")
-    exp.model <- lm(log(bdlgs_per_stem) ~ log_herb_mean, data=merged)
+    cat(paste0("Calculating budlings per stem fit (", obj$mdlargs$method, ")..."))
+    if (obj$mdlargs$method == 'exp') {
+      mdl <- lm(log(bdlgs_per_stem) ~ log_herb_mean, data=merged)
+    } else {
+      mdl <- lm(bdlgs_per_stem ~ log_herb_mean, data=merged)
+    }
     cat("done!\n")
 
     budlings.per.stem.fit <- vector("list", 3)
-    budlings.per.stem.fit[[1]] <- exp.model
+    budlings.per.stem.fit[[1]] <- mdl
     budlings.per.stem.fit[[2]] <- merged$site
-    budlings.per.stem.fit[[3]] <- function (x, pars, perturb = rep(0,2)) {
-      pars <- pars + perturb
-      y <- exp(pars[1] + pars[2]*x)
+    if (obj$mdlargs$method == 'exp') {
+      budlings.per.stem.fit[[3]] <- function (x, pars, perturb = rep(0,2)) {
+        pars <- pars + perturb
+        y <- exp(pars[1] + pars[2]*x)
+      }
+    } else {
+      budlings.per.stem.fit[[3]] <- function (x, pars, perturb = rep(0,2)) {
+        pars <- pars + perturb
+        y <- pars[1] + pars[2]*x
+      }
     }
     names(budlings.per.stem.fit) <- c("fit","site","predict")
 
@@ -851,12 +873,18 @@ computeClonalKernel.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   attach(obj$pars, warn.conflicts = FALSE)
   attach(obj$matrices, warn.conflicts = FALSE)
   
-  mean.log_herb_avg <- sum(dist.herb*log_herb_avg$x)*log_herb_avg$dx
-  # mean.buds.per.stem <- exp(predict(budlings.per.stem.fit, new = data.frame(log_herb_mean = mean.log_herb_avg)))
+  if (obj$mdlargs$input == 'meanonly') {
+    mean.log_herb_avg <- sum(dist.herb*log_herb_avg$x)*log_herb_avg$dx
+    mean.buds.per.stem <- budlings.per.stem.fit$predict(mean.log_herb_avg,
+                                                        budlings.per.stem.fit$fit$coefficients,
+                                                        perturb[1:2])
+  } else {
+    mean.buds.per.stem <- t(budlings.per.stem.fit$predict(log_herb_avg$x,
+                                                          budlings.per.stem.fit$fit$coefficients,
+                                                          perturb[1:2])) %*%
+      t(t(H[1+(0:(obj$N-1))*obj$N,1]))*log_herb_avg$dx
+  }
   
-  mean.buds.per.stem <- budlings.per.stem.fit$predict(mean.log_herb_avg,
-                                                      budlings.per.stem.fit$fit$coefficients,
-                                                      perturb[1:2])
   Kc <- t(t(mean.buds.per.stem*budling.fit[[obj$site]]$predict(h_apical$b,
                                                                budling.fit[[obj$site]]$fit$estimate,
                                                                perturb[3:4])))%*%t(rep(1,obj$N))*h_apical$dx
