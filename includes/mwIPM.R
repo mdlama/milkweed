@@ -69,11 +69,15 @@ mwIPM <- function(x = list()) {
   # Note:  Had to move this AFTER bootIPM or it would'nt load - ?????
   #
   
-  if (all(names(x) != "data")) {
-    x$data <- read.csv(mwROOT("data","stemdata.csv"))
-  }
   if (all(names(x) != "N")) {
     x$N = 50
+  }
+  if (all(names(x) != "nudge")) {
+    x$nudge = 0.01
+  }
+  if (all(names(x) != "data")) {
+    x$data <- read.csv(mwROOT("data","stemdata.csv")) %>%
+      mutate(log_herb_avg = log(x$nudge + herb_avg))
   }
   if (all(names(x) != "site")) {
     site = "Bertha"
@@ -97,13 +101,13 @@ mwIPM <- function(x = list()) {
   }
   if (all(names(x) != "mdlargs")) {
     x$mdlargs <- list(method = 'exp',
-                      input = 'meanonly')
+                      input = 'full')
   } else {
     if (all(names(x$mdlargs) != "method")) {
       x$mdlargs$method = "exp"
     }
     if (all(names(x$mdlargs) != "input")) {
-      x$mdlargs$input = "meanonly"
+      x$mdlargs$input = "full"
     }
   }
   x <- x[which(!(names(x) %in% c("compute","saveresults")))]
@@ -192,8 +196,8 @@ setVars.mwIPM <- function (obj) {
   h_apical.next$dx = h_apical.next$b[2] - h_apical.next$b[1] # class size
   
   # log_herb_avg
-  log_herb_avg <- list(min = log(0.1),
-                       max = log(6.1))
+  log_herb_avg <- list(min = log(obj$nudge),
+                       max = log(6+obj$nudge))
   log_herb_avg$b = log_herb_avg$min + c(0:N)*(log_herb_avg$max - log_herb_avg$min)/N # boundary points
   log_herb_avg$x = 0.5*(log_herb_avg$b[1:N] + log_herb_avg$b[2:(N+1)])
   log_herb_avg$dx = log_herb_avg$b[2] - log_herb_avg$b[1] # class size
@@ -613,7 +617,7 @@ setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE,
         eval(parse(text = paste0(functext,
           sprintf("N <- length(x)
                    dx <- x[2]-x[1]
-                   z <- exp(x)-0.1
+                   z <- exp(x)-%g
                    y <- rep(0, N-1)
                    for (j in 1:(N-1)) {
                      y[j] = p%s(z[j+1], pars[2], pars[3]) - p%s(z[j], pars[2], pars[3])
@@ -626,6 +630,7 @@ setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE,
                    }
                    y <- y/dx
                  }",
+                 obj$nudge,
                  munched.fit[[i]][[1]]$distname,
                  munched.fit[[i]][[1]]$distname,
                  munched.fit[[i]][[1]]$distname,
@@ -1188,7 +1193,7 @@ renderFloweringFit.mwIPM <- function(obj) {
     ylab("Log(Herbivory)")
   
   # Add lines
-  herb_ex <- data.frame(yintercept = c(log(0.1), mean(obj$data$log_herb_avg, na.rm=T), log(6.1)))
+  herb_ex <- data.frame(yintercept = c(log(obj$nudge), mean(obj$data$log_herb_avg, na.rm=T), log(6+obj$nudge)))
   
   imgt <- imgt + geom_hline(aes(yintercept = yintercept),
                           data = herb_ex,
@@ -1382,7 +1387,7 @@ renderHerbivoryDistFit.mwIPM <- function(obj) {
     theme_bw() +
     xlab("ln(Herbivory Score)") +
     ylab("Probability Density") +
-    scale_x_continuous(limits = c(log(0.1), log(6.1))) + 
+    scale_x_continuous(limits = c(log(obj$nudge), log(6+obj$nudge))) + 
     scale_fill_manual(values = c(hue_pal()(5), NA)) + 
     scale_color_manual(values = c(hue_pal()(5), "black")) +
     labs(colour="Sites", fill="Sites") +
