@@ -15,7 +15,7 @@ Let's prepare the data we will use for all vital rates.
 
 ```{r}
 x <- seq(from = 0, to = 160, length.out = 100)
-y <- seq(from = -2.5, to = 2, length.out = 100)
+y <- seq(from = -4.8, to = 2, length.out = 100)
 M <- mesh(x, y)
 ```
 
@@ -55,14 +55,14 @@ p1 <- ggplot(mydata, aes(x = h_apical,
 p1 <- p1 + theme(axis.line = element_blank()) + 
      scale_x_continuous(limits = c(0, max(M$x)), 
                         expand = c(0, 0)) + 
-     scale_y_continuous(limits = c(-2.5, 2.0), 
+     scale_y_continuous(limits = c(-4.8, 2.0), 
                         expand = c(0, 0)) +
-     ylab("Log(Herbivory)")
+     ylab("ln(Herbivory severity)")
      
 # Add lines
-herb_ex <- data.frame(yintercept = c(log(0.1), 
+herb_ex <- data.frame(yintercept = c(log(ipm$nudge), 
                                      mean(log_herb_avg), 
-                                     log(6.1)))
+                                     log(6+ipm$nudge)))
 
 p1 <- p1 + geom_hline(aes(yintercept = yintercept), 
                       data = herb_ex, 
@@ -115,7 +115,7 @@ p2 <- ggplot(mycurves, aes(x = h_apical,
                          expand = c(0, 0)) + 
       scale_color_manual(values = brewer.pal(5, "YlOrRd")[2:4]) +
       # coord_cartesian(xlim = c(0, max(x))) + 
-      xlab("Apical Height (cm)") +
+      xlab("Height (cm)") +
       ylab("Flowering Probability")     
 
 p2 <- p2 + theme(legend.position = "none")
@@ -137,7 +137,7 @@ log_herb_avg <- ipm$data %>%
   log_herb_avg
 
 x <- seq(from = 0, to = 160, length.out = 100)
-y <- seq(from = -2.5, to = 2, length.out = 100)
+y <- seq(from = -4.8, to = 2, length.out = 100)
 M <- mesh(x, y)
 ```
 
@@ -158,7 +158,7 @@ p3 <- ggplot(mydata, aes(x = h_apical,
                          z = h_apical.next)) +
       geom_raster(aes(fill = h_apical.next)) +
       geom_contour(colour = "white", alpha = 0.8) + 
-      scale_fill_gradientn("Apical Height\n(Late Season)", 
+      scale_fill_gradientn("Height\n(Late Season)", 
                            colours=c("#00000000","#BBBBBBBB"),
                            limits=c(0, max(mydata$h_apical.next)))
 
@@ -166,14 +166,14 @@ p3 <- ggplot(mydata, aes(x = h_apical,
 p3 <- p3 + theme(axis.line = element_blank()) + 
      scale_x_continuous(limits = c(0, max(M$x)), 
                         expand = c(0, 0)) + 
-     scale_y_continuous(limits = c(-2.5, 2.0), 
+     scale_y_continuous(limits = c(-4.8, 2.0), 
                         expand = c(0, 0)) +
-     ylab("Log(Herbivory)")
+     ylab("ln(Herbivory severity)")
      
 # Add lines
-herb_ex <- data.frame(yintercept = c(log(0.1), 
+herb_ex <- data.frame(yintercept = c(log(ipm$nudge), 
                                      mean(log_herb_avg), 
-                                     log(6.1)))
+                                     log(6+ipm$nudge)))
 
 p3 <- p3 + geom_hline(aes(yintercept = yintercept), 
                       data = herb_ex, 
@@ -226,8 +226,8 @@ p4 <- ggplot(mycurves, aes(x = h_apical,
                          expand = c(0, 0)) + 
       scale_color_manual(values = brewer.pal(5, "YlOrRd")[2:4]) +
       # coord_cartesian(xlim = c(0, max(x))) + 
-      xlab("Apical Height (cm)") +
-      ylab("Apical Height (Late Season)")     
+      xlab("Height (cm)") +
+      ylab("Height (Late Season)")     
 
 p4
 ```
