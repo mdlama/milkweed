@@ -267,8 +267,8 @@ pmunch_elastiplot <- pmunch_elastiplot +
   scale_y_continuous(limits = c(min(ipm$vars$h_apical$x), 
                                 max(ipm$vars$h_apical$x)), 
                      expand = c(0, 0)) + 
-  xlab("Apical height at year t (cm)") + 
-  ylab("Apical height at year t+1 (cm)") +
+  xlab("Height at year t (cm)") + 
+  ylab("Height at year t+1 (cm)") +
   labs(fill = "Elasticity") +
   theme_bw() +
   ggtitle("(b)") +
