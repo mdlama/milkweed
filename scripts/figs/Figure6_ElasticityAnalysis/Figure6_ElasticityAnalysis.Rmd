@@ -172,7 +172,7 @@ r_budlings <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 21-ym, ymax = 22+
 r_bdlgs_per_stem <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 23-ym, ymax = 24+ym, fill = "black", alpha = al)
 
 # Functional form labels
-xc <- -0.15
+xc <- -0.4
 sz <- 2.5
 t_bdlgs_per_stem <- annotate("text", x = xc, y = 23.5, label = "Buds per stem", size = sz)
 t_budlings <- annotate("text", x = xc, y = 21.5, label = "Budling recruits", size = sz)
