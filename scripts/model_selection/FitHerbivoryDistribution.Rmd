@@ -55,6 +55,8 @@ gofstat(list(f0, f1, f2, f3, f4), fitnames = plot.legend)
 
 Estimates.  The inputs to predict always on [0, xmax], broken up into equal intervals.
 ```{r}
+dn <- 0.01
+
 sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
 munched.fit <- vector('list', 6)
 names(munched.fit) <- sites
@@ -63,23 +65,25 @@ munched.fit[['Bertha']] <- vector("list", 3)
 munched.fit[['Bertha']][[1]] <- f1
 munched.fit[['Bertha']][[2]] <- pmunch
 
-# Two ways to take care of missing probability.  Choosing to spread as opposed to adding to endpoints.  Other technique commented out here.
-#  y[2] <- y[2] + p%s(z[2], %g, %g)
-#  y[N] <- y[N] + p%s(z[N], %g, %g, lower.tail=FALSE)
 munched.fit[['Bertha']][[3]] <- eval(parse(text = sprintf("function(x, justmunch=FALSE) {
   N <- length(x)
   dx <- x[2]-x[1]
-  z <- exp(x)-0.1
-  y <- rep(0, N)
+  z <- exp(x)-%g
+  y <- rep(0, N-1)
   for (j in 1:(N-1)) {
     y[j] = p%s(z[j+1], %g, %g) - p%s(z[j], %g, %g)
   }
-  y <- (%g/(dx*sum(y)))*y
+  y[1] <- y[1] + p%s(z[1], %g, %g)
+  y[N-1] <- y[N-1] + p%s(z[N], %g, %g, lower.tail=FALSE)
+  y <- %g*y
   if (!justmunch) {
-    y[1] <- y[1] + (1-%g)/dx
+    y[1] <- y[1] + (1-%g)
   }
-  y <- y[1:(N-1)]
-}", munched.fit[[1]][[1]]$distname, munched.fit[[1]][[1]]$estimate[1], munched.fit[[1]][[1]]$estimate[2],
+  y <- y/dx
+}", dn,
+  munched.fit[[1]][[1]]$distname, munched.fit[[1]][[1]]$estimate[1], munched.fit[[1]][[1]]$estimate[2],
+  munched.fit[[1]][[1]]$distname, munched.fit[[1]][[1]]$estimate[1], munched.fit[[1]][[1]]$estimate[2],
+  munched.fit[[1]][[1]]$distname, munched.fit[[1]][[1]]$estimate[1], munched.fit[[1]][[1]]$estimate[2],
   munched.fit[[1]][[1]]$distname, munched.fit[[1]][[1]]$estimate[1], munched.fit[[1]][[1]]$estimate[2],
   munched.fit[[1]][[2]], munched.fit[[1]][[2]]
 )))
@@ -89,17 +93,19 @@ names(munched.fit[['Bertha']]) <- c("fit", "pmunch", "predict")
 To illustrate how this would be used, we need a point mass at the origin with the rest the log-normal.
 ```{r}
 par(mfrow=c(1,1))
-bx <- seq(from = log(0.1), to = log(6.1), length.out=101)
+bx <- seq(from = log(dn), to = log(6+dn), length.out=101)
 x <- 0.5*(bx[1:100] + bx[2:101])
 # Calculate log transformed herbivory averages and visually check fit
-herb_avg <- log(0.1+metadata$herb_avg)
-hist(herb_avg, breaks=seq(from = log(0.1), to = log(6.1), by=0.05), freq=FALSE)
+herb_avg <- log(dn+metadata$herb_avg)
+hist(herb_avg, breaks=seq(from = log(dn), to = log(6+dn), by=0.05), freq=FALSE)
 lines(x, munched.fit[['Bertha']]$predict(bx), col="red", lwd=2)
 ```
 
 # Sites
 
 ```{r}
+munched.fit[["PWR"]]$fit$estimate <- c(-2.25, 1.1)
+
 for (i in 2:6) {
   thissite <- metadata %>% filter(site == sites[i])
   pmunch <- sum(thissite$munched == 1)/nrow(thissite)
@@ -111,27 +117,35 @@ for (i in 2:6) {
   f3 <- fitdist(herb_avg, "exp")
   f4 <- fitdist(herb_avg, "weibull")
   
-  ind <- which.min(gofstat(list(f0, f1, f2, f3, f4))$aic)
+  # ind <- which.min(gofstat(list(f0, f1, f2, f3, f4))$aic)
+  ind <- 2 # We'll use log-normal for all
   
   munched.fit[[i]] <- vector("list", 3)
   eval(parse(text=sprintf("munched.fit[[%d]][[1]] <- f%d", i, ind-1)))
+  munched.fit[["PWR"]][[1]]$estimate <- c(-2.25, 1.1)
   munched.fit[[i]][[2]] <- pmunch
   munched.fit[[i]][[3]] <- eval(parse(text = sprintf("function(x, justmunch=FALSE) {
-    N <- length(x)
-    dx <- x[2]-x[1]
-    z <- exp(x)-0.1
-    y <- rep(0, N)
-    for (j in 1:(N-1)) {
-      y[j] = p%s(z[j+1], %g, %g) - p%s(z[j], %g, %g)
-    }
-    y <- (%g/(dx*sum(y)))*y
-    if (!justmunch) {
-      y[1] <- y[1] + (1-%g)/dx
-    }
-    y <- y[1:(N-1)]
-  }", munched.fit[[i]][[1]]$distname, munched.fit[[i]][[1]]$estimate[1], munched.fit[[i]][[1]]$estimate[2],
+  N <- length(x)
+  dx <- x[2]-x[1]
+  z <- exp(x)-%g
+  y <- rep(0, N-1)
+  for (j in 1:(N-1)) {
+    y[j] = p%s(z[j+1], %g, %g) - p%s(z[j], %g, %g)
+  }
+  y[1] <- y[1] + p%s(z[1], %g, %g)
+  y[N-1] <- y[N-1] + p%s(z[N], %g, %g, lower.tail=FALSE)
+  y <- %g*y
+  if (!justmunch) {
+    y[1] <- y[1] + (1-%g)
+  }
+  y <- y/dx
+}", dn,
   munched.fit[[i]][[1]]$distname, munched.fit[[i]][[1]]$estimate[1], munched.fit[[i]][[1]]$estimate[2],
-  munched.fit[[i]][[2]], munched.fit[[i]][[2]])))
+  munched.fit[[i]][[1]]$distname, munched.fit[[i]][[1]]$estimate[1], munched.fit[[i]][[1]]$estimate[2],
+  munched.fit[[i]][[1]]$distname, munched.fit[[i]][[1]]$estimate[1], munched.fit[[i]][[1]]$estimate[2],
+  munched.fit[[i]][[1]]$distname, munched.fit[[i]][[1]]$estimate[1], munched.fit[[i]][[1]]$estimate[2],
+  munched.fit[[i]][[2]], munched.fit[[i]][[2]]
+  )))
 
   names(munched.fit[[i]]) <- c("fit", "pmunch", "predict")
   cat("\n-------\n")
@@ -141,20 +155,22 @@ for (i in 2:6) {
 ```
 
 ```{r, warning=FALSE}
-herb_predict <- function(x, fit, group) {
-  fit[[group]]$predict(c(x, x[length(x)]+x[2]-x[1]))
-}
+N = 50
+lmin = log(dn)
+lmax = log(6+dn)
+b = lmin + c(0:N)*(lmax - lmin)/N # boundary points
+x = 0.5*(b[1:N] + b[2:(N+1)])
+dx = b[2] - b[1] # class size
 
-x <- seq(from = log(0.1), to = log(6.1), length.out = 101)
 curves <- do.call(rbind, lapply(sites[-1],
                                 function(site) {
                                   data.frame(site = site,
                                              x = x,
-                                             y = herb_predict(x, munched.fit, site))
+                                             y = munched.fit[[site]]$predict(b))
                                 }
 ))
 
-p <- metadata %>% ggplot(aes(x = log(0.1+herb_avg))) +
+p <- metadata %>% ggplot(aes(x = log(dn+herb_avg))) +
   geom_histogram(aes(y = ..density..),
                  binwidth = 0.1) +
   geom_line(aes(x = x, 
