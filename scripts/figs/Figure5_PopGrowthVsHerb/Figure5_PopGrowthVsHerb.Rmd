@@ -106,7 +106,7 @@ if (!file.exists(mwROOT("data","calculated","figure5a.RData")) | (compute)) {
 # Bootstrap data with per-capita herbivory
 Bootstrap the data to get 95% confidence ellipses for average herbivory and lambda over each site.
 ```{r, eval=F}
-compute <- TRUE
+compute <- FALSE
 parallel <- TRUE
 
 if (!file.exists(mwROOT("data","calculated","figure5b.RData")) | (compute)) {
@@ -169,7 +169,7 @@ p <- p + theme_bw() +
          scale_x_continuous(limits = c(-3.5, 0.0)) + 
          scale_y_continuous(limits = c(0.0, 1.7)) + 
          xlab("ln(Herbivory severity)") +
-         ylab("Per Capita Growth Rate") + 
+         ylab(expression(paste("Population growth rate(", lambda, ")"))) + 
          labs(color = "Sites") + 
          theme(legend.background = element_rect(fill="lightgrey",
                                                 size=0.1,
@@ -208,7 +208,7 @@ p <- p + theme_bw() +
          scale_x_continuous(limits = c(-3.5, 0.0)) + 
          scale_y_continuous(limits = c(0.0, 1.7)) + 
          xlab("ln(Herbivory severity)") +
-         ylab("Per Capita Growth Rate") + 
+         ylab(expression(paste("Population growth rate (", lambda, ")"))) + 
          labs(color = "Sites") + 
          theme(legend.background = element_rect(fill="lightgrey",
                                                 size=0.1,
