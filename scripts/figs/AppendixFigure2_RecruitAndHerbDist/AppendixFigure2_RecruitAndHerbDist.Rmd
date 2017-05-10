@@ -19,18 +19,18 @@ ipm <- mwIPM()
 
 ```{r, warning=FALSE}
 N <- 1000
-bx <- seq(from = log(0.1), to = log(6.1), length.out = N+1)
+bx <- seq(from = log(ipm$nudge), to = log(6+ipm$nudge), length.out = N+1)
 x <- 0.5*(bx[1:N] + bx[2:(N+1)])
 
 site_ind <- c('BLD1','BLD2','PWR','SKY','YTB','Bertha')
 plotdata <- do.call(rbind, lapply(site_ind, 
                                   function (site) {
                                     data.frame(site = site,
-                                               x = x,
+                                               x = x[2:(N-1)],
                                                y = ipm$pars$munched.fit[[site]]$predict(bx,
                                                                                         c(ipm$pars$munched.fit[[site]]$pmunch, 
                                                                                           ipm$pars$munched.fit[[site]]$fit$estimate),
-                                                                                        justmunch=TRUE))
+                                                                                        justmunch=TRUE)[2:(N-1)])
                                   })
 )
 
@@ -45,9 +45,10 @@ plot_herb <- plotdata %>% ggplot(aes(x = x, y = y, fill = site, colour = site)) 
   geom_area(position = "identity", alpha = 0.3)
 
 plot_herb <- plot_herb + theme_bw() +
-  xlab("ln(Herbivory Score)") +
+  xlab("ln(Herbivory severity)") +
   ylab("Probability Density") +
-  scale_x_continuous(limits = c(log(0.1), log(6.1))) + 
+  scale_x_continuous(limits = c(-4.0, log(6+ipm$nudge))) + 
+  scale_y_continuous(limits = c(0, 0.4)) +
   scale_fill_manual(values = c(hue_pal()(5), NA)) + 
   scale_color_manual(values = c(hue_pal()(5), "black")) +
   labs(colour="Sites", fill="Sites") +
@@ -77,18 +78,18 @@ site_ind <- c('BLD1','BLD2','PWR','SKY','YTB','Bertha')
 plotdata <- do.call(rbind, lapply(site_ind, 
                                   function (site) {
                                     data.frame(site = site,
-                                               x = x,
+                                               x = x[3:N-1],
                                                y = ipm$pars$budling.fit[[site]]$predict(bx,
-                                                                                        ipm$pars$budling.fit[[site]]$fit$estimate))
+                                                                                        ipm$pars$budling.fit[[site]]$fit$estimate)[3:N-1])
                                   })
 )
 
 # Now add seedling distributions
 plotdata <- bind_rows(plotdata,
                       data.frame(site = "Seedlings",
-                                 x = x,
+                                 x = x[3:N-1],
                                  y = ipm$pars$seedling.fit$predict(bx, 
-                                                                   ipm$pars$seedling.fit$fit$estimate)))
+                                                                   ipm$pars$seedling.fit$fit$estimate)[3:N-1]))
 
 plotdata$site <- factor(plotdata$site, levels = c('BLD1','BLD2','PWR','SKY','YTB','Bertha','Seedlings'))
 
@@ -109,7 +110,7 @@ plot_recr <- plotdata %>% ggplot(aes(x = x,
   geom_area(position = "identity", alpha = 0.3)
 
 plot_recr <- plot_recr + theme_bw() +
-  xlab("Apical Height (cm)") +
+  xlab("Height (cm)") +
   ylab("Probability Density") +
   scale_x_continuous(limits = c(0, 160)) +
   scale_fill_manual(values = c(hue_pal()(5), NA, NA)) + 
