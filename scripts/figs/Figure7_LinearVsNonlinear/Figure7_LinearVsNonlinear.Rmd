@@ -124,6 +124,13 @@ levels(plotdata$type) <- c("Exponential", "Linear")
 plotdata$type <- factor(plotdata$type, levels = c("Linear", "Exponential"))
 sitedata$site <- factor(sitedata$site, levels = c(sitenames[-1], "Combined"))
 
+# ggplot color palette
+gg_color_hue <- function(n) {
+    hues = seq(15, 375, length = n + 1)
+    hcl(h = hues, l = 65, c = 100)[1:n]
+}
+gg_colors <- gg_color_hue(5)
+
 plotdata %>% ggplot(aes(x = meanlog,
                         y = sdlog,
                         z = growth_rate)) +
@@ -140,8 +147,8 @@ plotdata %>% ggplot(aes(x = meanlog,
   scale_y_continuous(limits = c(min(sdlog), 
                                 max(sdlog)), 
                      expand = c(0, 0)) +
-  xlab(expression(mu)) + 
-  ylab(expression(sigma)) +
+  xlab(expression(paste("Log-normal location parameter (", mu, ")"))) + 
+  ylab(expression(paste("Log-normal scale parameter (", sigma, ")"))) +
   labs(fill = "Growth\nRate", color = "Sites        ") +    # Weird bug requiring spaces to order legends 
   geom_point(aes(x = meanlog,
                  y = sdlog,
@@ -149,6 +156,7 @@ plotdata %>% ggplot(aes(x = meanlog,
                  color = site), 
              size = 1.8,
              data = sitedata) +
+  scale_color_manual(values = c(gg_colors, "#000000")) +
   theme_bw() ->
   p
 ```
@@ -171,5 +179,5 @@ p1
 
 Save figure.
 ```{r}
-ggsave("Figure7_LinearVsNonlinear.png", width=7, height=5, device = "png", p)
+ggsave("Figure7_LinearVsNonlinear.png", width=7, height=4, device = "png", p)
 ```
