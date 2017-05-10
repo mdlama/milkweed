@@ -24,7 +24,7 @@ if (!file.exists(mwROOT("data","calculated","figure6.RData")) | (compute)) {
   registerDoParallel(cores = numcl)
   results <- tbl_df(foreach(i=1:20, .combine=bind_rows) %dopar% {
     source("../../../.Rprofile")
-    ipm %<>% bootIPM() %>% analyzeParameters(compute = TRUE)
+    ipm %<>% bootIPM() %>% analyzeParameters(distpars = TRUE)
     thisone <- ipm$analysis$parameters %>% select(type, name, elasticity)
     thisone
   })
@@ -37,13 +37,13 @@ if (!file.exists(mwROOT("data","calculated","figure6.RData")) | (compute)) {
 
 ## Spread elasticity over kernel for herbivory parameters
 ```{r}
-ipm %<>% analyzeStandard() %>% analyzeParameters()
+ipm %<>% analyzeStandard() %>% analyzeParameters(distpars = TRUE)
 res <- ipm$analysis$parameters %>% 
     filter(type == "Herbivory") %>% 
     select(pars, elasticity)
 
 herbivory_func <- function(x) {
-  as.vector((ipm %>% setHerbivoryMatrix(perturb = x))$kernels$K)
+  as.vector((ipm %>% setHerbivoryMatrix(perturb = x, distpars = TRUE))$kernels$K)
 }
 
 J <- jacobian(herbivory_func, rep(0,3))
@@ -115,7 +115,7 @@ newlabelorder <- c("Clonal-(Intercept)",
 #   https://stat.ethz.ch/R-manual/R-devel/library/grDevices/html/plotmath.html
 fancypantslabels <- rev(newlabelorder)
 fancypantslabels[1] <- TeX('$\\alpha$')
-fancypantslabels[2] <- TeX('$\\beta_{\\bar{z}_{\\omega}}$')
+fancypantslabels[2] <- TeX('$\\beta_{z_{\\omega}}$')
 fancypantslabels[3] <- TeX('$\\mu$')
 fancypantslabels[4] <- TeX('$\\sigma$')
 fancypantslabels[5] <- TeX('$p_{\\omega}$')
