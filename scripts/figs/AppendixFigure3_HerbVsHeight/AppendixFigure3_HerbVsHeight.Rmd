@@ -19,7 +19,8 @@ stemdata$year <- factor(stemdata$year)
 First, let's get the data ready.  We need to normalize the data (mean 0 and standard deviation 1).
 ```{r}
 stemdata_usc <- stemdata %>% filter(!is.na(h_apical),
-                                    !is.na(herb_avg))
+                                    !is.na(herb_avg)) %>%
+  mutate(log_herb_avg = log(0.01 + herb_avg))
 
 stemdata_sc <- stemdata_usc %>% mutate_each(funs(as.numeric(scale(.))), 
                                             h_apical, 
@@ -92,7 +93,7 @@ pa <- stemdata_usc %>% ggplot(aes(x = h_apical,
   facet_grid(year ~ site) +
   binomial_smooth() +
   theme_bw() +
-  xlab("Apical Height (cm)") +
+  xlab("Height (cm)") +
   ylab("Probability of being eaten") +
   ggtitle("(a)") + 
   theme(plot.title = element_text(hjust = 0,
@@ -157,8 +158,8 @@ pb <- stemdata_usc %>%
   geom_point(alpha = 0.3) +
   geom_smooth(method = "lm") +
   theme_bw() +
-  xlab("Apical Height (cm)") +
-  ylab("Ln(Herbivory Score)") +
+  xlab("Height (cm)") +
+  ylab("ln(Herbivory score)") +
   ggtitle("(b)") + 
   theme(plot.title = element_text(hjust = 0,
                                   margin = margin(b = 15, unit = "pt")))
