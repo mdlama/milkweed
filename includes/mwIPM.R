@@ -953,10 +953,15 @@ computeMPM.mwIPM <- function(obj) {
   attach(obj$pars, warn.conflicts = FALSE)
   attach(obj$matrices, warn.conflicts = FALSE)
   
-  mean.log_herb_avg <- sum(dist.herb*log_herb_avg$x)*log_herb_avg$dx
-  # mean.buds.per.stem <- exp(predict(budlings.per.stem.fit, new = data.frame(log_herb_mean = mean.log_herb_avg)))
-  mean.buds.per.stem <- budlings.per.stem.fit$predict(mean.log_herb_avg,
-                                                      budlings.per.stem.fit$fit$coefficients)
+  if (obj$mdlargs$input == 'meanonly') {
+    mean.log_herb_avg <- sum(dist.herb*log_herb_avg$x)*log_herb_avg$dx
+    mean.buds.per.stem <- budlings.per.stem.fit$predict(mean.log_herb_avg,
+                                                        budlings.per.stem.fit$fit$coefficients)
+  } else {
+    mean.buds.per.stem <- t(budlings.per.stem.fit$predict(log_herb_avg$x,
+                                                          budlings.per.stem.fit$fit$coefficients)) %*%
+      t(t(H[1+(0:(obj$N-1))*obj$N,1]))*log_herb_avg$dx
+  }
   
   Kss <- seedling.emergence[[obj$site]]*seeds.per.pod*(P*G*S*F)%*%H*log_herb_avg$dx*h_apical.next$dx*h_apical$dx
   alpha <- sum(Kss%*%t(t(seedling.fit$predict(h_apical$b, seedling.fit$fit$estimate))))
