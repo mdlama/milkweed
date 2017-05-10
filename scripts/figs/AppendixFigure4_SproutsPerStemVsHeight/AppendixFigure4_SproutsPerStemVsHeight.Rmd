@@ -51,7 +51,7 @@ myplot <- merged %>% ggplot(aes(x = h_apical,
                                 colour = site)) +
   geom_point() +
   theme_bw() +
-  xlab("Apical Height (cm)") +
+  xlab("Height (cm)") +
   ylab("Sprouts per stem") +
   labs(colour = "Site")
 
