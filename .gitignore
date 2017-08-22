@@ -3,10 +3,3 @@
 .RData
 .DS_Store
 .Ruserdata
-README.html
-includes/mwDist.R
-scripts/figs/old_figs
-scripts/figs/Figure1_Model/Figure1_Model.aux
-scripts/figs/Figure1_Model/Figure1_Model.log
-scripts/figs/Figure1_Model/Figure1_Model.pdf
-*.png
