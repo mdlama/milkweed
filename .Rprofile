@@ -21,7 +21,7 @@ require(doParallel, quietly = TRUE, warn.conflicts = FALSE)     # For bootstrapp
 
 if (require(rprojroot, quietly = TRUE, warn.conflicts = FALSE)) {
   mwROOT <- is_rstudio_project$make_fix_file()
-  source(mwROOT("includes","mwMod.R"))
-  source(mwROOT("includes","mwIPM.R"))
+  source(mwROOT("R","mw_mod.R"))
+  source(mwROOT("R","mw_ipm.R"))
   cat("\nWelcome at", date(), "\n")
 }
