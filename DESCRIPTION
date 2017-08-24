@@ -1,0 +1,31 @@
+Package: Milkweed
+Title: What the Package Does (one line, title case)
+Version: 0.0.0.9000
+Authors@R: c(
+  person("M. Drew", "LaMar", email = "mdlama@wm.edu", role = c("aut", "cre")),
+  person("Harmony", "Dalgleish", email = "hjdalgleish@wm.edu", role = "ctb"),
+  person("Sivan", "Yair", email = "", role = "ctb"),
+  person("Soren", "Struckman", email = "", role = "ctb"))
+Description: What the package does (one paragraph).
+Depends: R (>= 3.4.1)
+License: What license is it under?
+Encoding: UTF-8
+LazyData: true
+Imports: fitdistrplus,
+    tidyr (>= 0.7.0),
+    dplyr (>= 0.7.2),
+    ggplot2 (>= 2.2.1),
+    lme4 (>= 1.1.13),
+    AICcmodavg (>= 2.1.1),
+    magrittr (>= 1.5),
+    rootSolve (>= 1.7),
+    numDeriv (>= 2016.8.1),
+    rappdirs (>= 0.3.1)
+Suggests: RColorBrewer (>= 1.1.2),
+    scales (>= 0.4.1),
+    plot3D (>= 1.1),
+    gtable (>= 0.2.0),
+    grid (>= 3.4.1),
+    gridExtra (>= 2.2.1),
+    latex2exp (>= 0.4.0),
+    doParallel (>= 1.0.10)
