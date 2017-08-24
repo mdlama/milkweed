@@ -11,7 +11,7 @@ Depends: R (>= 3.4.1)
 License: What license is it under?
 Encoding: UTF-8
 LazyData: true
-Imports: fitdistrplus,
+Imports: fitdistrplus (>= 1.0.9),
     tidyr (>= 0.7.0),
     dplyr (>= 0.7.2),
     ggplot2 (>= 2.2.1),
@@ -29,3 +29,4 @@ Suggests: RColorBrewer (>= 1.1.2),
     gridExtra (>= 2.2.1),
     latex2exp (>= 0.4.0),
     doParallel (>= 1.0.10)
+RoxygenNote: 6.0.1

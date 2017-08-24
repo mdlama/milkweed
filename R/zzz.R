@@ -11,12 +11,18 @@
   )
   toset <- !(names(op.devtools) %in% names(op))
   if(any(toset)) options(op.devtools[toset])
-  
+
+  dirs <- rappdirs::app_dir("Milkweed", "LaMar")
   op.milkweed <- list(
-    milkweed.dirs = app_dir("Milkweed", "LaMar")
+    milkweed.cache = file.path(dirs$data(), "calculated")
   )
   toset <- !(names(op.milkweed) %in% names(op))
   if(any(toset)) options(op.milkweed[toset])
-  
+
+  # Create directory for cached calculations
+  dir.create(file.path(dirs$data(), "calculated"),
+             recursive = TRUE,
+             showWarnings = FALSE)
+
   invisible()
 }
