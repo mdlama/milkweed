@@ -1465,7 +1465,22 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
 
 # Renderers ------------------------------
 
+#' Render plot of flowering vs. height.
+#'
+#' @param obj A mwIPM model object.
+#'
+#' @return A plot object.
+#' @export
+#'
+#' @import dplyr
+#' @import ggplot2
+#' @importFrom magrittr %>%
+#'
+#' @examples
+#' ipm %>% renderFlowerFit()
 renderFloweringFit.mwIPM <- function(obj) {
+  requirePackages(c("grid", "gridExtra", "gtable", "RColorBrewer"))
+
   attach(obj$pars, warn.conflicts = FALSE)
   attach(obj$vars, warn.conflicts = FALSE)
 
@@ -1498,7 +1513,7 @@ renderFloweringFit.mwIPM <- function(obj) {
   imgt <- imgt + geom_hline(aes(yintercept = yintercept),
                           data = herb_ex,
                           linetype = c(1, 2, 5),
-                          col = brewer.pal(5, "YlOrRd")[2:4],
+                          col = RColorBrewer::brewer.pal(5, "YlOrRd")[2:4],
                           size=1)
 
   # Move over a bit to match panel (b) below
@@ -1535,7 +1550,7 @@ renderFloweringFit.mwIPM <- function(obj) {
   imgb <- ggplot(mycurves, aes(x = h_apical, y = prob.flower, col = Herbivory, linetype = Herbivory)) +
     geom_line(size = 1.0) +
     scale_x_continuous(limits = c(0, h_apical$max), expand = c(0, 0)) +
-    scale_color_manual(values = brewer.pal(5, "YlOrRd")[2:4]) +
+    scale_color_manual(values = RColorBrewer::brewer.pal(5, "YlOrRd")[2:4]) +
     xlab("Apical Height (cm)") +
     ylab("Flowering Probability")
 
@@ -1543,11 +1558,11 @@ renderFloweringFit.mwIPM <- function(obj) {
 
   gt <- ggplotGrob(imgt)
   gb <- ggplotGrob(imgb)
-  gb <- gtable_add_cols(gb, unit(1, "mm"))
+  gb <- gtable::gtable_add_cols(gb, unit(1, "mm"))
   g <- rbind(gt, gb, size="first")
-  g$widths <- unit.pmax(gt$widths, gb$widths)
+  g$widths <- grid::unit.pmax(gt$widths, gb$widths)
 
-  img <- grid.arrange(g)
+  img <- gridExtra::grid.arrange(g)
 
   detach(obj$pars)
   detach(obj$vars$h_apical)
@@ -1555,7 +1570,22 @@ renderFloweringFit.mwIPM <- function(obj) {
   return(img)
 }
 
+#' Render plot of budling distributions.
+#'
+#' @param obj A mwIPM model object.
+#'
+#' @return A plot object.
+#' @export
+#'
+#' @import dplyr
+#' @importFrom magrittr %>%
+#' @import ggplot2
+#'
+#' @examples
+#' ipm %>% renderBudlingDistFit()
 renderBudlingDistFit.mwIPM <- function(obj) {
+  requirePackages("scales")
+
   attach(obj$pars, warn.conflicts = FALSE)
   attach(obj$vars$h_apical, warn.conflicts = FALSE)
 
@@ -1605,8 +1635,8 @@ renderBudlingDistFit.mwIPM <- function(obj) {
     xlab("Apical Height (cm)") +
     ylab("Probability Density") +
     scale_x_continuous(limits = c(0, 160)) +
-    scale_fill_manual(values = c(hue_pal()(5), NA)) +
-    scale_color_manual(values = c(hue_pal()(5), "black")) +
+    scale_fill_manual(values = c(scales::hue_pal()(5), NA)) +
+    scale_color_manual(values = c(scales::hue_pal()(5), "black")) +
     labs(colour="Sites", fill="Sites", linetype="Sites") +
     theme(legend.background = element_rect(fill="lightgrey",
                                            size=0.1,
@@ -1620,7 +1650,22 @@ renderBudlingDistFit.mwIPM <- function(obj) {
   return(pb)
 }
 
+#' Render plot of herbivory distributions.
+#'
+#' @param obj A mwIPM model object.
+#'
+#' @return A plot object.
+#' @export
+#'
+#' @import dplyr
+#' @importFrom magrittr %>%
+#' @import ggplot2
+#'
+#' @examples
+#' ipm %>% renderHerbivoryDistFit()
 renderHerbivoryDistFit.mwIPM <- function(obj) {
+  requirePackages("scales")
+
   attach(obj$pars, warn.conflicts = FALSE)
   attach(obj$vars$log_herb_avg, warn.conflicts = FALSE)
 
@@ -1688,8 +1733,8 @@ renderHerbivoryDistFit.mwIPM <- function(obj) {
     xlab("ln(Herbivory Score)") +
     ylab("Probability Density") +
     scale_x_continuous(limits = c(log(obj$nudge), log(6+obj$nudge))) +
-    scale_fill_manual(values = c(hue_pal()(5), NA)) +
-    scale_color_manual(values = c(hue_pal()(5), "black")) +
+    scale_fill_manual(values = c(scales::hue_pal()(5), NA)) +
+    scale_color_manual(values = c(scales::hue_pal()(5), "black")) +
     labs(colour="Sites", fill="Sites") +
     theme(legend.background = element_rect(fill="lightgrey",
                                            size=0.1,
@@ -1705,6 +1750,12 @@ renderHerbivoryDistFit.mwIPM <- function(obj) {
 
 # Helpers  ------------------------------
 
+#' Parameters to moments.
+#'
+#' @param x Vector of parameters.
+#' @param type Distribution type (lnorm, gamma, or identity)
+#'
+#' @return Vector of moments.
 ParsToMoms <- function(x, type = "lnorm") {
   if (type == "lnorm") {
     y <- c(y1 = exp(x[1] + 0.5*x[2]*x[2]),
@@ -1721,6 +1772,12 @@ ParsToMoms <- function(x, type = "lnorm") {
   return(y)
 }
 
+#' Jacobian of parameters to moments.
+#'
+#' @param x Vector of parameters.
+#' @param type Distribution type (lnorm, gamma, or identity)
+#'
+#' @return Jacobian matrix
 jacParsToMoms <- function(x, type = "lnorm") {
   if (type == "lnorm") {
     CV <- x[2]/x[1]
@@ -1737,6 +1794,12 @@ jacParsToMoms <- function(x, type = "lnorm") {
   return(J)
 }
 
+#' Moments to parameters.
+#'
+#' @param y Vector of moments.
+#' @param type Distribution type (lnorm, gamma, or identity)
+#'
+#' @return Vector of moments.
 MomsToPars <- function(y, type = "lnorm") {
   if (type == "lnorm") {
     x <- c(x1 = log(y[1]/sqrt(1 + (y[2]/y[1])^2)),
@@ -1753,6 +1816,12 @@ MomsToPars <- function(y, type = "lnorm") {
   return(x)
 }
 
+#' Jacobian of moments to parameters.
+#'
+#' @param y Vector of moments.
+#' @param type Distribution type (lnorm, gamma, or identity)
+#'
+#' @return Jacobian matrix
 jacMomsToPars <- function(y, type = "lnorm") {
   if (type == "lnorm") {
     J <- exp(y[1] + y[2]*y[2]/2)*diag(c(1,sqrt(exp(y[2]*y[2])-1)))%*%matrix(c(1,1,1,1+1/(1-exp(-1*y[2]*y[2]))), byrow=T, nrow=2)%*%diag(c(1,y[2]))
@@ -1766,6 +1835,13 @@ jacMomsToPars <- function(y, type = "lnorm") {
   return(J)
 }
 
+#' Perturbation of the parameter-to-moments transformation.
+#'
+#' @param pars Vector of parameters or moments
+#' @param perturb Perturbation vector
+#' @param type Distribution type (lnorm, gamma, or identity)
+#'
+#' @return Gradient vector.
 perturbTrans <- function(pars, perturb = rep(0,2), type = "lnorm") {
   if (type == "lnorm") {
     MSD <- ParsToMoms(x = pars, type)
@@ -1777,4 +1853,18 @@ perturbTrans <- function(pars, perturb = rep(0,2), type = "lnorm") {
     tpars <- pars + perturb
   }
   return(tpars)
+}
+
+#' Helper function to check for required packages.
+#'
+#' @param req Vector of required packages.
+#'
+requirePackages <- function(req) {
+  lapply(req, function(pkg) {
+    if (!requireNamespace(pkg)) {
+      stop(paste("Package", pkg, "is required for rendering."))
+    }
+  })
+
+  invisible()
 }
