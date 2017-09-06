@@ -30,29 +30,29 @@ calcPars <- function(mdl, scaled, vars) {
   pars$scaled <- matrix(rep(0,6*4), byrow=TRUE, nrow=6)
   colnames(pars$scaled) <- c("(Intercept)", vars[1], vars[2], paste0(vars[1], ":", vars[2]))
   rownames(pars$scaled) <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
-  
+
   # Assign values for Bertha
   assignme <- rownames(coef(summary(mdl)))
   for (i in 1:length(assignme)) {
     pars$scaled["Bertha", assignme[i]] <- coef(summary(mdl))[assignme[i], "Estimate"]
   }
-  
+
   # Assign values for sites
   for (i in 1:ncol(coef(mdl)$site)) {
     varexp <- colnames(coef(mdl)$site)[i]
     pars$scaled[2:6,varexp] <- coef(mdl)$site[,varexp]
   }
-  
+
   mur <- 0
   sdr <- 1
   if (growth) {
     mur <- attributes(scaled$h_apical.next)$'scaled:center'
     sdr <- attributes(scaled$h_apical.next)$'scaled:scale'
-    
+
     pars$sd <- rep(0,6)
     names(pars$sd) <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
     pars$sd['Bertha'] <- sdr*sd(mdl@frame$h_apical.next - predict(mdl, type="response", re.form=NA))
-    pars$sd[2:6] <- sdr*sd(mdl@frame$h_apical.next - predict(mdl, type="response", re.form=~(h_apical+log_herb_avg|site)))
+    pars$sd[2:6] <- sdr*sd(mdl@frame$h_apical.next - predict(mdl, type="response", re.form=~(h_apical|site)))
   }
   mux <- c(0,0)
   sdx <- c(0,0)
@@ -60,7 +60,7 @@ calcPars <- function(mdl, scaled, vars) {
     mux[i] <- attributes(scaled[[vars[i]]])$'scaled:center'
     sdx[i] <- attributes(scaled[[vars[i]]])$'scaled:scale'
   }
-  
+
   # Calculate unscaled parameters
   pars$unscaled <- pars$scaled %*% diag(c(sdr, sdr/sdx[1], sdr/sdx[2], sdr/(sdx[1]*sdx[2]))) %*%
     cbind(c(1, -1*mux[1], -1*mux[2], mux[1]*mux[2]),
@@ -69,7 +69,7 @@ calcPars <- function(mdl, scaled, vars) {
           c(0,         0,         0,            1)) +
     cbind(rep(mur, 6), matrix(rep(0, 18), nrow=6))
   colnames(pars$unscaled) <- c("(Intercept)", vars[1], vars[2], paste0(vars[1], ":", vars[2]))
-  
+
   calcPars <- pars
 }
 
@@ -91,17 +91,17 @@ checkPars <- function(obj) {
   newdata <- data.frame(row.names = 1:nrow(obj$mdl@frame))
   newdata[[obj$vars[1]]] <- mux[1] + sdx[1]*obj$scaled[[obj$vars[1]]]
   newdata[[obj$vars[2]]] <- mux[2] + sdx[2]*obj$scaled[[obj$vars[2]]]
-  
+
   # First, check Bertha
   estresp <- predict(obj, newdata=newdata, type='Bertha')
   fitresp <- mur + sdr*predict(obj$mdl, type="response", re.form=NA)
   E <- max(estresp - fitresp)
   cat(sprintf("Bertha error: %g\n", E))
-  
+
   # Now for sites
   sites <- rownames(obj$pars$unscaled)[-1]
   # Get random effect terms
-  terms <- sapply(findbars(formula(obj$mdl)), deparse)
+  terms <- sapply(lme4::findbars(formula(obj$mdl)), deparse)
   # Get location of site random effect (space is necessary in front)
   I <- which(grepl(" site", terms))
   # Reformulate with ~

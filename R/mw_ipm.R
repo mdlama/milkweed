@@ -42,9 +42,52 @@ computeMPM <- function(obj) UseMethod("computeMPM")
 setSite <- function(obj, site, compute) UseMethod("setSite")
 bootIPM <- function(obj) UseMethod("bootIPM")
 
-# Analyze growth rate
+# Analyses
+
+#' Compute the population growth rate.
+#'
+#' @param obj A mwIPM model object.
+#'
+#' @return The population growth rate
+#' @export
+#'
+#' @examples
+#' lambda <- ipm %>% analyzeGrowthRate()
 analyzeGrowthRate <- function(obj) UseMethod("analyzeGrowthRate")
+
+#' Compute standard IPM population level metrics, such as the population
+#' growth rate, left and right eigenvectors, and sensitivity and elasticit
+#' matrices.
+#'
+#' @param obj A mwIPM model object.
+#'
+#' @return A mwIPM model object, with the results of the computation stored
+#' in a list.
+#' @export
+#'
+#' @examples
+#' ipm %<>% analyzeStandard()
+#' str(ipm$analysis$standard)
 analyzeStandard <- function(obj) UseMethod("analyzeStandard")
+
+#' Sensitivity analysis on parameters.
+#'
+#' @param obj A mwIPM model object.
+#' @param compute Recompute or load from cache?
+#' @param saveresults Cache results?
+#' @param params Which parameter to perturb?  One of "all", "Flowering", ...
+#' @param distpars Determines in which scale (log or linear) perturbation is occurring.
+#'
+#' @return A mwIPM model object, with the results of the computation stored
+#' in a list.
+#' @export
+#'
+#' @importFrom magrittr %>% %<>%
+#' @import dplyr
+#'
+#' @examples
+#' ipm %<>% analyzeParameters()
+#' str(ipm$analysis$parameters)
 analyzeParameters <- function(obj, compute, saveresults, params, distpars) UseMethod("analyzeParameters")
 
 # Renderers
@@ -173,9 +216,9 @@ mwIPM <- function(x = list()) {
 #' @param obj A mwIPM model object.
 #'
 #' @return A mwIPM model object.
+#' @export
 #' @import dplyr
 #' @importFrom magrittr %>% %<>%
-#' @export
 #'
 #' @examples
 #' ipm %<>% bootIPM()
@@ -408,9 +451,8 @@ setFloweringFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, upd
                                         !is.na(herb_avg),
                                         !is.na(fec.flower))
 
-    metadata_sc <- metadata_usc %>% mutate_at(funs(as.numeric(scale(.))),
-                                              h_apical,
-                                              herb_avg)
+    metadata_sc <- metadata_usc %>% mutate_at(.vars = vars(h_apical, herb_avg),
+                                              .funs = funs(as.numeric(scale(.))))
 
     cat("Computing flowering fit...")
     flower.mdl <- lme4::glmer(fec.flower ~ h_apical + herb_avg - 1 + (herb_avg|site/transect)+(h_apical*herb_avg|year),
@@ -460,9 +502,8 @@ setSurvivalFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, upda
                                         fec.flower == 1,
                                         !is.na(surv))
 
-    metadata_sc <- metadata_usc %>% mutate_at(funs(as.numeric(scale(.))),
-                                              h_apical,
-                                              herb_avg)
+    metadata_sc <- metadata_usc %>% mutate_at(.vars = vars(h_apical, herb_avg),
+                                              .funs = funs(as.numeric(scale(.))))
 
     cat("Computing survival fit...")
     surv.mdl <- lme4::glmer(surv ~ herb_avg + (herb_avg|site/transect) + (1|year),
@@ -513,10 +554,8 @@ setGrowthFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update
                                         fec.flower == 1,
                                         surv == 1)
 
-    metadata_sc <- metadata_usc %>% mutate_at(funs(as.numeric(scale(.))),
-                                              h_apical,
-                                              h_apical.next,
-                                              herb_avg)
+    metadata_sc <- metadata_usc %>% mutate_at(.vars = vars(h_apical, h_apical.next, herb_avg),
+                                              .funs = funs(as.numeric(scale(.))))
 
 
     cat("Computing growth fit...")
@@ -567,10 +606,8 @@ setPodsFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update =
                                         surv == 1,
                                         !is.na(N_pods))
 
-    metadata_sc <- metadata_usc %>% mutate_at(funs(as.numeric(scale(.))),
-                                              h_apical,
-                                              h_apical.next,
-                                              herb_avg)
+    metadata_sc <- metadata_usc %>% mutate_at(.vars = vars(h_apical, h_apical.next, herb_avg),
+                                              .funs = funs(as.numeric(scale(.))))
 
     cat("Computing pods fit...")
     pods.mdl <- lme4::glmer(N_pods ~ h_apical.next + herb_avg - 1 + (h_apical.next|site/transect) + (h_apical.next*herb_avg|year),
@@ -1151,11 +1188,11 @@ computeClonalKernel.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   if (obj$mdlargs$input == 'meanonly') {
     mean.herb_avg <- sum(dist.herb*herb_avg$x)*herb_avg$dx
     mean.buds.per.stem <- budlings.per.stem.fit$predict(mean.herb_avg,
-                                                        coef(budlings.per.stem.fit$fit),
+                                                        stats::coef(budlings.per.stem.fit$fit),
                                                         perturb[1:2])
   } else {
     mean.buds.per.stem <- t(budlings.per.stem.fit$predict(herb_avg$x,
-                                                          coef(budlings.per.stem.fit$fit),
+                                                          stats::coef(budlings.per.stem.fit$fit),
                                                           perturb[1:2])) %*%
       t(t(H[1+(0:(obj$N-1))*obj$N,1]))*herb_avg$dx
   }
@@ -1209,7 +1246,7 @@ setSite.mwIPM <- function(obj, site = "Bertha", compute = FALSE) {
     if (site %in% c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")) {
       obj$site <- site
 
-      obj %<>% setVars()
+      obj <- obj %>% setVars()
 
       obj %<>%
         setFloweringMatrix(update = FALSE) %>%
@@ -1240,6 +1277,7 @@ setSite.mwIPM <- function(obj, site = "Bertha", compute = FALSE) {
 #' @param obj A mwIPM model object.
 #'
 #' @return A mwIPM model object.
+#'
 #' @export
 #'
 #' @examples
@@ -1252,10 +1290,10 @@ computeMPM.mwIPM <- function(obj) {
   if (obj$mdlargs$input == 'meanonly') {
     mean.herb_avg <- sum(dist.herb*herb_avg$x)*herb_avg$dx
     mean.buds.per.stem <- budlings.per.stem.fit$predict(mean.herb_avg,
-                                                        coef(budlings.per.stem.fit$fit))
+                                                        stats::coef(budlings.per.stem.fit$fit))
   } else {
     mean.buds.per.stem <- t(budlings.per.stem.fit$predict(herb_avg$x,
-                                                          coef(budlings.per.stem.fit$fit))) %*%
+                                                          stats::coef(budlings.per.stem.fit$fit))) %*%
       t(t(H[1+(0:(obj$N-1))*obj$N,1]))*herb_avg$dx
   }
 
@@ -1454,7 +1492,7 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
       clonal_func <- function(x) {obj %>% computeClonalKernel(perturb = x) %>% analyzeGrowthRate()}
       analysis %<>% bind_rows(
         tbl_df(data.frame(sensitivity = numDeriv::grad(clonal_func, rep(0,4)),
-                          pars = c(coef(obj$pars$budlings.per.stem.fit$fit),
+                          pars = c(stats::coef(obj$pars$budlings.per.stem.fit$fit),
                                    obj$pars$budling.fit[[obj$site]]$fit$estimate),
                           type = c("Clonal", "Clonal", "Budlings", "Budlings"),
                           name = c("a",
@@ -1488,7 +1526,7 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
     }
 
     analysis %<>% filter(pars != 0) %>%
-      mutate(lambda = ipm %>% analyzeGrowthRate(),
+      mutate(lambda = obj %>% analyzeGrowthRate(),
              elasticity = sensitivity/(lambda/pars))
     analysis$type <- factor(analysis$type)
 
