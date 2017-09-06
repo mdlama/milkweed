@@ -85,12 +85,8 @@ mwIPM <- function(x = list()) {
   if (all(names(x) != "N")) {
     x$N = 50
   }
-  if (all(names(x) != "nudge")) {
-    x$nudge = 0.01
-  }
   if (all(names(x) != "data")) {
-    x$data <- stemdata %>%
-      mutate(log_herb_avg = log(x$nudge + herb_avg))
+    x$data <- stemdata %>% filter(site != "GRN")  # Only use GRN for budlings-per-stem
   }
   if (all(names(x) != "site")) {
     site = "Bertha"
@@ -113,11 +109,11 @@ mwIPM <- function(x = list()) {
     saveresults <- x$saveresults
   }
   if (all(names(x) != "mdlargs")) {
-    x$mdlargs <- list(method = 'exp',
+    x$mdlargs <- list(method = 'pow',
                       input = 'full')
   } else {
     if (all(names(x$mdlargs) != "method")) {
-      x$mdlargs$method = "exp"
+      x$mdlargs$method = "pow"
     }
     if (all(names(x$mdlargs) != "input")) {
       x$mdlargs$input = "full"
@@ -136,11 +132,11 @@ mwIPM <- function(x = list()) {
                                                        b = NA,
                                                        x = NA,
                                                        dx = NA),
-                                  log_herb_avg = list(min = NA,
-                                                      max = NA,
-                                                      b = NA,
-                                                      x = NA,
-                                                      dx = NA)),
+                                  herb_avg = list(min = NA,
+                                                  max = NA,
+                                                  b = NA,
+                                                  x = NA,
+                                                  dx = NA)),
                       pars = list(flower.fit = NA,
                                   growth.fit = NA,
                                   surv.fit = NA,
@@ -227,16 +223,16 @@ setVars.mwIPM <- function (obj) {
   h_apical.next$x = 0.5*(h_apical.next$b[1:N]+h_apical.next$b[2:(N+1)])
   h_apical.next$dx = h_apical.next$b[2] - h_apical.next$b[1] # class size
 
-  # log_herb_avg
-  log_herb_avg <- list(min = log(obj$nudge),
-                       max = log(6+obj$nudge))
-  log_herb_avg$b = log_herb_avg$min + c(0:N)*(log_herb_avg$max - log_herb_avg$min)/N # boundary points
-  log_herb_avg$x = 0.5*(log_herb_avg$b[1:N] + log_herb_avg$b[2:(N+1)])
-  log_herb_avg$dx = log_herb_avg$b[2] - log_herb_avg$b[1] # class size
+  # herb_avg
+  herb_avg <- list(min = 0.0,
+                   max = 6.0)
+  herb_avg$b = herb_avg$min + c(0:N)*(herb_avg$max - herb_avg$min)/N # boundary points
+  herb_avg$x = 0.5*(herb_avg$b[1:N] + herb_avg$b[2:(N+1)])
+  herb_avg$dx = herb_avg$b[2] - herb_avg$b[1] # class size
 
   obj$vars = list(h_apical = h_apical,
                   h_apical.next = h_apical.next,
-                  log_herb_avg = log_herb_avg)
+                  herb_avg = herb_avg)
 
   return(obj)
 }
@@ -409,21 +405,25 @@ setSeedlingEmergenceConst.mwIPM <- function(obj, compute = FALSE, saveresults = 
 setFloweringFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
   if (!file.exists(file.path(mwCache,"flowerFit.RData")) | (compute)) {
     metadata_usc <- obj$data %>% filter(!is.na(h_apical),
-                                        !is.na(log_herb_avg),
+                                        !is.na(herb_avg),
                                         !is.na(fec.flower))
 
-    metadata_sc <- metadata_usc %>% mutate_each(funs(as.numeric(scale(.))),
-                                                h_apical,
-                                                log_herb_avg)
+    metadata_sc <- metadata_usc %>% mutate_at(funs(as.numeric(scale(.))),
+                                              h_apical,
+                                              herb_avg)
 
     cat("Computing flowering fit...")
-    flower.mdl <- lme4::glmer(fec.flower ~ h_apical + h_apical:log_herb_avg - 1 + (1|site/transect)+(h_apical+log_herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+    flower.mdl <- lme4::glmer(fec.flower ~ h_apical + herb_avg - 1 + (herb_avg|site/transect)+(h_apical*herb_avg|year),
+                              data=metadata_sc,
+                              nAGQ=1,
+                              family=binomial(),
+                              control=glmerCtrl)
     cat("done!\n")
 
     flower.fit <- mwMod(list(mdl = flower.mdl,
-                             vars = c("h_apical", "log_herb_avg"),
+                             vars = c("h_apical", "herb_avg"),
                              scaled = list(h_apical = scale(metadata_usc$h_apical),
-                                           log_herb_avg = scale(metadata_usc$log_herb_avg))))
+                                           herb_avg = scale(metadata_usc$herb_avg))))
 
     # Check parameters
     cat("Checking parameters:\n")
@@ -460,18 +460,22 @@ setSurvivalFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, upda
                                         fec.flower == 1,
                                         !is.na(surv))
 
-    metadata_sc <- metadata_usc %>% mutate_each(funs(as.numeric(scale(.))),
-                                                h_apical,
-                                                log_herb_avg)
+    metadata_sc <- metadata_usc %>% mutate_at(funs(as.numeric(scale(.))),
+                                              h_apical,
+                                              herb_avg)
 
     cat("Computing survival fit...")
-    surv.mdl <- lme4::glmer(surv ~ 1 + (log_herb_avg|site/transect)+(1|year), data=metadata_sc, family=binomial(), nAGQ=1, control=glmerCtrl)
+    surv.mdl <- lme4::glmer(surv ~ herb_avg + (herb_avg|site/transect) + (1|year),
+                            data=metadata_sc,
+                            family=binomial(),
+                            nAGQ=1,
+                            control=glmerCtrl)
     cat("done!\n")
 
     surv.fit <- mwMod(list(mdl = surv.mdl,
-                           vars = c("h_apical", "log_herb_avg"),
+                           vars = c("h_apical", "herb_avg"),
                            scaled = list(h_apical = scale(metadata_usc$h_apical),
-                                         log_herb_avg = scale(metadata_usc$log_herb_avg))))
+                                         herb_avg = scale(metadata_usc$herb_avg))))
 
     # Check parameters
     cat("Checking parameters:\n")
@@ -509,21 +513,23 @@ setGrowthFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update
                                         fec.flower == 1,
                                         surv == 1)
 
-    metadata_sc <- metadata_usc %>% mutate_each(funs(as.numeric(scale(.))),
-                                                h_apical,
-                                                h_apical.next,
-                                                log_herb_avg)
+    metadata_sc <- metadata_usc %>% mutate_at(funs(as.numeric(scale(.))),
+                                              h_apical,
+                                              h_apical.next,
+                                              herb_avg)
 
 
     cat("Computing growth fit...")
-    growth.mdl <- lme4::lmer(h_apical.next ~ h_apical + h_apical:log_herb_avg + (h_apical+log_herb_avg|site/transect)+(h_apical|year), data=metadata_sc, REML=T)
+    growth.mdl <- lme4::lmer(h_apical.next ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical*herb_avg|year),
+                             data=metadata_sc,
+                             REML=T)
     cat("done!\n")
 
     growth.fit <- mwMod(list(mdl = growth.mdl,
-                             vars = c("h_apical", "log_herb_avg"),
+                             vars = c("h_apical", "herb_avg"),
                              scaled = list(h_apical = scale(metadata_usc$h_apical),
                                            h_apical.next = scale(metadata_usc$h_apical.next),
-                                           log_herb_avg = scale(metadata_usc$log_herb_avg))))
+                                           herb_avg = scale(metadata_usc$herb_avg))))
     # Check parameters
     cat("Checking parameters:\n")
     checkPars(growth.fit)
@@ -561,20 +567,24 @@ setPodsFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update =
                                         surv == 1,
                                         !is.na(N_pods))
 
-    metadata_sc <- metadata_usc %>% mutate_each(funs(as.numeric(scale(.))),
-                                                h_apical,
-                                                h_apical.next,
-                                                log_herb_avg)
+    metadata_sc <- metadata_usc %>% mutate_at(funs(as.numeric(scale(.))),
+                                              h_apical,
+                                              h_apical.next,
+                                              herb_avg)
 
     cat("Computing pods fit...")
-    pods.mdl <- lme4::glmer(N_pods ~ h_apical.next + log_herb_avg - 1 + (h_apical.next+log_herb_avg|site/transect)+(h_apical.next+log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
+    pods.mdl <- lme4::glmer(N_pods ~ h_apical.next + herb_avg - 1 + (h_apical.next|site/transect) + (h_apical.next*herb_avg|year),
+                            data=metadata_sc,
+                            nAGQ=1,
+                            family=poisson(link = "log"),
+                            control=glmerCtrl)
     cat("done!\n")
 
     pods.fit <- mwMod(list(mdl = pods.mdl,
-                           vars = c("h_apical.next", "log_herb_avg"),
+                           vars = c("h_apical.next", "herb_avg"),
                            scaled = list(h_apical = scale(metadata_usc$h_apical),
                                          h_apical.next = scale(metadata_usc$h_apical.next),
-                                         log_herb_avg = scale(metadata_usc$log_herb_avg))))
+                                         herb_avg = scale(metadata_usc$herb_avg))))
     # Check parameters
     cat("Checking parameters:\n")
     checkPars(pods.fit)
@@ -761,20 +771,18 @@ setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE,
         eval(parse(text = paste0(functext,
           sprintf("N <- length(x)
                    dx <- x[2]-x[1]
-                   z <- exp(x)-%g
                    y <- rep(0, N-1)
                    for (j in 1:(N-1)) {
-                     y[j] = p%s(z[j+1], pars[2], pars[3]) - p%s(z[j], pars[2], pars[3])
+                     y[j] = p%s(x[j+1], pars[2], pars[3]) - p%s(x[j], pars[2], pars[3])
                    }
-                   y[1] <- y[1] + p%s(z[1], pars[2], pars[3])
-                   y[N-1] <- y[N-1] + p%s(z[N], pars[2], pars[3], lower.tail = FALSE)
+                   y[1] <- y[1] + p%s(x[1], pars[2], pars[3])
+                   y[N-1] <- y[N-1] + p%s(x[N], pars[2], pars[3], lower.tail = FALSE)
                    y <- pars[1]*y
                    if (!justmunch) {
                      y[1] <- y[1] + (1-pars[1])
                    }
                    y <- y/dx
                  }",
-                 obj$nudge,
                  munched.fit[[i]][[1]]$distname,
                  munched.fit[[i]][[1]]$distname,
                  munched.fit[[i]][[1]]$distname,
@@ -809,47 +817,80 @@ setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE,
 #' @import dplyr
 setBudlingsPerStemFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
   if (!file.exists(file.path(mwCache,"budlingsPerStemFit.RData")) | (compute)) {
-    data_gp <- obj$data %>% group_by(year, transect) %>%
-                            summarize(N_seedlings = sum(seedling, na.rm=T),
-                                      N_total = sum(aliveJune, na.rm=T),
-                                      N_budlings = N_total - N_seedlings,
-                                      log_herb_mean = mean(log_herb_avg, na.rm=T),
-                                      site = first(site))
+    # Note that we are using stemdata and not obj$data!!!!  We can refer to obj$data once we have
+    #  full integrated and cleaned data for 2017.  This should be the ONLY place where we use
+    #  stemdata in place of obj$data.
+    data_gp <- stemdata %>%
+      group_by(year, transect) %>%
+      summarize(N_seedlings = sum(seedling, na.rm=T),
+                N_total = sum(aliveJune, na.rm=T),
+                N_budlings = N_total - N_seedlings,
+                herb_mean = mean(herb_avg, na.rm=T),
+                site = first(site)) %>%
+      ungroup(year, transect) %>%
+      ##NOTE: these 4 bind_rows() calls add in explicit 0s where transects died off, resulting in a year with 0 stems, necessary as it would skew the model if it were not included
+      bind_rows(data.frame(year = 2016, transect = 60, N_seedlings = 0, N_total = 0, N_budlings = 0, herb_mean = 0, site = "YTB")) %>%
+      bind_rows(data.frame(year = 2016, transect = 61, N_seedlings = 0, N_total = 0, N_budlings = 0, herb_mean = 0, site = "YTB")) %>%
+      bind_rows(data.frame(year = 2016, transect = 63, N_seedlings = 0, N_total = 0, N_budlings = 0, herb_mean = 0, site = "YTB")) %>%
+      bind_rows(data.frame(year = 2017, transect = 71, N_seedlings = 0, N_total = 0, N_budlings = 0, herb_mean = 0, site = "SKY")) %>%
+      bind_rows(data.frame(year = 2017, transect = 62, N_seedlings = 0, N_total = 0, N_budlings = 0, herb_mean = 0, site = "YTB")) %>%
+      bind_rows(data.frame(year = 2017, transect = 65, N_seedlings = 0, N_total = 0, N_budlings = 0, herb_mean = 0, site = "YTB")) %>%
+      group_by(year, transect)
 
-    data13_14 <- data_gp %>% filter(year %in% 2013:2014) %>%
-                             group_by(transect) %>%
-                             summarize(bdlgs_per_stem = last(N_budlings)/first(N_total),
-                                       log_herb_mean = first(log_herb_mean),
-                                       site = first(site))
+    #transects 44 and 48 were abandoned after 2013 and so were not included
+    data13_14 <- data_gp %>% filter(year %in% 2013:2014 & ! transect %in% c(44, 48)) %>%
+      group_by(transect) %>%
+      summarize(bdlgs_per_stem = last(N_budlings)/first(N_total),
+                herb_mean = first(herb_mean),
+                site = first(site))
 
-    data14_15 <- data_gp %>% filter(year %in% 2014:2015 & transect != 70) %>%
-                             group_by(transect) %>%
-                             summarize(bdlgs_per_stem = last(N_budlings)/first(N_total),
-                                       log_herb_mean = first(log_herb_mean),
-                                       site = first(site))
+    #transects 70 and 72 were abandoned after 2014 and so were not included
+    data14_15 <- data_gp %>% filter(year %in% 2014:2015 & ! transect %in% c(70, 72)) %>%
+      group_by(transect) %>%
+      summarize(bdlgs_per_stem = last(N_budlings)/first(N_total),
+                herb_mean = first(herb_mean),
+                site = first(site))
 
-    fulldat <- bind_rows(data13_14, data14_15)
+    #transect 80 was abandoned after 2015 so was not included
+    data15_16 <- data_gp %>% filter(year %in% 2015:2016 & transect != 80) %>%
+      group_by(transect) %>%
+      summarize(bdlgs_per_stem = last(N_budlings)/first(N_total),
+                herb_mean = first(herb_mean),
+                site = first(site))
+
+    #GRN was a new site and data is only available for 2017, and transect 80 in 2017 is a
+    #  new transect NOT the same as transect 80 that was abandoned (same number only, which
+    #  should be fixed.) Also, transects 60, 61, 62 are not present in 2017 since they died,
+    #  so they are excluded.
+    data16_17 <- data_gp %>% filter(year %in% 2016:2017 & site != 'GRN' & ! transect %in% c(60, 61, 63, 73, 80)) %>%
+      group_by(transect) %>%
+      summarize(bdlgs_per_stem = last(N_budlings)/first(N_total),
+                herb_mean = first(herb_mean),
+                site = first(site))
+
+    fulldat <- bind_rows(data13_14, data14_15, data15_16, data16_17)
 
     merged <- fulldat %>% group_by(transect) %>%
-                          summarize(log_herb_mean = mean(log_herb_mean),
-                                    bdlgs_per_stem = mean(bdlgs_per_stem),
-                                    site = first(site))
+      summarize(herb_mean = mean(herb_mean),
+                bdlgs_per_stem = mean(bdlgs_per_stem),
+                site = first(site))
 
+    # Using nls instead of lm even if linear for cleaner code - fits are the same
     cat(paste0("Calculating budlings per stem fit (", obj$mdlargs$method, ")..."))
-    if (obj$mdlargs$method == 'exp') {
-      mdl <- lm(log(bdlgs_per_stem) ~ log_herb_mean, data=merged)
+    if (obj$mdlargs$method == 'pow') {
+      mdl <- nls(bdlgs_per_stem ~ a*herb_mean^b, data=merged, start=list(a = 1, b = 1))
     } else {
-      mdl <- lm(bdlgs_per_stem ~ log_herb_mean, data=merged)
+      mdl <- nls(bdlgs_per_stem ~ a + b*herb_mean, data=merged, start=list(a = 1, b = 1))
     }
     cat("done!\n")
 
     budlings.per.stem.fit <- vector("list", 3)
     budlings.per.stem.fit[[1]] <- mdl
     budlings.per.stem.fit[[2]] <- merged$site
-    if (obj$mdlargs$method == 'exp') {
+    if (obj$mdlargs$method == 'pow') {
       budlings.per.stem.fit[[3]] <- function (x, pars, perturb = rep(0,2)) {
         pars <- pars + perturb
-        y <- exp(pars[1] + pars[2]*x)
+        y <- pars[1]*x^pars[2]
       }
     } else {
       budlings.per.stem.fit[[3]] <- function (x, pars, perturb = rep(0,2)) {
@@ -885,7 +926,7 @@ setBudlingsPerStemFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALS
 setFloweringMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   # Flowering
   # N x N^2
-  obj$matrices$F = t(c(outer(obj$vars$h_apical$x, obj$vars$log_herb_avg$x, function(x,y) {predict(obj$pars$flower.fit, newdata = data.frame(h_apical = x, log_herb_avg = y), type=obj$site, perturb=perturb)})))[rep(1,obj$N),]
+  obj$matrices$F = t(c(outer(obj$vars$h_apical$x, obj$vars$herb_avg$x, function(x,y) {predict(obj$pars$flower.fit, newdata = data.frame(h_apical = x, herb_avg = y), type=obj$site, perturb=perturb)})))[rep(1,obj$N),]
 
   if (update) {
     obj <- obj %>% computeSexualKernel()
@@ -907,7 +948,7 @@ setFloweringMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
 setSurvivalMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   # Survival
   # N x N^2
-  obj$matrices$S = t(c(outer(obj$vars$h_apical$x, obj$vars$log_herb_avg$x, function(x,y) {predict(obj$pars$surv.fit, newdata = data.frame(h_apical = x, log_herb_avg = y), type=obj$site, perturb=perturb)})))[rep(1,obj$N),]
+  obj$matrices$S = t(c(outer(obj$vars$h_apical$x, obj$vars$herb_avg$x, function(x,y) {predict(obj$pars$surv.fit, newdata = data.frame(h_apical = x, herb_avg = y), type=obj$site, perturb=perturb)})))[rep(1,obj$N),]
 
   if (update) {
     obj <- obj %>% computeSexualKernel()
@@ -931,7 +972,7 @@ setGrowthMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,5)) {
   # N x N^2
 
   N <- obj$N
-  Mu <- c(outer(obj$vars$h_apical$x, obj$vars$log_herb_avg$x, function(x,y) {predict(obj$pars$growth.fit, newdata = data.frame(h_apical = x, log_herb_avg = y), type=obj$site, perturb=perturb[1:4])}))
+  Mu <- c(outer(obj$vars$h_apical$x, obj$vars$herb_avg$x, function(x,y) {predict(obj$pars$growth.fit, newdata = data.frame(h_apical = x, herb_avg = y), type=obj$site, perturb=perturb[1:4])}))
   G <- matrix(rep(0, N^3), nrow=N)
   for (i in (1:N^2)) {
     for (j in 1:N) {
@@ -944,7 +985,7 @@ setGrowthMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,5)) {
   obj$matrices$G <- G
 
   # Check for eviction
-  # colSums(G%*%H*dx.h_apical.next*dx.log_herb_avg)
+  # colSums(G%*%H*dx.h_apical.next*dx.herb_avg)
 
   # Plot growth
   # image.plot(h_apical, h_apical.next, t(G%*%H), col=topo.colors(100))
@@ -975,8 +1016,8 @@ setPodsMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   for (i in 1:N) {
     # h_apical.next
     for (j in 1:N) {
-      # log_herb_avg
-      P[i,(1+(j-1)*N):(j*N)] <- predict(obj$pars$pods.fit, newdata = data.frame(h_apical.next = obj$vars$h_apical.next$x[i], log_herb_avg = obj$vars$log_herb_avg$x[j]), type=obj$site, perturb=perturb)
+      # herb_avg
+      P[i,(1+(j-1)*N):(j*N)] <- predict(obj$pars$pods.fit, newdata = data.frame(h_apical.next = obj$vars$h_apical.next$x[i], herb_avg = obj$vars$herb_avg$x[j]), type=obj$site, perturb=perturb)
     }
   }
   obj$matrices$P <- P
@@ -1006,7 +1047,7 @@ setHerbivoryMatrix.mwIPM <- function(obj, dist.herb = NA, update = TRUE, perturb
 
   N <- obj$N
   if (any(is.na(dist.herb))) {
-    dist.herb <- obj$pars$munched.fit[[obj$site]]$predict(obj$vars$log_herb_avg$b,
+    dist.herb <- obj$pars$munched.fit[[obj$site]]$predict(obj$vars$herb_avg$b,
                                                           c(obj$pars$munched.fit[[obj$site]]$pmunch,
                                                             obj$pars$munched.fit[[obj$site]]$fit$estimate),
                                                           perturb,
@@ -1074,7 +1115,7 @@ computeSexualKernel.mwIPM <- function(obj, update = TRUE, perturb = rep(0,2)) {
   attach(obj$pars, warn.conflicts = FALSE)
   attach(obj$matrices, warn.conflicts = FALSE)
 
-  Ks <- (seedling.emergence[[obj$site]]+perturb[1])*(seeds.per.pod+perturb[2])*R%*%(P*G*S*F)%*%H*log_herb_avg$dx*h_apical.next$dx*h_apical$dx
+  Ks <- (seedling.emergence[[obj$site]]+perturb[1])*(seeds.per.pod+perturb[2])*R%*%(P*G*S*F)%*%H*herb_avg$dx*h_apical.next$dx*h_apical$dx
   # image.plot(h_apical, h_apical, t(Ks), col=topo.colors(100))
 
   detach(obj$vars)
@@ -1108,15 +1149,15 @@ computeClonalKernel.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   attach(obj$matrices, warn.conflicts = FALSE)
 
   if (obj$mdlargs$input == 'meanonly') {
-    mean.log_herb_avg <- sum(dist.herb*log_herb_avg$x)*log_herb_avg$dx
-    mean.buds.per.stem <- budlings.per.stem.fit$predict(mean.log_herb_avg,
-                                                        budlings.per.stem.fit$fit$coefficients,
+    mean.herb_avg <- sum(dist.herb*herb_avg$x)*herb_avg$dx
+    mean.buds.per.stem <- budlings.per.stem.fit$predict(mean.herb_avg,
+                                                        coef(budlings.per.stem.fit$fit),
                                                         perturb[1:2])
   } else {
-    mean.buds.per.stem <- t(budlings.per.stem.fit$predict(log_herb_avg$x,
-                                                          budlings.per.stem.fit$fit$coefficients,
+    mean.buds.per.stem <- t(budlings.per.stem.fit$predict(herb_avg$x,
+                                                          coef(budlings.per.stem.fit$fit),
                                                           perturb[1:2])) %*%
-      t(t(H[1+(0:(obj$N-1))*obj$N,1]))*log_herb_avg$dx
+      t(t(H[1+(0:(obj$N-1))*obj$N,1]))*herb_avg$dx
   }
 
   Kc <- t(t(mean.buds.per.stem*budling.fit[[obj$site]]$predict(h_apical$b,
@@ -1209,16 +1250,16 @@ computeMPM.mwIPM <- function(obj) {
   attach(obj$matrices, warn.conflicts = FALSE)
 
   if (obj$mdlargs$input == 'meanonly') {
-    mean.log_herb_avg <- sum(dist.herb*log_herb_avg$x)*log_herb_avg$dx
-    mean.buds.per.stem <- budlings.per.stem.fit$predict(mean.log_herb_avg,
-                                                        budlings.per.stem.fit$fit$coefficients)
+    mean.herb_avg <- sum(dist.herb*herb_avg$x)*herb_avg$dx
+    mean.buds.per.stem <- budlings.per.stem.fit$predict(mean.herb_avg,
+                                                        coef(budlings.per.stem.fit$fit))
   } else {
-    mean.buds.per.stem <- t(budlings.per.stem.fit$predict(log_herb_avg$x,
-                                                          budlings.per.stem.fit$fit$coefficients)) %*%
-      t(t(H[1+(0:(obj$N-1))*obj$N,1]))*log_herb_avg$dx
+    mean.buds.per.stem <- t(budlings.per.stem.fit$predict(herb_avg$x,
+                                                          coef(budlings.per.stem.fit$fit))) %*%
+      t(t(H[1+(0:(obj$N-1))*obj$N,1]))*herb_avg$dx
   }
 
-  Kss <- seedling.emergence[[obj$site]]*seeds.per.pod*(P*G*S*F)%*%H*log_herb_avg$dx*h_apical.next$dx*h_apical$dx
+  Kss <- seedling.emergence[[obj$site]]*seeds.per.pod*(P*G*S*F)%*%H*herb_avg$dx*h_apical.next$dx*h_apical$dx
   alpha <- sum(Kss%*%t(t(seedling.fit$predict(h_apical$b, seedling.fit$fit$estimate))))
   beta <- sum(Kss%*%t(t(budling.fit[[obj$site]]$predict(h_apical$b,
                                                         budling.fit[[obj$site]]$fit$estimate))))
@@ -1313,8 +1354,8 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
                           type = as.character("Flowering"),
                           name = c("(Intercept)",
                                    "h_apical",
-                                   "log_herb_avg",
-                                   "h_apical:log_herb_avg")
+                                   "herb_avg",
+                                   "h_apical:herb_avg")
         )
         )
       )
@@ -1330,8 +1371,8 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
                           type = as.character("Survival"),
                           name = c("(Intercept)",
                                    "h_apical",
-                                   "log_herb_avg",
-                                   "h_apical:log_herb_avg")
+                                   "herb_avg",
+                                   "h_apical:herb_avg")
         )
         )
       )
@@ -1348,8 +1389,8 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
                           type = as.character("Growth"),
                           name = c("(Intercept)",
                                    "h_apical",
-                                   "log_herb_avg",
-                                   "h_apical:log_herb_avg",
+                                   "herb_avg",
+                                   "h_apical:herb_avg",
                                    "sd")
         )
         )
@@ -1366,8 +1407,8 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
                           type = as.character("Pods"),
                           name = c("(Intercept)",
                                    "h_apical",
-                                   "log_herb_avg",
-                                   "h_apical:log_herb_avg")
+                                   "herb_avg",
+                                   "h_apical:herb_avg")
         )
         )
       )
@@ -1413,11 +1454,11 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
       clonal_func <- function(x) {obj %>% computeClonalKernel(perturb = x) %>% analyzeGrowthRate()}
       analysis %<>% bind_rows(
         tbl_df(data.frame(sensitivity = numDeriv::grad(clonal_func, rep(0,4)),
-                          pars = c(obj$pars$budlings.per.stem.fit$fit$coefficients,
+                          pars = c(coef(obj$pars$budlings.per.stem.fit$fit),
                                    obj$pars$budling.fit[[obj$site]]$fit$estimate),
                           type = c("Clonal", "Clonal", "Budlings", "Budlings"),
-                          name = c("(Intercept)",
-                                   "log_herb_avg",
+                          name = c("a",
+                                   "b",
                                    "mean",
                                    "sd")
         )
@@ -1485,17 +1526,17 @@ renderFloweringFit.mwIPM <- function(obj) {
   attach(obj$vars, warn.conflicts = FALSE)
 
   ## Top (heatmap)
-  M <- mesh(h_apical$x, log_herb_avg$x)
+  M <- mesh(h_apical$x, herb_avg$x)
   plotdata <- tbl_df(data.frame(h_apical = as.vector(M$x),
-                                log_herb_avg = as.vector(M$y)))
+                                herb_avg = as.vector(M$y)))
   z <- predict(flower.fit,
                newdata=data.frame(h_apical = as.vector(M$x),
-                                  log_herb_avg = as.vector(M$y)),
+                                  herb_avg = as.vector(M$y)),
                type="Bertha")
   plotdata <- plotdata %>% mutate(prob.flower = z)
 
   # Heatmap
-  imgt <- ggplot(plotdata, aes(x = h_apical, y = log_herb_avg, z = prob.flower)) +
+  imgt <- ggplot(plotdata, aes(x = h_apical, y = herb_avg, z = prob.flower)) +
     geom_raster(aes(fill = prob.flower)) +
     geom_contour(colour = "white", alpha = 0.8) +
     scale_fill_gradientn("Flowering\nProbability",
@@ -1504,11 +1545,11 @@ renderFloweringFit.mwIPM <- function(obj) {
 
   imgt <- imgt + theme(axis.line = element_blank()) +
     scale_x_continuous(limits = c(0, h_apical$max), expand = c(0, 0)) +
-    scale_y_continuous(limits = c(log_herb_avg$min, log_herb_avg$max), expand = c(0, 0)) +
-    ylab("Log(Herbivory)")
+    scale_y_continuous(limits = c(herb_avg$min, herb_avg$max), expand = c(0, 0)) +
+    ylab("Herbivory Score")
 
   # Add lines
-  herb_ex <- data.frame(yintercept = c(log(obj$nudge), mean(obj$data$log_herb_avg, na.rm=T), log(6+obj$nudge)))
+  herb_ex <- data.frame(yintercept = c(0, mean(obj$data$herb_avg, na.rm=T), 6))
 
   imgt <- imgt + geom_hline(aes(yintercept = yintercept),
                           data = herb_ex,
@@ -1528,19 +1569,19 @@ renderFloweringFit.mwIPM <- function(obj) {
   min <- data.frame(h_apical = h_apical$x,
                     prob.flower = predict(flower.fit,
                                           newdata=data.frame(h_apical = h_apical$x,
-                                                             log_herb_avg = herb_ex[1,1]),
+                                                             herb_avg = herb_ex[1,1]),
                                           type="Bertha"),
                     Herbivory = "min")
   avg <- data.frame(h_apical = h_apical$x,
                     prob.flower = predict(flower.fit,
                                           newdata=data.frame(h_apical = h_apical$x,
-                                                             log_herb_avg = herb_ex[2,1]),
+                                                             herb_avg = herb_ex[2,1]),
                                           type="Bertha"),
                     Herbivory = "avg")
   max <- data.frame(h_apical = h_apical$x,
                     prob.flower = predict(flower.fit,
                                           newdata=data.frame(h_apical = h_apical$x,
-                                                             log_herb_avg = herb_ex[3,1]),
+                                                             herb_avg = herb_ex[3,1]),
                                           type="Bertha"),
                     Herbivory = "max")
 
@@ -1667,7 +1708,7 @@ renderHerbivoryDistFit.mwIPM <- function(obj) {
   requirePackages("scales")
 
   attach(obj$pars, warn.conflicts = FALSE)
-  attach(obj$vars$log_herb_avg, warn.conflicts = FALSE)
+  attach(obj$vars$herb_avg, warn.conflicts = FALSE)
 
   y <- munched.fit[['BLD1']]$predict(b,
                                      c(munched.fit[['BLD1']]$pmunch,
@@ -1730,9 +1771,9 @@ renderHerbivoryDistFit.mwIPM <- function(obj) {
 
   pa <- pa + ggtitle("Herbivory Distributions") +
     theme_bw() +
-    xlab("ln(Herbivory Score)") +
+    xlab("Herbivory Score") +
     ylab("Probability Density") +
-    scale_x_continuous(limits = c(log(obj$nudge), log(6+obj$nudge))) +
+    scale_x_continuous(limits = c(0, 6)) +
     scale_fill_manual(values = c(scales::hue_pal()(5), NA)) +
     scale_color_manual(values = c(scales::hue_pal()(5), "black")) +
     labs(colour="Sites", fill="Sites") +
@@ -1743,7 +1784,7 @@ renderHerbivoryDistFit.mwIPM <- function(obj) {
           legend.position = c(0.885, 0.72))
 
   detach(obj$pars)
-  detach(obj$vars$log_herb_avg)
+  detach(obj$vars$herb_avg)
 
   return(pa)
 }
