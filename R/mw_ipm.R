@@ -1938,10 +1938,11 @@ perturbTrans <- function(pars, perturb = rep(0,2), type = "lnorm") {
 #'
 #' @param req Vector of required packages.
 #'
+#' @export
 requirePackages <- function(req) {
   lapply(req, function(pkg) {
     if (!requireNamespace(pkg)) {
-      stop(paste("Package", pkg, "is required for rendering."))
+      stop(paste("Package", pkg, "is required.  Please install it to continue."), call. = FALSE)
     }
   })
 

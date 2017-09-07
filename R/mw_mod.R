@@ -1,4 +1,21 @@
-# Constructor for mwMod class
+# Generics
+
+#' Method for mwMod prediction
+#'
+#' @param obj Object of class mwMod.
+#' @param newdata Data frame with new data for prediction.
+#' @param type Site
+#' @param perturb Perturbation vector for sensitivity analysis.
+#'
+#' @export
+predict <- function(obj, newdata, type, perturb) UseMethod("predict")
+
+#' Constructor for mwMod class
+#'
+#' @param x Argument list
+#'
+#' @return Object of class mwMod
+#' @export
 mwMod <- function(x) {
   if (all(names(x) != "mdl")) {
     stop("You must specify a model (mdl) for class mwMod.")
@@ -13,7 +30,14 @@ mwMod <- function(x) {
   structure(x, class = "mwMod")
 }
 
-# Method for mwMod prediction
+#' Method for mwMod prediction
+#'
+#' @param obj Object of class mwMod.
+#' @param newdata Data frame with new data for prediction.
+#' @param type Site
+#' @param perturb Perturbation vector for sensitivity analysis.
+#'
+#' @export
 predict.mwMod <- function(obj, newdata, type="Bertha", perturb=rep(0,4)) {
   pars <- obj$pars$unscaled
   linpart <- (pars[type,"(Intercept)"]+perturb[1]) + (pars[type,obj$vars[1]]+perturb[2])*newdata[[obj$vars[1]]] + (pars[type,obj$vars[2]]+perturb[3])*newdata[[obj$vars[2]]] + (pars[type,paste0(obj$vars[1],":",obj$vars[2])]+perturb[4])*newdata[[obj$vars[1]]]*newdata[[obj$vars[2]]]
