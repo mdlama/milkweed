@@ -8,7 +8,7 @@
 #' @param perturb Perturbation vector for sensitivity analysis.
 #'
 #' @export
-predict <- function(obj, newdata, type, perturb) UseMethod("predict")
+# predict <- function(obj, newdata, type, perturb) UseMethod("predict")
 
 #' Constructor for mwMod class
 #'

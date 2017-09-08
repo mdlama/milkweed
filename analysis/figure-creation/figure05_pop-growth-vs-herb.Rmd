@@ -9,21 +9,28 @@ output:
 # Initialization
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-source("../../../.Rprofile")
+library(milkweed)
+library(dplyr)
+library(ggplot2)
+requirePackages("doParallel")
+library(doParallel) # Normally, I don't load suggested packages, but this one requires and loads parallel, foreach, and iterators,
+                    #   so, you know, it's easier this way.
+'%<>%' <- magrittr::'%<>%'
 ipm <- mwIPM()
+mwCache <- getOption("milkweed.cache")
 ```
 
 # Get curves
 
 ```{r}
 sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
-minind <- max(which(ipm$vars$log_herb_avg$x < -3.5))
-maxind <- max(which(ipm$vars$log_herb_avg$x < -0.5))+1
-plotdata <- data.frame(log_herb_avg = ipm$vars$log_herb_avg$x[minind:maxind],
+minind <- max(which(ipm$vars$herb_avg$x < 0.1))
+maxind <- max(which(ipm$vars$herb_avg$x < 2.0))+1
+plotdata <- data.frame(herb_avg = ipm$vars$herb_avg$x[minind:maxind],
                        growth_rate = sapply(minind:maxind, 
                                             function (x) { 
                                               ipm %>% 
-                                                setHerbivoryMatrix(dist.herb = c(rep(0,x-1), 1/ipm$vars$log_herb_avg$dx, rep(0,ipm$N-x))) %>% 
+                                                setHerbivoryMatrix(dist.herb = c(rep(0,x-1), 1/ipm$vars$herb_avg$dx, rep(0,ipm$N-x))) %>% 
                                                 analyzeGrowthRate()
                                             }),
                        disttype = "pointmass")
@@ -35,9 +42,9 @@ sitedata <- bind_cols(tbl_df(t(sapply(ipm$pars$munched.fit[2:6], function (x) {c
 myline <- lm(sdlog ~ meanlog, data = sitedata)
 
 munched <- ipm$pars$munched.fit[["Bertha"]]$predict
-b <- ipm$vars$log_herb_avg$b
-lx <- ipm$vars$log_herb_avg$x
-dx <- ipm$vars$log_herb_avg$dx
+b <- ipm$vars$herb_avg$b
+lx <- ipm$vars$herb_avg$x
+dx <- ipm$vars$herb_avg$dx
 pmunch <- ipm$pars$munched.fit[["Bertha"]]$pmunch
 pmunchFit <- lm(pmunch ~ meanlog, data = sitedata)
 myfunc <- function(x, mu) {
@@ -51,10 +58,10 @@ myfunc <- function(x, mu) {
 }
 
 plotdata <- bind_rows(plotdata,
-                      data.frame(log_herb_avg = ipm$vars$log_herb_avg$x[minind:maxind],
-                                 growth_rate = sapply(ipm$vars$log_herb_avg$x[minind:maxind],
+                      data.frame(herb_avg = ipm$vars$herb_avg$x[minind:maxind],
+                                 growth_rate = sapply(ipm$vars$herb_avg$x[minind:maxind],
                                                       function (x) {
-                                                        meanlog <- uniroot(myfunc, c(log(0.01), log(6.01)), mu = x)$root
+                                                        meanlog <- uniroot(myfunc, c(log(0.001), log(6.001)), mu = x)$root
                                                         pmunch <- predict(pmunchFit, data.frame(meanlog = meanlog))
                                                         ipm %>%
                                                           setHerbivoryMatrix(dist.herb = munched(b,
@@ -74,12 +81,12 @@ Bootstrap the data to get 95% confidence ellipses for average herbivory and lamb
 compute <- FALSE
 parallel <- TRUE
 
-if (!file.exists(mwROOT("data","calculated","figure5a.RData")) | (compute)) {
+if (!file.exists(file.path(mwCache,"figure5a.RData")) | (compute)) {
   coreProcess <- function(ipm, sites) {
     ipm %<>% bootIPM()
     thisone <- ipm$data %>% 
       group_by(site) %>% 
-      summarize(log_herb_avg = mean(log_herb_avg, na.rm=T), 
+      summarize(herb_avg = mean(herb_avg, na.rm=T), 
                 growth_rate = NA,
                 disttype = "lnorm")
     thisone$growth_rate <- sapply(sites[-1], function (x) {ipm %>% setSite(x) %>% analyzeGrowthRate()})
@@ -90,16 +97,18 @@ if (!file.exists(mwROOT("data","calculated","figure5a.RData")) | (compute)) {
     numcl <- detectCores()-1
     registerDoParallel(cores = numcl)
     results <- tbl_df(foreach(i=1:20, .combine=bind_rows) %dopar% {
-      source("../../../.Rprofile")
+      library(milkweed)
+      library(dplyr)
+      library(ggplot2)
       coreProcess(ipm, sites)
     })
   } else {
     results <- do.call(rbind, lapply(1:20, function (x) {coreProcess(ipm, sites)}))
   }
   
-  save(plotdata, results, file=mwROOT("data","calculated","figure5a.RData"))
+  save(plotdata, results, file=file.path(mwCache,"figure5a.RData"))
 } else {
-  load(mwROOT("data","calculated","figure5a.RData"))
+  load(file.path(mwCache,"figure5a.RData"))
 }
 ```
 
@@ -126,7 +135,9 @@ if (!file.exists(mwROOT("data","calculated","figure5b.RData")) | (compute)) {
     numcl <- detectCores()-1
     registerDoParallel(cores = numcl)
     results <- tbl_df(foreach(i=1:20, .combine=bind_rows) %dopar% {
-      source("../../../.Rprofile")
+      library(milkweed)
+      library(dplyr)
+      library(ggplot2)
       coreProcess(ipm, sites)
     })
   } else {
@@ -144,7 +155,7 @@ if (!file.exists(mwROOT("data","calculated","figure5b.RData")) | (compute)) {
 Render and plot the figure.
 ```{r}
 # Bertha growth rate vs point-mass herbivory scores
-p <- plotdata %>% ggplot(aes(x = log_herb_avg,
+p <- plotdata %>% ggplot(aes(x = herb_avg,
                              y = growth_rate,
                              linetype = disttype)) +
                   geom_line() + 
@@ -152,13 +163,13 @@ p <- plotdata %>% ggplot(aes(x = log_herb_avg,
                              linetype = 3)
 
 # Site-specific bootstrapped data points with 95% confidence ellipse
-p <- p + geom_point(aes(x = log_herb_avg, 
+p <- p + geom_point(aes(x = herb_avg, 
                         y = growth_rate, 
                         color = site,
                         linetype = NA), 
                     size = 0.5,
                     data=results) + 
-         stat_ellipse(aes(x = log_herb_avg, 
+         stat_ellipse(aes(x = herb_avg, 
                           y = growth_rate, 
                           color = site,
                           linetype = NA), 
@@ -166,9 +177,9 @@ p <- p + geom_point(aes(x = log_herb_avg,
 
 # Change theme, scale, and labels
 p <- p + theme_bw() +
-         scale_x_continuous(limits = c(-3.5, 0.0)) + 
+         scale_x_continuous(limits = c(0.0, 2.0)) + 
          scale_y_continuous(limits = c(0.0, 1.7)) + 
-         xlab("ln(Herbivory severity)") +
+         xlab("Herbivory severity") +
          ylab(expression(paste("Population growth rate(", lambda, ")"))) + 
          labs(color = "Sites") + 
          theme(legend.background = element_rect(fill="lightgrey",
@@ -186,28 +197,28 @@ p
 plotdata %>% filter(disttype == "lnorm") -> plotdata2
 
 # Bertha growth rate vs point-mass herbivory scores
-p <- plotdata2 %>% ggplot(aes(x = log_herb_avg,
+p <- plotdata2 %>% ggplot(aes(x = herb_avg,
                              y = growth_rate)) +
                   geom_line() + 
                   geom_hline(aes(yintercept = 1.0), 
                              linetype = 3)
 
 # Site-specific bootstrapped data points with 95% confidence ellipse
-p <- p + geom_point(aes(x = log_herb_avg, 
+p <- p + geom_point(aes(x = herb_avg, 
                         y = growth_rate, 
                         color = site), 
                     size = 0.5,
                     data=results) + 
-         stat_ellipse(aes(x = log_herb_avg, 
+         stat_ellipse(aes(x = herb_avg, 
                           y = growth_rate, 
                           color = site), 
                       data = results)
 
 # Change theme, scale, and labels
 p <- p + theme_bw() +
-         scale_x_continuous(limits = c(-3.5, 0.0)) + 
-         scale_y_continuous(limits = c(0.0, 1.7)) + 
-         xlab("ln(Herbivory severity)") +
+         scale_x_continuous(limits = c(0.0, 1.5)) + 
+         scale_y_continuous(limits = c(0.5, 1.7)) + 
+         xlab("Herbivory severity") +
          ylab(expression(paste("Population growth rate (", lambda, ")"))) + 
          labs(color = "Sites") + 
          theme(legend.background = element_rect(fill="lightgrey",

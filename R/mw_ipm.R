@@ -29,7 +29,21 @@ setFloweringMatrix <- function(obj, update, perturb) UseMethod("setFloweringMatr
 setSurvivalMatrix <- function(obj, update, perturb) UseMethod("setSurvivalMatrix")
 setPodsMatrix <- function(obj, update, perturb) UseMethod("setPodsMatrix")
 setGrowthMatrix <- function(obj, update, perturb) UseMethod("setGrowthMatrix")
+
+#' Create herbivory matrix.
+#'
+#' @param obj A mwIPM model object.
+#' @param dist.herb Herbivory distribution.
+#' @param update Update dependencies?
+#' @param perturb Parameter perturbation vector for sensitivity analysis.
+#' @param distpars Determines in which scale (log or linear) perturbation is occurring.
+#'
+#' @return A mwIPM model object.
+#' @export
+#'
+#' @importFrom magrittr %<>%
 setHerbivoryMatrix <- function(obj, dist.herb, update, perturb, distpars) UseMethod("setHerbivoryMatrix")
+
 setSeedlingRecruitmentMatrix <- function(obj, update, perturb) UseMethod("setSeedlingRecruitmentMatrix")
 
 # Compute kernels from matrices
@@ -39,7 +53,32 @@ computeFullKernel <- function(obj) UseMethod("computeFullKernel")
 
 # Setup or compute MPM/IPM
 computeMPM <- function(obj) UseMethod("computeMPM")
+
+#' Set site and recompute kernel.
+#'
+#' @param obj A mwIPM model object.
+#' @param site Site ("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
+#' @param compute Recompute or load from cache?
+#'
+#' @return A mwIPM model object.
+#' @export
+#'
+#' @importFrom magrittr %>% %<>%
+#' @examples
+#' ipm %<>% setSite("BLD1")
 setSite <- function(obj, site, compute) UseMethod("setSite")
+
+#' Bootstraps over the stems.
+#'
+#' @param obj A mwIPM model object.
+#'
+#' @return A mwIPM model object.
+#' @export
+#' @import dplyr
+#' @importFrom magrittr %>% %<>%
+#'
+#' @examples
+#' ipm %<>% bootIPM()
 bootIPM <- function(obj) UseMethod("bootIPM")
 
 # Analyses
@@ -98,8 +137,8 @@ renderHerbivoryDistFit <- function(obj) UseMethod("renderHerbivoryDistFit")
 # Helpers & Globals
 
 glmerCtrl <- lme4::glmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
-# mwCache <- getOptions("milkweed.cache") # Won't work until library() works
 mwCache <- file.path(rappdirs::app_dir("Milkweed", "LaMar")$data(), "calculated")
+options(milkweed.cache = mwCache) # Store this for outside use in vignettes
 
 # Keeping these commented here as a record
 # ParsToMoms <- function(x)
@@ -921,6 +960,9 @@ setBudlingsPerStemFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALS
     }
     cat("done!\n")
 
+    # Add data, as nls doesn't store the data
+    mdl$merged <- merged
+
     budlings.per.stem.fit <- vector("list", 3)
     budlings.per.stem.fit[[1]] <- mdl
     budlings.per.stem.fit[[2]] <- merged$site
@@ -1076,6 +1118,7 @@ setPodsMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
 #' @param distpars Determines in which scale (log or linear) perturbation is occurring.
 #'
 #' @return A mwIPM model object.
+#' @export
 #'
 #' @importFrom magrittr %<>%
 setHerbivoryMatrix.mwIPM <- function(obj, dist.herb = NA, update = TRUE, perturb = rep(0,3), distpars = FALSE) {
