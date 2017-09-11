@@ -9,7 +9,10 @@ output:
 # Initialization
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-source("../../../.Rprofile")
+library(milkweed)
+library(dplyr)
+library(ggplot2)
+requirePackages("scales", "gridExtra")
 ipm <- mwIPM()
 ```
 
@@ -19,7 +22,7 @@ ipm <- mwIPM()
 
 ```{r, warning=FALSE}
 N <- 1000
-bx <- seq(from = log(ipm$nudge), to = log(6+ipm$nudge), length.out = N+1)
+bx <- seq(from = 0, to = 6, length.out = N+1)
 x <- 0.5*(bx[1:N] + bx[2:(N+1)])
 
 site_ind <- c('BLD1','BLD2','PWR','SKY','YTB','Bertha')
@@ -45,12 +48,12 @@ plot_herb <- plotdata %>% ggplot(aes(x = x, y = y, fill = site, colour = site)) 
   geom_area(position = "identity", alpha = 0.3)
 
 plot_herb <- plot_herb + theme_bw() +
-  xlab("ln(Herbivory severity)") +
+  xlab("Herbivory severity") +
   ylab("Probability Density") +
-  scale_x_continuous(limits = c(-4.0, log(6+ipm$nudge))) + 
-  scale_y_continuous(limits = c(0, 0.4)) +
-  scale_fill_manual(values = c(hue_pal()(5), NA)) + 
-  scale_color_manual(values = c(hue_pal()(5), "black")) +
+  scale_x_continuous(limits = c(0, 6)) + 
+  # scale_y_continuous(limits = c(0, 0.4)) +
+  scale_fill_manual(values = c(scales::hue_pal()(5), NA)) + 
+  scale_color_manual(values = c(scales::hue_pal()(5), "black")) +
   labs(colour="Sites", fill="Sites") +
   theme(legend.background = element_rect(fill="lightgrey",
                                          size=0.1,
@@ -113,8 +116,8 @@ plot_recr <- plot_recr + theme_bw() +
   xlab("Height (cm)") +
   ylab("Probability Density") +
   scale_x_continuous(limits = c(0, 160)) +
-  scale_fill_manual(values = c(hue_pal()(5), NA, NA)) + 
-  scale_color_manual(values = c(hue_pal()(5), "black", "black")) + 
+  scale_fill_manual(values = c(scales::hue_pal()(5), NA, NA)) + 
+  scale_color_manual(values = c(scales::hue_pal()(5), "black", "black")) + 
   scale_linetype_manual(values = c(1,1,1,1,1,1,2)) +
   labs(colour="Sites", fill="Sites", linetype="Sites") +
   theme(legend.background = element_rect(fill="lightgrey",
@@ -132,6 +135,6 @@ plot_recr
 # Render and save final plot
 
 ```{r, fig.width=12, fig.height=4}
-pall <- grid.arrange(plot_herb, plot_recr, ncol=2)
+pall <- gridExtra::grid.arrange(plot_herb, plot_recr, ncol=2)
 ggsave("AppendixFigure2_RecruitAndHerbDist.png", height=4, width=12, device = "png", pall)
 ```
