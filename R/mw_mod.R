@@ -1,15 +1,5 @@
 # Generics
 
-#' Method for mwMod prediction
-#'
-#' @param obj Object of class mwMod.
-#' @param newdata Data frame with new data for prediction.
-#' @param type Site
-#' @param perturb Perturbation vector for sensitivity analysis.
-#'
-#' @export
-# predict <- function(obj, newdata, type, perturb) UseMethod("predict")
-
 #' Constructor for mwMod class
 #'
 #' @param x Argument list
