@@ -39,11 +39,12 @@ predict.mwMod <- function(obj, newdata, type="Bertha", perturb=rep(0,4)) {
 }
 
 calcPars <- function(mdl, scaled, vars) {
+  num_sites <- length(c("Bertha", levels(stemdata$site)))
   growth <- (class(mdl) == "lmerMod")
   pars <- list(scaled=NA, unscaled=NA)
-  pars$scaled <- matrix(rep(0,6*4), byrow=TRUE, nrow=6)
+  pars$scaled <- matrix(rep(0,num_sites*4), byrow=TRUE, nrow=num_sites)
   colnames(pars$scaled) <- c("(Intercept)", vars[1], vars[2], paste0(vars[1], ":", vars[2]))
-  rownames(pars$scaled) <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
+  rownames(pars$scaled) <- c("Bertha", levels(stemdata$site))
 
   # Assign values for Bertha
   assignme <- rownames(coef(summary(mdl)))
@@ -54,7 +55,7 @@ calcPars <- function(mdl, scaled, vars) {
   # Assign values for sites
   for (i in 1:ncol(coef(mdl)$site)) {
     varexp <- colnames(coef(mdl)$site)[i]
-    pars$scaled[2:6,varexp] <- coef(mdl)$site[,varexp]
+    pars$scaled[2:num_sites,varexp] <- coef(mdl)$site[,varexp]
   }
 
   mur <- 0
@@ -63,10 +64,10 @@ calcPars <- function(mdl, scaled, vars) {
     mur <- attributes(scaled$h_apical.next)$'scaled:center'
     sdr <- attributes(scaled$h_apical.next)$'scaled:scale'
 
-    pars$sd <- rep(0,6)
-    names(pars$sd) <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
+    pars$sd <- rep(0,num_sites)
+    names(pars$sd) <- rownames(pars$scaled)
     pars$sd['Bertha'] <- sdr*sd(mdl@frame$h_apical.next - predict(mdl, type="response", re.form=NA))
-    pars$sd[2:6] <- sdr*sd(mdl@frame$h_apical.next - predict(mdl, type="response", re.form=~(h_apical|site)))
+    pars$sd[2:num_sites] <- sdr*sd(mdl@frame$h_apical.next - predict(mdl, type="response", re.form=~(h_apical|site)))
   }
   mux <- c(0,0)
   sdx <- c(0,0)
@@ -81,7 +82,7 @@ calcPars <- function(mdl, scaled, vars) {
           c(0,         1,         0,     -1*mux[2]),
           c(0,         0,         1,     -1*mux[1]),
           c(0,         0,         0,            1)) +
-    cbind(rep(mur, 6), matrix(rep(0, 18), nrow=6))
+    cbind(rep(mur, num_sites), matrix(rep(0, 3*num_sites), nrow=num_sites))
   colnames(pars$unscaled) <- c("(Intercept)", vars[1], vars[2], paste0(vars[1], ":", vars[2]))
 
   calcPars <- pars
@@ -121,7 +122,7 @@ checkPars <- function(obj) {
   # Reformulate with ~
   re.form <- reformulate(paste0("(", terms[I], ")"))
   fitresp <- mur + sdr*predict(obj$mdl, type="response", re.form=re.form)
-  E <- rep(0, 5)
+  E <- rep(0, length(sites)-1)
   for (i in 1:length(sites)) {
     isite <- sites[i]
     I <- which(obj$mdl@frame$site == isite)

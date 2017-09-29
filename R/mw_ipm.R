@@ -57,7 +57,7 @@ computeMPM <- function(obj) UseMethod("computeMPM")
 #' Set site and recompute kernel.
 #'
 #' @param obj A mwIPM model object.
-#' @param site Site ("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
+#' @param site Site ("Bertha", "BLD1", "BLD2", "GET", "GRN", "PWR", "SKY", "YTB")
 #' @param compute Recompute or load from cache?
 #'
 #' @return A mwIPM model object.
@@ -159,22 +159,18 @@ options(milkweed.cache = mwCache) # Store this for outside use in vignettes
 #' @examples
 #' ipm <- mwIPM()
 mwIPM <- function(x = list()) {
-  #
-  # Specify min and max of variables in list form.
-  # Note:  Had to move this AFTER bootIPM or it would'nt load - ?????
-  #
-
+  x$all_sites = c("Bertha", levels(stemdata$site))
   if (all(names(x) != "N")) {
     x$N = 50
   }
   if (all(names(x) != "data")) {
-    x$data <- stemdata %>% filter(site != "GRN")  # Only use GRN for budlings-per-stem
+    x$data <- stemdata %>% filter(site %in% x$all_sites)
   }
   if (all(names(x) != "site")) {
     site = "Bertha"
     x$site <- NA
-  } else if (!(site %in% c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB"))) {
-    stop(paste(site, "is not a valid site!  Please choose one of Bertha, BLD1, BLD2, PWR, SKY, or YTB."))
+  } else if (!(x$site %in% x$all_sites)) {
+    stop(paste(x$site, "is not a valid site!  Please choose one of ", paste0(toString(x$all_sites), ".")))
   }
   if (all(names(x) != "compute")) {
     compute = FALSE
@@ -420,9 +416,8 @@ setSeedsPerPodConst.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE,
 #' @import dplyr
 setSeedlingEmergenceConst.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
   if (!file.exists(file.path(mwCache,"seedlingEmergenceConst.RData")) | (compute)) {
-    sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
-    seedling.emergence <- rep(NA, 6)
-    names(seedling.emergence) <- sites
+    seedling.emergence <- rep(NA, length(obj$all_sites))
+    names(seedling.emergence) <- obj$all_sites
 
     # Need seeds per pod, so compute if needed
     if (is.na(obj$pars$seeds.per.pod)) {
@@ -439,7 +434,7 @@ setSeedlingEmergenceConst.mwIPM <- function(obj, compute = FALSE, saveresults = 
 
     seedling.emergence[1] <- mean(data_gp$N_seedlings[2:3]/data_gp$N_seeds[1:2])
 
-    # Sites
+    # Sites - really need to map this one
     data_gp <- obj$data %>% group_by(year, site) %>%
                             summarize(N_seedlings = sum(seedling, na.rm=T),
                                       N_seeds = seeds.per.pod*sum(N_pods, na.rm=T))
@@ -452,9 +447,17 @@ setSeedlingEmergenceConst.mwIPM <- function(obj, compute = FALSE, saveresults = 
                              group_by(site) %>%
                              summarize(emergence = last(N_seedlings)/first(N_seeds))
 
-    fulldat <- bind_rows(data13_14, data14_15)
+    data15_16 <- data_gp %>% filter(year %in% 2015:2016) %>%
+      group_by(site) %>%
+      summarize(emergence = last(N_seedlings)/first(N_seeds))
 
-    seedling.emergence[2:6] <- (fulldat %>% group_by(site) %>% summarize(emergence = mean(emergence)))$emergence
+    data16_17 <- data_gp %>% filter(year %in% 2016:2017) %>%
+      group_by(site) %>%
+      summarize(emergence = last(N_seedlings)/first(N_seeds))
+
+    fulldat <- bind_rows(data13_14, data14_15, data15_16, data16_17)
+
+    seedling.emergence[2:length(obj$all_sites)] <- (fulldat %>% group_by(site) %>% summarize(emergence = mean(emergence)))$emergence
     cat("done!\n")
 
     if (saveresults) {
@@ -740,7 +743,7 @@ setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, 
 #' @import dplyr
 setBudlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
   if (!file.exists(file.path(mwCache,"budlingDistFit.RData")) | (compute)) {
-    sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
+    sites <- obj$all_sites
     mdls <- c("norm", "norm", "norm", "norm", "weibull", "weibull")
     budling.fit <- vector('list', 6)
     names(budling.fit) <- sites
@@ -812,12 +815,15 @@ setBudlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, u
 #' @import dplyr
 setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
   if (!file.exists(file.path(mwCache,"herbivoryDistFit.RData")) | (compute)) {
-    sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
-    mdls <- c("lnorm", "lnorm", "lnorm", "lnorm", "lnorm", "lnorm")
-    munched.fit <- vector('list', 6)
-    names(munched.fit) <- sites
+    num_sites <- length(obj$all_sites)
 
-    for (i in 1:6) {
+    mdls <- rep("lnorm", length(obj$all_sites)) # Default - change after model selection
+    names(mdls) <- obj$all_sites
+
+    munched.fit <- vector('list', num_sites)
+    names(munched.fit) <- obj$all_sites
+
+    for (i in 1:num_sites) {
       if (i == 1) { # Bertha
         thissite <- obj$data %>% filter(!is.na(h_apical),
                                         !is.na(munched))
@@ -836,7 +842,7 @@ setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE,
       pmunch <- sum(thissite$munched == 1)/nrow(thissite)
       herb_avg <- (thissite %>% filter(munched == 1))$herb_avg
 
-      cat("Computing herbivory distribution fit for", sites[i], "...")
+      cat("Computing herbivory distribution fit for", x$all_sites[i], "...")
       f0 <- fitdistrplus::fitdist(herb_avg, mdls[i])
       cat("done!\n")
 
@@ -1275,7 +1281,7 @@ computeFullKernel.mwIPM <- function(obj) {
 #' Set site and recompute kernel.
 #'
 #' @param obj A mwIPM model object.
-#' @param site Site ("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
+#' @param site Site ("Bertha", "BLD1", "BLD2", "GET", "GRN", "PWR", "SKY", "YTB")
 #' @param compute Recompute or load from cache?
 #'
 #' @return A mwIPM model object.
@@ -1286,7 +1292,7 @@ computeFullKernel.mwIPM <- function(obj) {
 #' ipm %<>% setSite("BLD1")
 setSite.mwIPM <- function(obj, site = "Bertha", compute = FALSE) {
   if ((compute) | is.na(obj$site) | (site != obj$site)) {
-    if (site %in% c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")) {
+    if (site %in% obj$all_sites) {
       obj$site <- site
 
       obj <- obj %>% setVars()
@@ -1306,7 +1312,7 @@ setSite.mwIPM <- function(obj, site = "Bertha", compute = FALSE) {
 
       obj %<>% computeMPM()
     } else {
-      stop(paste(site, "is not a valid site!  Please choose one of Bertha, BLD1, BLD2, PWR, SKY, or YTB."))
+      stop(paste0(site, " is not a valid site!  Please choose one of ", toString(obj$all_sites), "."))
     }
   } else {
     warning(paste(site, "is already the current site."))
