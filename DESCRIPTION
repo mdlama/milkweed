@@ -28,5 +28,6 @@ Suggests: RColorBrewer (>= 1.1.2),
     grid (>= 3.4.1),
     gridExtra (>= 2.2.1),
     latex2exp (>= 0.4.0),
-    doParallel (>= 1.0.10)
+    doParallel (>= 1.0.10),
+    DHARMa (>= 0.1.5)
 RoxygenNote: 6.0.1

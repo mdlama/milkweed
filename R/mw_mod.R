@@ -38,6 +38,13 @@ predict.mwMod <- function(obj, newdata, type="Bertha", perturb=rep(0,4)) {
   }
 }
 
+#' Store scaled and calculate unscaled parameters for models.
+#'
+#' @param mdl Model
+#' @param scaled List of scaled variables (output of `scale` command)
+#' @param vars Vector of names for scaled variables
+#'
+#' @return List of scaled and unscaled parameters.
 calcPars <- function(mdl, scaled, vars) {
   num_sites <- length(c("Bertha", levels(stemdata$site)))
   growth <- (class(mdl) == "lmerMod")
@@ -85,9 +92,15 @@ calcPars <- function(mdl, scaled, vars) {
     cbind(rep(mur, num_sites), matrix(rep(0, 3*num_sites), nrow=num_sites))
   colnames(pars$unscaled) <- c("(Intercept)", vars[1], vars[2], paste0(vars[1], ":", vars[2]))
 
-  calcPars <- pars
+  return(pars)
 }
 
+#' Check to make sure parameter unscaling worked after call to
+#' \code{\link{calcPars}} function.
+#'
+#' @param obj mwMod model object
+#'
+#' @export
 checkPars <- function(obj) {
   growth <- (class(obj$mdl) == "lmerMod")
   mux <- c(0,0)

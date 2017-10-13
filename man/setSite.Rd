@@ -9,7 +9,7 @@ setSite(obj, site, compute)
 \arguments{
 \item{obj}{A mwIPM model object.}
 
-\item{site}{Site ("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")}
+\item{site}{Site ("Bertha", "BLD1", "BLD2", "GET", "GRN", "PWR", "SKY", "YTB")}
 
 \item{compute}{Recompute or load from cache?}
 }

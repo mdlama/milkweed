@@ -7,7 +7,10 @@ output:
 ---
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-source("../../../.Rprofile")
+library(milkweed)
+library(dplyr)
+library(ggplot2)
+requirePackages(c("grid", "gridExtra"))
 ipm <- mwIPM()
 ```
 
@@ -16,7 +19,7 @@ ipm <- mwIPM()
 # For growth, sdr = attr(scaled$h_apical.next, 'scaled:scale'), else, = 1
 # Let mua = attr(scaled$h_apical, 'scaled:center'), 
 #     sda = attr(scaled$h_apical, 'scaled:scale'),
-#     sdh = attr(scaled$log_herb_avg, 'scaled:scale')
+#     sdh = attr(scaled$herb_avg, 'scaled:scale')
 # Then, seh_unscaled = seh_scaled*sdr/sdh - sea_scaled*sdr*mua/(sda*sdh).
 # Note that sea_scaled is zero when there is no interaction term.
 
@@ -30,21 +33,21 @@ mydata <- tbl_df(data.frame())
 
 ```{r}
 attach(ipm$pars)
-re <- ranef(surv.fit$mdl, condVar = TRUE, whichel = "site")[[1]]
+re <- lme4::ranef(surv.fit$mdl, condVar = TRUE, whichel = "site")[[1]]
 pv <- attr(re, "postVar")
 se <- sqrt(pv[2,2,])
 
 sdr <- 1
 mua <- attr(surv.fit$scaled$h_apical, "scaled:center")
 sda <- attr(surv.fit$scaled$h_apical, "scaled:scale")
-sdh <- attr(surv.fit$scaled$log_herb_avg, "scaled:scale")
+sdh <- attr(surv.fit$scaled$herb_avg, "scaled:scale")
 ci <- 1.96*se*sdr/sdh
 
 cis <- NA # No fixed herbivory effect
 
 mydata <- bind_rows(mydata, data.frame(rate = "Survival Probability",
                                        site = sitenames, 
-                                       slope = surv.fit$pars$unscaled[-1,"log_herb_avg"],
+                                       slope = surv.fit$pars$unscaled[-1,"herb_avg"],
                                        ci = ci))
 detach(ipm$pars)
 ```
@@ -56,23 +59,23 @@ attach(ipm$pars)
 
 h_apical <- ipm$data %>% 
   filter(!is.na(h_apical),
-         !is.na(log_herb_avg),
+         !is.na(herb_avg),
          !is.na(fec.flower)) %$%
   h_apical
 
-qfadj <- flower.fit$pars$unscaled["Bertha", "h_apical:log_herb_avg"]*quantile(h_apical, probs = c(0.05, 0.5, 0.95))
+qfadj <- flower.fit$pars$unscaled["Bertha", "h_apical:herb_avg"]*quantile(h_apical, probs = c(0.05, 0.5, 0.95))
 
 sdr <- 1
 mua <- attr(flower.fit$scaled$h_apical, "scaled:center")
 sda <- attr(flower.fit$scaled$h_apical, "scaled:scale")
-sdh <- attr(flower.fit$scaled$log_herb_avg, "scaled:scale")
+sdh <- attr(flower.fit$scaled$herb_avg, "scaled:scale")
 
-sei <- summary(flower.fit$mdl)$coefficients["h_apical:log_herb_avg", "Std. Error"]
+sei <- summary(flower.fit$mdl)$coefficients["h_apical:herb_avg", "Std. Error"]
 cif <- 1.96*sei*mua/(sda*sdh)
 
 mydata <- bind_rows(mydata, data.frame(rate = "Flowering Probability",
                                        site = sitenames,
-                                       slope = flower.fit$pars$unscaled[-1,"log_herb_avg"] + qfadj[2],
+                                       slope = flower.fit$pars$unscaled[-1,"herb_avg"] + qfadj[2],
                                        ci = rep(NA, 5)))
 detach(ipm$pars)
 ```
@@ -88,24 +91,24 @@ h_apical <- ipm$data %>%
          surv == 1) %$%
   h_apical
 
-qgadj <- growth.fit$pars$unscaled["Bertha", "h_apical:log_herb_avg"]*quantile(h_apical, probs = c(0.05, 0.5, 0.95))
+qgadj <- growth.fit$pars$unscaled["Bertha", "h_apical:herb_avg"]*quantile(h_apical, probs = c(0.05, 0.5, 0.95))
 
-re <- ranef(growth.fit$mdl, condVar = TRUE, whichel = "site")[[1]]
+re <- lme4::ranef(growth.fit$mdl, condVar = TRUE, whichel = "site")[[1]]
 pv <- attr(re, "postVar")
 se <- sqrt(pv[3,3,])
 
 sdr <- attr(growth.fit$scaled$h_apical.next, "scaled:scale")
 mua <- attr(growth.fit$scaled$h_apical, "scaled:center")
 sda <- attr(growth.fit$scaled$h_apical, "scaled:scale")
-sdh <- attr(growth.fit$scaled$log_herb_avg, "scaled:scale")
+sdh <- attr(growth.fit$scaled$herb_avg, "scaled:scale")
 ci <- 1.96*se*sdr/sdh
 
-sei <- summary(growth.fit$mdl)$coefficients["h_apical:log_herb_avg", "Std. Error"]
+sei <- summary(growth.fit$mdl)$coefficients["h_apical:herb_avg", "Std. Error"]
 cig <- 1.96*sei*mua*sdr/(sda*sdh)
 
 mydata <- bind_rows(mydata, data.frame(rate = "Growth",
                                        site = sitenames, 
-                                       slope = growth.fit$pars$unscaled[-1,"log_herb_avg"] + qgadj[2],
+                                       slope = growth.fit$pars$unscaled[-1,"herb_avg"] + qgadj[2],
                                        ci = ci))
 detach(ipm$pars)
 ```
@@ -113,22 +116,22 @@ detach(ipm$pars)
 ## Pods
 ```{r}
 attach(ipm$pars)
-re <- ranef(pods.fit$mdl, condVar = TRUE, whichel = "site")[[1]]
+re <- lme4::ranef(pods.fit$mdl, condVar = TRUE, whichel = "site")[[1]]
 pv <- attr(re, "postVar")
 se <- sqrt(pv[3,3,])
 
 sdr <- 1
 mua <- attr(pods.fit$scaled$h_apical.next, "scaled:center")
 sda <- attr(pods.fit$scaled$h_apical.next, "scaled:scale")
-sdh <- attr(pods.fit$scaled$log_herb_avg, "scaled:scale")
+sdh <- attr(pods.fit$scaled$herb_avg, "scaled:scale")
 ci <- 1.96*se*sdr/sdh
 
-sei <- summary(pods.fit$mdl)$coefficients["log_herb_avg", "Std. Error"]
+sei <- summary(pods.fit$mdl)$coefficients["herb_avg", "Std. Error"]
 cip <- 1.96*sei/sdh
 
 mydata <- bind_rows(mydata, data.frame(rate = "Pod Production",
                                        site = sitenames, 
-                                       slope = pods.fit$pars$unscaled[-1,"log_herb_avg"],
+                                       slope = pods.fit$pars$unscaled[-1,"herb_avg"],
                                        ci = ci))
 detach(ipm$pars)
 ```
@@ -140,10 +143,10 @@ rdata <- data.frame(rate = c("Survival Probability",
                              "Flowering Probability",
                              "Growth",
                              "Pod Production"),
-                    rslope = c(surv.fit$pars$unscaled["Bertha", "log_herb_avg"],
-                               flower.fit$pars$unscaled["Bertha", "log_herb_avg"]+qfadj[2],
-                               growth.fit$pars$unscaled["Bertha", "log_herb_avg"]+qgadj[2],
-                               pods.fit$pars$unscaled["Bertha", "log_herb_avg"]))
+                    rslope = c(surv.fit$pars$unscaled["Bertha", "herb_avg"],
+                               flower.fit$pars$unscaled["Bertha", "herb_avg"]+qfadj[2],
+                               growth.fit$pars$unscaled["Bertha", "herb_avg"]+qgadj[2],
+                               pods.fit$pars$unscaled["Bertha", "herb_avg"]))
 
 # Fixed effect transparent bars
 fdata <- data.frame(rate = c("Survival Probability",
@@ -295,8 +298,8 @@ pp
 
 ## All together now
 ```{r}
-pall <- grid.arrange(pf, pg, pp, ps, 
+pall <- gridExtra::grid.arrange(pf, pg, pp, ps, 
                      left="Site", 
-                     bottom=textGrob(TeX('$\\beta_{z_{\\omega}}$')))
+                     bottom=grid::textGrob(TeX('$\\beta_{z_{\\omega}}$')))
 ggsave("Figure3_HerbSlopePars.png", width=6, device = "png", pall)
 ```

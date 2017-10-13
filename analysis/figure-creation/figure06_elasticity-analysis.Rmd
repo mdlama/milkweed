@@ -9,8 +9,16 @@ output:
 # Initialization
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-source("../../../.Rprofile")
+library(milkweed)
+library(dplyr)
+library(ggplot2)
+requirePackages(c("doParallel", "latex2exp"))
+library(doParallel) # Normally, I don't load suggested packages, but this one requires and loads parallel, foreach, and iterators,
+                    #   so, you know, it's easier this way.
+'%<>%' <- magrittr::'%<>%'
+TeX <- latex2exp::TeX
 ipm <- mwIPM()
+mwCache <- getOption("milkweed.cache")
 ```
 
 # Analysis
@@ -19,19 +27,21 @@ ipm <- mwIPM()
 ```{r}
 compute <- FALSE
 
-if (!file.exists(mwROOT("data","calculated","figure6.RData")) | (compute)) {
+if (!file.exists(file.path(mwCache,"figure6.RData")) | (compute)) {
   numcl <- detectCores()-1
   registerDoParallel(cores = numcl)
   results <- tbl_df(foreach(i=1:20, .combine=bind_rows) %dopar% {
-    source("../../../.Rprofile")
+    library(milkweed)
+    library(dplyr)
+    '%<>%' <- magrittr::'%<>%'
     ipm %<>% bootIPM() %>% analyzeParameters(distpars = TRUE)
     thisone <- ipm$analysis$parameters %>% select(type, name, elasticity)
     thisone
   })
   
-  save(results, file=mwROOT("data","calculated","figure6.RData"))
+  save(results, file=file.path(mwCache,"figure6.RData"))
 } else {
-  load(mwROOT("data","calculated","figure6.RData"))
+  load(file.path(mwCache,"figure6.RData"))
 }
 ```
 
@@ -46,7 +56,7 @@ herbivory_func <- function(x) {
   as.vector((ipm %>% setHerbivoryMatrix(perturb = x, distpars = TRUE))$kernels$K)
 }
 
-J <- jacobian(herbivory_func, rep(0,3))
+J <- numDeriv::jacobian(herbivory_func, rep(0,3))
 
 # Loops!?  We don't need no stinkin loops...
 S1 <- ipm$analysis$standard$sens*matrix(J[,1], nrow=ipm$N)*ipm$vars$h_apical$dx # pmunch
@@ -71,7 +81,7 @@ abs(sum(sum(E3)) - res$elasticity[3])
 
 ```{r}
 plotdata <- results %>% 
-  unite(label, type, name, sep="-", remove=FALSE) %>% 
+  tidyr::unite(label, type, name, sep="-", remove=FALSE) %>% 
   group_by(label) %>% 
   summarize(meanElasticity = mean(elasticity),
             n = n(),
