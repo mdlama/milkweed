@@ -836,7 +836,7 @@ setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE,
         sprintf(
           paste0("function(x, pars, perturb = rep(0,3), distpars = FALSE, justmunch = FALSE) {
                pars[1] <- pars[1] + perturb[1]
-               pars[2:3] <- perturbTrans(pars[2:3], perturb[2:3], type = ifelse(!distpars, '%s', 'id'))\n"),
+               pars[2:3] <- perturbTrans(pars[2:3], perturb[2:3], type = ifelse(distpars, '%s', 'ident'))\n"),
           mdls[i]
         )
       pmunch <- sum(thissite$munched == 1)/nrow(thissite)
