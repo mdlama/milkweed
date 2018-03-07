@@ -21,36 +21,44 @@ stemdata <- tbl_df(stemdata)
 Compute budlings per stem.
 ```{r}
 data_gp <- stemdata %>% 
-  mutate(log_herb_avg = log(0.01 + herb_avg)) %>%
   group_by(year, transect) %>% 
   summarize(N_seedlings = sum(seedling, na.rm=T), 
             N_total = sum(aliveJune, na.rm=T), 
             N_budlings = N_total - N_seedlings,
-            log_herb_mean = mean(log_herb_avg, na.rm=T),
-            site = first(site))
+            herb_mean = mean(herb_avg, na.rm=T),
+            site = first(site)) %>%
+  ungroup(year, transect) %>%
+  ##NOTE: these 4 bind_rows() calls add in explicit 0s where transects died off, resulting in a year with 0 stems, necessary as it would skew the model if it were not included
+  bind_rows(data.frame(year = 2016, transect = 60, N_seedlings = 0, N_total = 0, N_budlings = 0, herb_mean = 0, site = "YTB")) %>%
+  bind_rows(data.frame(year = 2016, transect = 61, N_seedlings = 0, N_total = 0, N_budlings = 0, herb_mean = 0, site = "YTB")) %>%
+  bind_rows(data.frame(year = 2016, transect = 63, N_seedlings = 0, N_total = 0, N_budlings = 0, herb_mean = 0, site = "YTB")) %>%
+  bind_rows(data.frame(year = 2017, transect = 71, N_seedlings = 0, N_total = 0, N_budlings = 0, herb_mean = 0, site = "SKY")) %>%
+  bind_rows(data.frame(year = 2017, transect = 62, N_seedlings = 0, N_total = 0, N_budlings = 0, herb_mean = 0, site = "YTB")) %>%
+  bind_rows(data.frame(year = 2017, transect = 65, N_seedlings = 0, N_total = 0, N_budlings = 0, herb_mean = 0, site = "YTB")) %>%
+  group_by(year, transect)
 
-data13_14 <- data_gp %>% filter(year %in% 2013:2014) %>% 
+data13_14 <- data_gp %>% filter(year %in% 2013:2014 & ! transect %in% c(44, 48)) %>% #transects 44 and 48 were abandoned after 2013 and so were not included
   group_by(transect) %>% 
   summarize(bdlgs_per_stem = last(N_budlings)/first(N_total),
-            log_herb_mean = first(log_herb_mean),
+            herb_mean = first(herb_mean),
             site = first(site))
 
-data14_15 <- data_gp %>% filter(year %in% 2014:2015 & transect != 70) %>%
+data14_15 <- data_gp %>% filter(year %in% 2014:2015 & ! transect %in% c(70, 72)) %>% #transects 70 and 72 were abandoned after 2014 and so were not included
   group_by(transect) %>% 
   summarize(bdlgs_per_stem = last(N_budlings)/first(N_total),
-            log_herb_mean = first(log_herb_mean),
+            herb_mean = first(herb_mean),
             site = first(site))
 
-data15_16 <- data_gp %>% filter(year %in% 2015:2016) %>%
-  group_by(transect) %>% 
+data15_16 <- data_gp %>% filter(year %in% 2015:2016 & transect != 80) %>% #transect 80 was abandoned after 2015 so was not included
+  group_by(transect) %>%
   summarize(bdlgs_per_stem = last(N_budlings)/first(N_total),
-            log_herb_mean = first(log_herb_mean),
+            herb_mean = first(herb_mean),
             site = first(site))
 
-data16_17 <- data_gp %>% filter(year %in% 2016:2017) %>%
-  group_by(transect) %>% 
+data16_17 <- data_gp %>% filter(year %in% 2016:2017 & site != 'GRN' & ! transect %in% c(60, 61, 63, 73, 80)) %>% #GRN was a new site and data is only available for 2017, and transect 80 in 2017 is a new transect NOT the same as transect 80 that was abandoned (same number only, which should be fixed.) Also, transects 60, 61, 62 are not present in 2017 since they died, so they are excluded.
+  group_by(transect) %>%
   summarize(bdlgs_per_stem = last(N_budlings)/first(N_total),
-            log_herb_mean = first(log_herb_mean),
+            herb_mean = first(herb_mean),
             site = first(site))
 
 fulldat <- bind_rows(data13_14, data14_15, data15_16, data16_17)
@@ -60,16 +68,16 @@ Let's average over transects.
 
 ```{r}
 merged <- fulldat %>% group_by(transect) %>% 
-  summarize(log_herb_mean = mean(log_herb_mean),
+  summarize(herb_mean = mean(herb_mean),
             bdlgs_per_stem = mean(bdlgs_per_stem),
             site = first(site)) %>%
-  filter(!is.nan(log_herb_mean))
+  filter(!is.nan(herb_mean))
 ```
 
 Model fits.
 ```{r}
-exp.model <- lm(log(bdlgs_per_stem) ~ log_herb_mean, data=merged)
-lin.model <- lm(bdlgs_per_stem ~ log_herb_mean, data=merged)
+exp.model <- lm(log(bdlgs_per_stem) ~ herb_mean, data=merged)
+lin.model <- lm(bdlgs_per_stem ~ herb_mean, data=merged)
 cst.model <- lm(bdlgs_per_stem ~ 1, data=merged)
 AICc(cst.model)
 AICc(lin.model)
@@ -80,22 +88,22 @@ All three models are rather similar - in this case we will go with the exponenti
 ```{r}
 fit <- exp.model 
 
-plotdata <- data.frame(log_herb_avg = fit$model$log_herb_mean, 
+plotdata <- data.frame(herb_avg = fit$model$herb_mean, 
                        buds_per_stem = exp(fit$model$`log(bdlgs_per_stem)`),
                        site = merged$site)
 
-p <- plotdata %>% ggplot(aes(x = log_herb_avg, 
+p <- plotdata %>% ggplot(aes(x = herb_avg, 
                              y = buds_per_stem,
                              color = site)) + 
                   geom_point()
 
-xpts <- seq(from=log(0.01), to=log(6.01), length.out = 1000)
+xpts <- seq(from=0, to=6, length.out = 1000)
 ypts <- predict(fit, 
-                new = data.frame(log_herb_mean = xpts), 
+                new = data.frame(herb_mean = xpts), 
                 level=0.95,
                 interval="confidence",
                 se.fit=TRUE)
-plotdata <- data.frame(log_herb_avg = xpts, 
+plotdata <- data.frame(herb_avg = xpts, 
                        buds_per_stem = exp(ypts$fit[,"fit"]),
                        lwr = exp(ypts$fit[,"lwr"]),
                        upr = exp(ypts$fit[,"upr"]),
@@ -111,7 +119,7 @@ p <- p + geom_line(data = plotdata,
          scale_y_continuous(limits = c(0, 2.8))
          
 p <- p + theme_bw() +
-         xlab("ln(Herbivory Score)") +
+         xlab("Herbivory Score") +
          ylab("Per capita clonal reproduction\n (sprouts/stem)") +
          labs(color="Sites") + 
          theme(legend.background = element_rect(fill="lightgrey",
