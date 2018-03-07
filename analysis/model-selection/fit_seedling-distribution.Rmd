@@ -7,12 +7,16 @@ output: html_document
 We use the `fdistrplus` package (https://cran.r-project.org/web/packages/fitdistrplus/vignettes/paper2JSS.pdf)
 
 ```{r, warning=FALSE, message=FALSE}
-source("../../.Rprofile")
+library(milkweed)
+library(dplyr)
+library(ggplot2)
+library(fitdistrplus)
+`%$%` <- magrittr::`%$%`
 ```
 
 Read, filter and transform data.
 ```{r}
-metadata <- tbl_df(read.csv(mwROOT("data","stemdata.csv")))
+metadata <- tbl_df(stemdata)
 ```
 
 Fits of h_apical for seedlings.
@@ -50,4 +54,4 @@ Goodness-of-fit measures.
 gofstat(list(f0, f1, f2, f3, f4), fitnames = distnames)
 ```
 
-Looks like gamma is the best fit, but lognormal distribution is somewhat close.  We'll go with lognormal for ease in implementing parameter perturbation and elasticity analysis.
+Looks like Weibull is the best fit, but similar to budling distributions, we'll go with normal for easier interpretation with perturbation analysis.

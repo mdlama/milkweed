@@ -682,7 +682,7 @@ setPodsFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update =
 
 ## Distributions
 
-#' Sets the seedling distribution.
+#' Sets the seedling distribution (normal distribution).
 #'
 #' @param obj A mwIPM model object.
 #' @param compute Recompute or load from cache?
@@ -698,7 +698,7 @@ setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, 
     h_apical <- (obj$data %>% filter(seedling == 1, !is.na(h_apical)))$h_apical
 
     cat("Computing seedling distribution fit...")
-    f1 <- fitdistrplus::fitdist(h_apical, "lnorm")
+    f1 <- fitdistrplus::fitdist(h_apical, "norm")
     cat("done!\n")
 
     seedling.fit <- vector("list", 2)
@@ -710,10 +710,10 @@ setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, 
            dx <- x[2]-x[1]
            y <- rep(0, N-1)
            for (j in 1:(N-1)) {
-             y[j] = plnorm(x[j+1], pars[1], pars[2]) - plnorm(x[j], pars[1], pars[2])
+             y[j] = pnorm(x[j+1], pars[1], pars[2]) - pnorm(x[j], pars[1], pars[2])
            }
-           y[1] <- y[1] + plnorm(x[1], pars[1], pars[2])
-           y[N-1] <- y[N-1] + plnorm(x[N], pars[1], pars[2], lower.tail = FALSE)
+           y[1] <- y[1] + pnorm(x[1], pars[1], pars[2])
+           y[N-1] <- y[N-1] + pnorm(x[N], pars[1], pars[2], lower.tail = FALSE)
            y <- y/dx
          }
     names(seedling.fit) <- c("fit", "predict")
@@ -1884,7 +1884,7 @@ renderHerbivoryDistFit.mwIPM <- function(obj) {
 #' @param type Distribution type (lnorm, gamma, or identity)
 #'
 #' @return Vector of moments.
-ParsToMoms <- function(x, type = "lnorm") {
+ParsToMoms <- function(x, type = "ident") {
   if (type == "lnorm") {
     y <- c(y1 = exp(x[1] + 0.5*x[2]*x[2]),
            y2 = sqrt(exp(2*x[1] + x[2]*x[2])*(exp(x[2]*x[2])-1)))
@@ -1906,7 +1906,7 @@ ParsToMoms <- function(x, type = "lnorm") {
 #' @param type Distribution type (lnorm, gamma, or identity)
 #'
 #' @return Jacobian matrix
-jacParsToMoms <- function(x, type = "lnorm") {
+jacParsToMoms <- function(x, type = "ident") {
   if (type == "lnorm") {
     CV <- x[2]/x[1]
     a <- 1 + CV*CV
@@ -1928,7 +1928,7 @@ jacParsToMoms <- function(x, type = "lnorm") {
 #' @param type Distribution type (lnorm, gamma, or identity)
 #'
 #' @return Vector of moments.
-MomsToPars <- function(y, type = "lnorm") {
+MomsToPars <- function(y, type = "ident") {
   if (type == "lnorm") {
     x <- c(x1 = log(y[1]/sqrt(1 + (y[2]/y[1])^2)),
            x2 = sqrt(log(1 + (y[2]/y[1])^2)))
@@ -1950,7 +1950,7 @@ MomsToPars <- function(y, type = "lnorm") {
 #' @param type Distribution type (lnorm, gamma, or identity)
 #'
 #' @return Jacobian matrix
-jacMomsToPars <- function(y, type = "lnorm") {
+jacMomsToPars <- function(y, type = "ident") {
   if (type == "lnorm") {
     J <- exp(y[1] + y[2]*y[2]/2)*diag(c(1,sqrt(exp(y[2]*y[2])-1)))%*%matrix(c(1,1,1,1+1/(1-exp(-1*y[2]*y[2]))), byrow=T, nrow=2)%*%diag(c(1,y[2]))
     rownames(J) <- c("m", "s")
@@ -1970,7 +1970,7 @@ jacMomsToPars <- function(y, type = "lnorm") {
 #' @param type Distribution type (lnorm, gamma, or identity)
 #'
 #' @return Gradient vector.
-perturbTrans <- function(pars, perturb = rep(0,2), type = "lnorm") {
+perturbTrans <- function(pars, perturb = rep(0,2), type = "ident") {
   if (type == "lnorm") {
     MSD <- ParsToMoms(x = pars, type)
     tpars <- MomsToPars(y = MSD+perturb, type)
