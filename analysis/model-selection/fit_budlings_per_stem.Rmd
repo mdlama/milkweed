@@ -7,12 +7,15 @@ output:
 ---
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-source("../../.Rprofile")
+library(milkweed)
+library(dplyr)
+library(ggplot2)
+library(AICcmodavg)
 ```
 
 Load data.
 ```{r}
-stemdata <- tbl_df(read.csv(mwROOT("data","stemdata.csv")))
+stemdata <- tbl_df(stemdata)
 ```
 
 Compute budlings per stem.
@@ -38,7 +41,19 @@ data14_15 <- data_gp %>% filter(year %in% 2014:2015 & transect != 70) %>%
             log_herb_mean = first(log_herb_mean),
             site = first(site))
 
-fulldat <- bind_rows(data13_14, data14_15)
+data15_16 <- data_gp %>% filter(year %in% 2015:2016) %>%
+  group_by(transect) %>% 
+  summarize(bdlgs_per_stem = last(N_budlings)/first(N_total),
+            log_herb_mean = first(log_herb_mean),
+            site = first(site))
+
+data16_17 <- data_gp %>% filter(year %in% 2016:2017) %>%
+  group_by(transect) %>% 
+  summarize(bdlgs_per_stem = last(N_budlings)/first(N_total),
+            log_herb_mean = first(log_herb_mean),
+            site = first(site))
+
+fulldat <- bind_rows(data13_14, data14_15, data15_16, data16_17)
 ```
 
 Let's average over transects.
@@ -47,7 +62,8 @@ Let's average over transects.
 merged <- fulldat %>% group_by(transect) %>% 
   summarize(log_herb_mean = mean(log_herb_mean),
             bdlgs_per_stem = mean(bdlgs_per_stem),
-            site = first(site))
+            site = first(site)) %>%
+  filter(!is.nan(log_herb_mean))
 ```
 
 Model fits.
