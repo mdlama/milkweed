@@ -744,7 +744,7 @@ setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, 
 setBudlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
   if (!file.exists(file.path(mwCache,"budlingDistFit.RData")) | (compute)) {
     sites <- obj$all_sites
-    mdls <- c("norm", "norm", "norm", "norm", "weibull", "weibull")
+    mdls <- c("norm", "norm", "norm", "norm", "norm", "norm", "weibull", "weibull")
     budling.fit <- vector('list', 6)
     names(budling.fit) <- sites
 

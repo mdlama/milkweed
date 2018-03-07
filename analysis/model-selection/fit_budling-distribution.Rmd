@@ -9,13 +9,17 @@ output:
 We use the `fdistrplus` package (https://cran.r-project.org/web/packages/fitdistrplus/vignettes/paper2JSS.pdf)
 
 ```{r, warning=FALSE, message=FALSE}
-source("../../.Rprofile")
-sites <- c("Bertha", "BLD1", "BLD2", "PWR", "SKY", "YTB")
+library(milkweed)
+library(dplyr)
+library(ggplot2)
+library(fitdistrplus)
+`%$%` <- magrittr::`%$%`
+sites <- c("Bertha", levels(stemdata$site))
 ```
 
 Read, filter and transform data.
 ```{r}
-metadata <- tbl_df(read.csv(mwROOT("data","stemdata.csv")))
+metadata <- tbl_df(stemdata)
 
 h_apical <- metadata %>% 
   filter(seedling == 0,
@@ -99,13 +103,29 @@ fit_site("BLD2")
 
 Results suggest going with a Weibull or normal distribution.
 
+## GET
+
+```{r, warning=FALSE}
+fit_site("GET")
+```
+
+Results suggest going with a normal distribution.
+
+## GRN
+
+```{r, warning=FALSE}
+fit_site("GRN")
+```
+
+Results suggest going with a normal or Weibull distribution.
+
 ## PWR
 
 ```{r, warning=FALSE}
 fit_site("PWR")
 ```
 
-Results suggest going with a Weibull or normal distribution.
+Results suggest going with a normal distribution.
 
 ## SKY
 
