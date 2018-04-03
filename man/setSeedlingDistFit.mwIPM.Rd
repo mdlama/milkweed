@@ -2,7 +2,7 @@
 % Please edit documentation in R/mw_ipm.R
 \name{setSeedlingDistFit.mwIPM}
 \alias{setSeedlingDistFit.mwIPM}
-\title{Sets the seedling distribution.}
+\title{Sets the seedling distribution (normal distribution).}
 \usage{
 \method{setSeedlingDistFit}{mwIPM}(obj, compute = FALSE,
   saveresults = FALSE, update = TRUE)
@@ -20,5 +20,5 @@
 A mwIPM model object.
 }
 \description{
-Sets the seedling distribution.
+Sets the seedling distribution (normal distribution).
 }

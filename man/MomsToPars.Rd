@@ -4,7 +4,7 @@
 \alias{MomsToPars}
 \title{Moments to parameters.}
 \usage{
-MomsToPars(y, type = "lnorm")
+MomsToPars(y, type = "ident")
 }
 \arguments{
 \item{y}{Vector of moments.}

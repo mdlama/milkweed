@@ -4,7 +4,7 @@
 \alias{perturbTrans}
 \title{Perturbation of the parameter-to-moments transformation.}
 \usage{
-perturbTrans(pars, perturb = rep(0, 2), type = "lnorm")
+perturbTrans(pars, perturb = rep(0, 2), type = "ident")
 }
 \arguments{
 \item{pars}{Vector of parameters or moments}

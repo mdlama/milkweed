@@ -4,7 +4,7 @@
 \alias{jacMomsToPars}
 \title{Jacobian of moments to parameters.}
 \usage{
-jacMomsToPars(y, type = "lnorm")
+jacMomsToPars(y, type = "ident")
 }
 \arguments{
 \item{y}{Vector of moments.}
