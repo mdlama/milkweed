@@ -15,6 +15,7 @@ library(AICcmodavg)
 
 Load data.
 ```{r}
+data(stemdata)
 stemdata <- tbl_df(stemdata)
 ```
 
@@ -71,7 +72,8 @@ merged <- fulldat %>% group_by(transect) %>%
   summarize(herb_mean = mean(herb_mean),
             bdlgs_per_stem = mean(bdlgs_per_stem),
             site = first(site)) %>%
-  filter(!is.nan(herb_mean))
+  filter(!is.nan(herb_mean)) %>%
+  filter(!is.nan(bdlgs_per_stem))
 ```
 
 Model fits.
@@ -84,12 +86,12 @@ AICc(lin.model)
 AICc(exp.model)
 ```
 
-All three models are rather similar - in this case we will go with the exponential model, as it makes more biological sense (it won't go negative, although neither will a constant model!!!)
+Linear is the best fit, following behind by the constant model.
 ```{r}
-fit <- exp.model 
+fit <- lin.model 
 
 plotdata <- data.frame(herb_avg = fit$model$herb_mean, 
-                       buds_per_stem = exp(fit$model$`log(bdlgs_per_stem)`),
+                       buds_per_stem = fit$model$bdlgs_per_stem,
                        site = merged$site)
 
 p <- plotdata %>% ggplot(aes(x = herb_avg, 
@@ -97,16 +99,16 @@ p <- plotdata %>% ggplot(aes(x = herb_avg,
                              color = site)) + 
                   geom_point()
 
-xpts <- seq(from=0, to=6, length.out = 1000)
+xpts <- seq(from=0, to=2, length.out = 1000)
 ypts <- predict(fit, 
                 new = data.frame(herb_mean = xpts), 
                 level=0.95,
                 interval="confidence",
                 se.fit=TRUE)
 plotdata <- data.frame(herb_avg = xpts, 
-                       buds_per_stem = exp(ypts$fit[,"fit"]),
-                       lwr = exp(ypts$fit[,"lwr"]),
-                       upr = exp(ypts$fit[,"upr"]),
+                       buds_per_stem = ypts$fit[,"fit"],
+                       lwr = ypts$fit[,"lwr"],
+                       upr = ypts$fit[,"upr"],
                        site = NA)
 
 p <- p + geom_line(data = plotdata, 
@@ -116,7 +118,7 @@ p <- p + geom_line(data = plotdata,
                      aes(ymin=lwr, 
                          ymax=upr), 
                      alpha = 0.2) + 
-         scale_y_continuous(limits = c(0, 2.8))
+         scale_y_continuous(limits = c(0, 2.0))
          
 p <- p + theme_bw() +
          xlab("Herbivory Score") +
