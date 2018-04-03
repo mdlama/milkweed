@@ -6,7 +6,9 @@ output:
     toc: true
 ---
 
-We use the `fdistrplus` package (https://cran.r-project.org/web/packages/fitdistrplus/vignettes/paper2JSS.pdf)
+We use the `fdistrplus` package (https://cran.r-project.org/web/packages/fitdistrplus/vignettes/paper2JSS.pdf).
+
+__*Summary*__ While many of the fits suggest going with the Weibull distribution, we will use the normal distribution throughout as the fits are good with the normal distribution, and for ease of implementation and interpretation.
 
 ```{r, warning=FALSE, message=FALSE}
 library(milkweed)
