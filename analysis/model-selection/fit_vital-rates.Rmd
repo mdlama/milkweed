@@ -158,7 +158,10 @@ Let's plot full data.
 ```{r}
 # Add points
 flower.plot <- metadata_usc %>% 
-  ggplot(aes(x = h_apical, y = fec.flower, color = site, size = herb_avg)) +
+  ggplot(aes(x = h_apical, 
+             y = fec.flower, 
+             color = site, 
+             size = herb_avg)) +
   geom_jitter(width = 0, 
               height = 0.05,
               alpha = 0.4)
@@ -200,108 +203,101 @@ suppressWarnings( # Hiding the follow warnings: (1) Unequal factor levels: coerc
 flower.plot + geom_line(data = curves)
 ```
 
-
-```{r, eval=FALSE}
-par_usc <- as.data.frame(flower.fit$pars$unscaled)
-plot(NULL, axes=T, xlim=c(0,160), ylim=c(-0.1,1.1), xlab="", ylab="")
-xpts <- seq(min(metadata_usc$h_apical), max(metadata_usc$h_apical), length.out=100)
-for (i in 2:6) {
-  site <- row.names(par_usc[i,])
-  points(metadata_usc[metadata_usc$site == site,]$h_apical, jitter(metadata_usc[metadata_usc$site == site,]$fec.flower, factor=0.2), col=i, xlim=c(0,160))
-  meanha <- mean(metadata_usc[metadata_usc$site == site,]$log_herb_avg)
-  coeff <- par_usc[i,]
-  ypred <- with(coeff, 1/(1+exp(-1*(`(Intercept)` + `h_apical`*xpts + `log_herb_avg`*meanha + `h_apical:log_herb_avg`*xpts*meanha))))
-  lines(xpts, ypred, col = i)
-}
-meanha <- mean(metadata_usc$log_herb_avg)
-# ypts = 1/(1+exp(-1*(pars$unscaled['(Intercept)'] + pars$unscaled['h_apical']*xpts + pars$unscaled['log_herb_avg']*meanha + pars$unscaled['h_apical:log_herb_avg']*xpts*meanha)))
-ypts = 1/(1+exp(-1*(par_usc['Bertha','(Intercept)'] + par_usc['Bertha','h_apical']*xpts + par_usc['Bertha','log_herb_avg']*meanha + 
-lines(xpts, ypts, col="black", lwd=2, lty=2)
-legend("bottomright", sort(unique(as.character(metadata_usc$site))), col=1:5, pch=1)
-```
-
 Now site-specific models.
 ```{r}
-xyplot(jitter(fec.flower, factor=0.2) ~ h_apical|site, data=metadata_usc, para=par_usc, metadata=metadata_usc, xpts=xpts, panel = function(x,y,metadata,para,xpts) {
-  panel.xyplot(x, y)
-  site <- row.names(para[packet.number(),])
-  meanha <- mean(metadata[metadata$site == site,]$log_herb_avg)
-  coeff <- para[packet.number(),]
-  ypred <- with(coeff, 1/(1+exp(-1*(`(Intercept)` + `h_apical`*xpts + `log_herb_avg`*meanha + `h_apical:log_herb_avg`*xpts*meanha))))
-  panel.lines(xpts, ypred, col = "red")
-})
+flower.plot <- metadata_usc %>% 
+  ggplot(aes(x = h_apical, 
+             y = fec.flower)) + 
+  geom_jitter(height = 0.1, 
+              alpha = 0.3) +
+  facet_wrap(~ site)
+
+flower.plot + 
+  geom_line(data = curves %>% filter(site != "Bertha")) + 
+  facet_wrap(~ site)
 ```
 
 ## Survival
 
 ```{r}
 metadata_usc <- metadata %>% filter(!is.na(h_apical),
-                                    !is.na(h_apical.next),
                                     !is.na(herb_avg),
-                                    fec.flower == 1,
-                                    !is.na(surv)) %>%
-  mutate(log_herb_avg = log(0.01 + herb_avg))
+                                    fec.flower == 1, # filtering out 0s because only the sexual pathway uses the survival function
+                                    !is.na(surv))
 
-metadata_sc <- metadata_usc %>% mutate_each(funs(as.numeric(scale(.))), 
-                                            h_apical, 
-                                            log_herb_avg)
+metadata_sc <- metadata_usc %>% mutate_at(.vars = vars(h_apical, herb_avg),
+                                          .funs = funs(as.numeric(scale(.))))
 
 # Get scaling parameters (really just mean and sd)
 h_apical_sc <- scale(metadata_usc$h_apical)
-log_herb_avg_sc <- scale(metadata_usc$log_herb_avg)
+herb_avg_sc <- scale(metadata_usc$herb_avg)
 
-xyplot(jitter(surv, factor=0.2) ~ h_apical|site, data=metadata_sc, group=year, auto.key = TRUE)
+metadata_sc %>% ggplot(aes(x = h_apical, 
+                           y = surv, 
+                           color = year)) + 
+                geom_jitter(height = 0.1, 
+                            alpha = 0.3) +
+                facet_wrap(~ site)
 ```
 
-First fit full model.
-
+### Random Effects
+First fit full model. Using nAGQ = 0 for quick approximation (matches results with nAGQ = 1).
 ```{r}
-# nAGQ = 0 for quick approximation (matches results with nAGQ = 1)
-surv.reg.full = glmer(surv ~ h_apical*log_herb_avg +  (h_apical*log_herb_avg|site/transect)+(h_apical*log_herb_avg|year), data=metadata_sc, nAGQ = 0, family=binomial())
-
+surv.reg.full = glmer(surv ~ h_apical*herb_avg +  (h_apical*herb_avg|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, nAGQ = 0, family=binomial())
 summary(surv.reg.full)
 ```
 
-First thing to go is interaction on site and transect.
-
+First thing to go is interaction on site and transect, since it has very low variance and is contributing relatively little to the variation in the model.
 ```{r}
-surv.reg.mdl1 = glmer(surv ~ h_apical*log_herb_avg +  (h_apical+log_herb_avg|site/transect)+(h_apical*log_herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+surv.reg.mdl1 = glmer(surv ~ h_apical*herb_avg +  (h_apical+herb_avg|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+summary(surv.reg.mdl1)
+```
 
-# h_apical is minimal in both
-surv.reg.mdl2 = glmer(surv ~ h_apical*log_herb_avg +  (log_herb_avg|site/transect)+(log_herb_avg+h_apical:log_herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
 
-# Dropping interaction term on year
-surv.reg.mdl3 = glmer(surv ~ h_apical*log_herb_avg +  (log_herb_avg|site/transect)+(log_herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+Interaction on year is also minimal in both, so it will be removed next.
+```{r}
+surv.reg.mdl2 = glmer(surv ~ h_apical*herb_avg +  (h_apical+herb_avg|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+summary(surv.reg.mdl2)
+```
 
-# Let's try combo of dropping log_herb_avg
-surv.reg.mdl4a = glmer(surv ~ h_apical*log_herb_avg +  (1|site/transect)+(log_herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+Dropping `herb_avg` in site/transect next.
+```{r}
+surv.reg.mdl3 = glmer(surv ~ h_apical*herb_avg +  (h_apical | site/transect) + (h_apical + herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+summary(surv.reg.mdl3)
+```
 
-surv.reg.mdl4b = glmer(surv ~ h_apical*log_herb_avg +  (log_herb_avg|site/transect)+(1|year), data=metadata_sc, nAGQ=0, family=binomial())
+Now drop `herb_avg` on year.
+```{r}
+surv.reg.mdl4 = glmer(surv ~ h_apical*herb_avg +  (h_apical | site/transect) + (h_apical | year), data=metadata_sc, nAGQ=0, family=binomial())
+summary(surv.reg.mdl4)
+```
 
-surv.reg.mdl4c = glmer(surv ~ h_apical*log_herb_avg +  (1|site/transect)+(1|year), data=metadata_sc, nAGQ=0, family=binomial())
+Now all that's left is to try combos of dropping `h_apical`.
+```{r}
+surv.reg.mdl5 = glmer(surv ~ h_apical*herb_avg +  (1|site/transect)+(h_apical|year), data=metadata_sc, nAGQ=0, family=binomial())
+surv.reg.mdl6 = glmer(surv ~ h_apical*herb_avg +  (h_apical|site/transect)+(1|year), data=metadata_sc, nAGQ=0, family=binomial())
+surv.reg.mdl7 = glmer(surv ~ h_apical*herb_avg +  (1|site/transect)+(1|year), data=metadata_sc, nAGQ=0, family=binomial())
+```
 
-sAICtab <- AIC(surv.reg.full, surv.reg.mdl1, surv.reg.mdl2, surv.reg.mdl3, surv.reg.mdl4a, surv.reg.mdl4b, surv.reg.mdl4c)
-sAICtab$dAIC <- min(sAICtab$AIC)-sAICtab$AIC
-sAICtab
+AIC table.
+```{r}
+aictab(list(surv.reg.full, surv.reg.mdl1, surv.reg.mdl2, surv.reg.mdl3, surv.reg.mdl4, surv.reg.mdl5, surv.reg.mdl6, surv.reg.mdl7), modnames = c('surv.reg.full', 'surv.reg.mdl1', 'surv.reg.mdl2', 'surv.reg.mdl3', 'surv.reg.mdl4', 'surv.reg.mdl5', 'surv.reg.mdl6', 'surv.reg.mdl7'))
+```
 
-sBICtab <- BIC(surv.reg.full, surv.reg.mdl1, surv.reg.mdl2, surv.reg.mdl3, surv.reg.mdl4a, surv.reg.mdl4b, surv.reg.mdl4c)
-sBICtab$dBIC <- min(sBICtab$BIC)-sBICtab$BIC
-sBICtab
-
-# Winner: AIC gives mdl4b, BIC mdl4c - let's go with mdl4b
-surv.reg.winner = glmer(surv ~ h_apical*log_herb_avg +  (log_herb_avg|site/transect)+(1|year), data=metadata_sc, family=binomial(), nAGQ=1, control=glmerCtrl)
-
+Winner: nearly indistinguishable AICc between Models 2 and 3.  Let's go with Model 2.
+```{r}
+surv.reg.winner = glmer(surv ~ h_apical*herb_avg +  (h_apical+herb_avg|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
 summary(surv.reg.winner)
 ```
 
-That's better.  On to fixed effects.
-
+### Fixed Effects
+On to fixed effects, removing h_apical first.
 ```{r}
-surv.reg.mdl1 = glmer(surv ~ log_herb_avg + h_apical:log_herb_avg + (log_herb_avg|site/transect)+(1|year), data=metadata_sc, family=binomial(), nAGQ=1, control=glmerCtrl)
+surv.reg.mdl1 = glmer(surv ~ herb_avg + h_apical:herb_avg + (h_apical+herb_avg|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, family=binomial(), nAGQ=1, control=glmerCtrl)
 
-surv.reg.mdl2 = glmer(surv ~ log_herb_avg + (log_herb_avg|site/transect)+(1|year), data=metadata_sc, family=binomial(), nAGQ=1, control=glmerCtrl)
+surv.reg.mdl2 = glmer(surv ~ herb_avg + (h_apical+herb_avg|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, family=binomial(), nAGQ=1, control=glmerCtrl)
 
-surv.reg.mdl3 = glmer(surv ~ 1 + (log_herb_avg|site/transect)+(1|year), data=metadata_sc, family=binomial(), nAGQ=1, control=glmerCtrl)
+surv.reg.mdl3 = glmer(surv ~ 1 + (h_apical+herb_avg|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, family=binomial(), nAGQ=1, control=glmerCtrl)
 
 sAICtab <- AIC(surv.reg.winner, surv.reg.mdl1, surv.reg.mdl2, surv.reg.mdl3)
 sAICtab$dAIC <- min(sAICtab$AIC)-sAICtab$AIC
@@ -313,13 +309,13 @@ sBICtab
 ```
 
 ```{r}
-# mdl3 wins by large margin in AIC and BIC
-surv.reg.final <- surv.reg.mdl3
+# mdl3 wins by large margin in BIC but close in AIC to mdl2 - since we're interested in herbivory, let's go with mdl2
+surv.reg.final <- surv.reg.mdl2
 summary(surv.reg.final)
 
 # Create model class
-scaled <- list(h_apical = h_apical_sc, log_herb_avg = log_herb_avg_sc)
-surv.fit <- mwMod(list(mdl = surv.reg.final, vars = c("h_apical", "log_herb_avg"), scaled = scaled))
+scaled <- list(h_apical = h_apical_sc, herb_avg = herb_avg_sc)
+surv.fit <- mwMod(list(mdl = surv.reg.final, vars = c("h_apical", "herb_avg"), scaled = scaled))
 checkPars(surv.fit) # Check parameters
 ```
 
