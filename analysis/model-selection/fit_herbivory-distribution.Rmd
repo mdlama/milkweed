@@ -103,7 +103,7 @@ lines(x, munched.fit[['Bertha']]$predict(bx), col="red", lwd=2)
 
 # Sites
 
-```{r}
+```{r perform fits}
 # munched.fit[["PWR"]]$fit$estimate <- c(-2.25, 1.1)
 
 for (i in 2:length(sites)) {
@@ -153,7 +153,7 @@ for (i in 2:length(sites)) {
 }
 ```
 
-```{r, warning=FALSE}
+```{r plot sites, warning=FALSE}
 N = 50
 lmin = 0
 lmax = 6
@@ -177,7 +177,7 @@ p <- metadata %>% ggplot(aes(x = herb_avg)) +
             data = curves, 
             colour = "red") +
   facet_wrap(~ site) +
-  coord_cartesian(ylim=c(0, 2)) +
+  coord_cartesian(ylim=c(0, 3)) +
   theme_bw() +
   xlab("Herbivory Score") +
   ylab("Density")
