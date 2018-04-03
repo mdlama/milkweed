@@ -539,7 +539,6 @@ setFloweringFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, upd
 setSurvivalFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
   if (!file.exists(file.path(mwCache,"survivalFit.RData")) | (compute)) {
     metadata_usc <- obj$data %>% filter(!is.na(h_apical),
-                                        !is.na(h_apical.next),
                                         !is.na(herb_avg),
                                         fec.flower == 1,
                                         !is.na(surv))
@@ -548,7 +547,7 @@ setSurvivalFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, upda
                                               .funs = funs(as.numeric(scale(.))))
 
     cat("Computing survival fit...")
-    surv.mdl <- lme4::glmer(surv ~ herb_avg + (herb_avg|site/transect) + (1|year),
+    surv.mdl <- lme4::glmer(surv ~ herb_avg + (h_apical+herb_avg|site/transect) + (h_apical+herb_avg|year),
                             data=metadata_sc,
                             family=binomial(),
                             nAGQ=1,
@@ -744,11 +743,12 @@ setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, 
 setBudlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
   if (!file.exists(file.path(mwCache,"budlingDistFit.RData")) | (compute)) {
     sites <- obj$all_sites
-    mdls <- c("norm", "norm", "norm", "norm", "norm", "norm", "weibull", "weibull")
-    budling.fit <- vector('list', 6)
+    num_sites <- length(obj$all_sites)
+    mdls <- rep("norm", num_sites)
+    budling.fit <- vector('list', num_sites)
     names(budling.fit) <- sites
 
-    for (i in 1:6) {
+    for (i in 1:num_sites) {
       if (i == 1) { # Bertha
         h_apical <- (obj$data %>% filter(seedling == 0,
                                          !is.na(h_apical)))$h_apical
@@ -817,7 +817,7 @@ setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE,
   if (!file.exists(file.path(mwCache,"herbivoryDistFit.RData")) | (compute)) {
     num_sites <- length(obj$all_sites)
 
-    mdls <- rep("lnorm", length(obj$all_sites)) # Default - change after model selection
+    mdls <- rep("lnorm", num_sites)
     names(mdls) <- obj$all_sites
 
     munched.fit <- vector('list', num_sites)
