@@ -284,20 +284,20 @@ AIC table.
 aictab(list(surv.reg.full, surv.reg.mdl1, surv.reg.mdl2, surv.reg.mdl3, surv.reg.mdl4, surv.reg.mdl5, surv.reg.mdl6, surv.reg.mdl7), modnames = c('surv.reg.full', 'surv.reg.mdl1', 'surv.reg.mdl2', 'surv.reg.mdl3', 'surv.reg.mdl4', 'surv.reg.mdl5', 'surv.reg.mdl6', 'surv.reg.mdl7'))
 ```
 
-Winner: nearly indistinguishable AICc between Models 2 and 3.  Let's go with Model 2.
+Winner: nearly indistinguishable AICc between Models 2 and 3.  Let's go with Model 3 as there appears to be convergence issues with Model 2.
 ```{r}
-surv.reg.winner = glmer(surv ~ h_apical*herb_avg +  (h_apical+herb_avg|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+surv.reg.winner = glmer(surv ~ h_apical*herb_avg +  (h_apical|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
 summary(surv.reg.winner)
 ```
 
 ### Fixed Effects
 On to fixed effects, removing h_apical first.
 ```{r}
-surv.reg.mdl1 = glmer(surv ~ herb_avg + h_apical:herb_avg + (h_apical+herb_avg|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, family=binomial(), nAGQ=1, control=glmerCtrl)
+surv.reg.mdl1 = glmer(surv ~ herb_avg + h_apical:herb_avg + (h_apical|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, family=binomial(), nAGQ=1, control=glmerCtrl)
 
-surv.reg.mdl2 = glmer(surv ~ herb_avg + (h_apical+herb_avg|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, family=binomial(), nAGQ=1, control=glmerCtrl)
+surv.reg.mdl2 = glmer(surv ~ herb_avg + (h_apical|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, family=binomial(), nAGQ=1, control=glmerCtrl)
 
-surv.reg.mdl3 = glmer(surv ~ 1 + (h_apical+herb_avg|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, family=binomial(), nAGQ=1, control=glmerCtrl)
+surv.reg.mdl3 = glmer(surv ~ 1 + (h_apical|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, family=binomial(), nAGQ=1, control=glmerCtrl)
 
 sAICtab <- AIC(surv.reg.winner, surv.reg.mdl1, surv.reg.mdl2, surv.reg.mdl3)
 sAICtab$dAIC <- min(sAICtab$AIC)-sAICtab$AIC
@@ -312,149 +312,39 @@ sBICtab
 # mdl3 wins by large margin in BIC but close in AIC to mdl2 - since we're interested in herbivory, let's go with mdl2
 surv.reg.final <- surv.reg.mdl2
 summary(surv.reg.final)
-
-# Create model class
-scaled <- list(h_apical = h_apical_sc, herb_avg = herb_avg_sc)
-surv.fit <- mwMod(list(mdl = surv.reg.final, vars = c("h_apical", "herb_avg"), scaled = scaled))
-checkPars(surv.fit) # Check parameters
 ```
 
-Winner:
-```
-surv ~ 1 + (log_herb_avg|site/transect) + (1|year)
-```
-
-Unscaling:
-```{r, eval=FALSE}
-par_intercept_sc <- coef(summary(surv.reg.final))["(Intercept)","Estimate"]
-
-muha <- attributes(h_apical_sc)$'scaled:center'
-sdha <- attributes(h_apical_sc)$'scaled:scale'
-muhe <- attributes(log_herb_avg_sc)$'scaled:center'
-sdhe <- attributes(log_herb_avg_sc)$'scaled:scale'
-
-par_intercept_usc <- par_intercept_sc
-
-pars <- c(par_intercept_usc, 0, 0, 0)
-names(pars) <- c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
-pars
-
-par_sc <- cbind(coef(surv.reg.final)$site[,2], rep(0, 5), coef(surv.reg.final)$site[,1], rep(0, 5))
-colnames(par_sc) <- c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
-rownames(par_sc) <- rownames(coef(surv.reg.final)$site)
-par_usc <- par_sc
-for (i in 1:5) {
-  par_usc[i,1] <- par_sc[i,1] - 1*par_sc[i,2]*(muha/sdha) - 1*par_sc[i,3]*(muhe/sdhe) + par_sc[i,4]*muha*muhe/(sdha*sdhe)
-  par_usc[i,2] <- par_sc[i,2]/sdha - 1*par_sc[i,4]*muhe/(sdha*sdhe)
-  par_usc[i,3] <- par_sc[i,3]/sdhe - 1*par_sc[i,4]*muha/(sdha*sdhe)
-  par_usc[i,4] <- par_sc[i,4]/(sdha*sdhe)
-}
-par_usc
-```
-
-First, check to make sure unscaled parameters are correct.
-
-```{r}
-# Get parameters from model
-pars <- getParameters(surv.reg.final, scaled = list(h_apical_sc = h_apical_sc, log_herb_avg_sc = log_herb_avg_sc))
-pars_usc <- pars$unscaled
-
-# Bertha
-h_apical <- metadata_usc$h_apical
-log_herb_avg <- metadata_usc$log_herb_avg
-estresp <- 1/(1+exp(-1*(pars_usc['Bertha', '(Intercept)'] + pars_usc['Bertha', 'h_apical']*h_apical + pars_usc['Bertha', 'log_herb_avg']*log_herb_avg + pars_usc['Bertha', 'h_apical:log_herb_avg']*h_apical*log_herb_avg)))
-
-fitresp <- predict(surv.reg.final, type="response", re.form=NA)
-
-(error <- max(abs(estresp-fitresp)))
-
-# Sites
-sites <- rownames(pars_usc)[-1]
-fitresp <- predict(surv.reg.final, type="response", re.form=~(log_herb_avg|site))
-E <- rep(0, 5)
-for (i in 1:length(sites)) {
-  isite <- sites[i]
-  h_apical <- (metadata_usc %>% filter(site == isite))$h_apical
-  log_herb_avg <- (metadata_usc %>% filter(site == isite))$log_herb_avg
-  estresp <- 1/(1+exp(-1*(pars_usc[isite,'(Intercept)'] + pars_usc[isite,'h_apical']*h_apical + pars_usc[isite,'log_herb_avg']*log_herb_avg + pars_usc[isite,'h_apical:log_herb_avg']*h_apical*log_herb_avg)))
-  
-  E[i] <- max(abs(estresp-fitresp[which(metadata_usc$site == isite)]))
-}
-max(E)
-```
-
-Now some diagnostics (aka model validation).
-
+### Model Validation and Diagnostics
+Now some diagnostics (aka model validation). Creating standard residual plots.
 ```{r}
 par(mfrow=c(2,2))
 plot(fitted(surv.reg.final), residuals(surv.reg.final, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
 plot(metadata_sc$h_apical, residuals(surv.reg.final, "deviance"), xlab="Apical height", ylab="Deviance residuals")
-plot(metadata_sc$log_herb_avg, residuals(surv.reg.final, "deviance"), xlab="Log(Herbivory average)", ylab="Deviance residuals")
+plot(metadata_sc$herb_avg, residuals(surv.reg.final, "deviance"), xlab="Herbivory average", ylab="Deviance residuals")
 par(mfrow=c(1,1))
 ```
 
-Let's plot full data, first on h_apical scale.
-
+DHARMa Diagnostics. Same process as above. 
 ```{r}
-plot(NULL, axes=T, xlim=c(0,160), ylim=c(-0.1,1.1), xlab="", ylab="")
-xpts <- seq(min(metadata_usc$h_apical), max(metadata_usc$h_apical), length.out=100)
-for (i in 1:5) {
-  site <- rownames(par_usc)[i]
-  points(metadata_usc[metadata_usc$site == site,]$h_apical, jitter(metadata_usc[metadata_usc$site == site,]$surv, factor=0.2), col=i, xlim=c(0,160))
-  coeff <- par_usc[i,]
-  meanha <- mean(metadata_usc[metadata_usc$site == site,]$log_herb_avg)
-  ypred <- 1/(1+exp(-1*(coeff['(Intercept)'] + coeff['h_apical']*xpts + coeff['log_herb_avg']*meanha + coeff['h_apical:log_herb_avg']*xpts*meanha)))
-  lines(xpts, ypred, col = i)
-}
-meanha <- mean(metadata_usc$log_herb_avg)
-ypts = 1/(1+exp(-1*(pars['(Intercept)'] + pars['h_apical']*xpts + pars['log_herb_avg']*meanha + pars['h_apical:log_herb_avg']*xpts*meanha)))
-lines(xpts, ypts, col="black", lwd=2, lty=2)
-legend("bottomright", sort(unique(as.character(metadata_usc$site))), col=1:5, pch=1)
+surv.simulationOutput = DHARMa::simulateResiduals(fittedModel = surv.reg.final, n=1000)
 ```
 
-Now on log_herb_avg scale.
-
 ```{r}
-plot(NULL, axes=T, xlim=c(-2.5,1.5), ylim=c(0.9,1.1), xlab="", ylab="")
-xpts <- seq(min(metadata_usc$log_herb_avg), max(metadata_usc$log_herb_avg), length.out=100)
-for (i in 1:5) {
-  site <- rownames(par_usc)[i]
-  points(metadata_usc[metadata_usc$site == site,]$log_herb_avg, jitter(metadata_usc[metadata_usc$site == site,]$surv, factor=0.2), col=i, xlim=c(-2.5,1.5))
-  coeff <- par_usc[i,]
-  meanha <- mean(metadata_usc[metadata_usc$site == site,]$h_apical)
-  ypred <- 1/(1+exp(-1*(coeff['(Intercept)'] + coeff['h_apical']*meanha + coeff['log_herb_avg']*xpts + coeff['h_apical:log_herb_avg']*xpts*meanha)))
-  lines(xpts, ypred, col = i)
-}
-meanha <- mean(metadata_usc$h_apical)
-ypts = 1/(1+exp(-1*(pars['(Intercept)'] + pars['h_apical']*meanha + pars['log_herb_avg']*xpts + pars['h_apical:log_herb_avg']*xpts*meanha)))
-lines(xpts, ypts, col="black", lwd=2, lty=2)
-legend("bottomright", sort(unique(as.character(metadata_usc$site))), col=1:5, pch=1)
+DHARMa::plotSimulatedResiduals(surv.simulationOutput)
+DHARMa::plotResiduals(metadata_sc$h_apical, surv.simulationOutput$scaledResiduals)
+DHARMa::plotResiduals(metadata_sc$herb_avg, surv.simulationOutput$scaledResiduals)
 ```
 
-Now site-specific models.  First, h_apical.
+Here we actually pass the Uniformity test, indicating that the residuals do fit the expected distribution.
 ```{r}
-xpts <- seq(min(metadata_usc$h_apical), max(metadata_usc$h_apical), length.out=100)
-xyplot(jitter(surv, factor=0.2) ~ h_apical|site, data=metadata_usc, para=par_usc, metadata=metadata_usc, xpts=xpts, panel = function(x,y,metadata,para,xpts) {
-  panel.xyplot(x, y)
-  site <- rownames(para)[packet.number()]
-  coeff <- para[packet.number(),]
-  meanhe <- mean(metadata[metadata$site == site,]$log_herb_avg)
-  ypred <- 1/(1+exp(-1*(coeff['(Intercept)'] + coeff['h_apical']*xpts + coeff['log_herb_avg']*meanhe + coeff['h_apical:log_herb_avg']*xpts*meanhe)))
-  panel.lines(xpts, ypred, col = "red")
-})
+DHARMa::testUniformity(surv.simulationOutput)
 ```
 
-Now site-specific models.  Now, log_herb_avg.
 ```{r}
-xpts <- seq(min(metadata_usc$log_herb_avg), max(metadata_usc$log_herb_avg), length.out=100)
-xyplot(jitter(surv, factor=0.2) ~ log_herb_avg|site, data=metadata_usc, para=par_usc, metadata=metadata_usc, xpts=xpts, panel = function(x,y,metadata,para,xpts) {
-  panel.xyplot(x, y)
-  site <- rownames(para)[packet.number()]
-  coeff <- para[packet.number(),]
-  meanha <- mean(metadata[metadata$site == site,]$h_apical)
-  ypred <- 1/(1+exp(-1*(coeff['(Intercept)'] + coeff['h_apical']*meanha + coeff['log_herb_avg']*xpts + coeff['h_apical:log_herb_avg']*xpts*meanha)))
-  panel.lines(xpts, ypred, col = "red")
-})
+# Create model class
+scaled <- list(h_apical = h_apical_sc, herb_avg = herb_avg_sc)
+surv.fit <- mwMod(list(mdl = surv.reg.final, vars = c("h_apical", "herb_avg"), scaled = scaled))
+checkPars(surv.fit) # Check parameters
 ```
 
 ## Growth
@@ -464,350 +354,363 @@ xyplot(jitter(surv, factor=0.2) ~ log_herb_avg|site, data=metadata_usc, para=par
 metadata_usc <- metadata %>% filter(!is.na(h_apical),
                                     !is.na(h_apical.next),
                                     !is.na(herb_avg),
-                                    fec.flower == 1,
-                                    surv == 1) %>%
-  mutate(log_herb_avg = log(0.01 + herb_avg))
+                                    fec.flower == 1, #growth is also only used in the sexual pathway
+                                    surv == 1) %>%   #plants must survive until september to reprodcude in our model
+  mutate(log_herb_avg = log(0.01 + herb_avg), arcsin_herb_avg = asin(sqrt(herb_avg/6)), h_apical_sq = h_apical*h_apical)
                                         
-metadata_sc <- metadata_usc %>% mutate_each(funs(as.numeric(scale(.))), 
-                                            h_apical,
-                                            h_apical.next, 
-                                            log_herb_avg)
+metadata_sc <- metadata_usc %>% mutate_at(.vars = vars(h_apical, h_apical.next, herb_avg, log_herb_avg, arcsin_herb_avg, h_apical_sq),
+                                          .funs = funs(as.numeric(scale(.))))
 
 # Get scaling parameters (really just mean and sd)
 h_apical_sc <- scale(metadata_usc$h_apical)
 h_apical.next_sc <- scale(metadata_usc$h_apical.next)
-log_herb_avg_sc <- scale(metadata_usc$log_herb_avg)
+herb_avg_sc <- scale(metadata_usc$herb_avg)
+log_herb_avg_sc = scale(metadata_usc$log_herb_avg)
+arcsin_herb_avg_sc = scale(metadata_usc$arcsin_herb_avg)
+h_apical_sq_sc = scale(metadata_usc$h_apical_sq)
 
-xyplot(h_apical.next ~ h_apical|site, data=metadata_sc, group=year, auto.key = TRUE)
+metadata_sc %>% ggplot(aes(x = h_apical, 
+                           y = h_apical.next, 
+                           color = year)) + 
+                geom_point(alpha = 0.3) +
+                facet_wrap(~ site)
 ```
 
 As this is a bona-fide LME, we can do the method mentioned in Zuur.  First, model selection on random effects with REML.
 
 ```{r}
-growth.reg.full=lmer(h_apical.next~h_apical*log_herb_avg + (h_apical*log_herb_avg|site/transect)+(h_apical*log_herb_avg|year),data=metadata_sc, REML=T)
+growth.reg.full=lmer(h_apical.next~h_apical*herb_avg + (h_apical*herb_avg|site/transect)+(h_apical*herb_avg|year),data=metadata_sc, REML=T)
+summary(growth.reg.full)
 
-growth.reg.mdl1a=lmer(h_apical.next~h_apical*log_herb_avg + (h_apical+log_herb_avg|site/transect)+(h_apical*log_herb_avg|year),data=metadata_sc, REML=T)
+growth.reg.mdl1=lmer(h_apical.next~h_apical*herb_avg + (h_apical+herb_avg|site/transect)+(h_apical*herb_avg|year),data=metadata_sc, REML=T)
+summary(growth.reg.mdl1)
 
-growth.reg.mdl1b=lmer(h_apical.next~h_apical*log_herb_avg + (h_apical*log_herb_avg|site/transect)+(h_apical+log_herb_avg|year),data=metadata_sc, REML=T)
+growth.reg.mdl2=lmer(h_apical.next~h_apical*herb_avg + (h_apical|site/transect)+(h_apical*herb_avg|year),data=metadata_sc, REML=T)
+summary(growth.reg.mdl2)
 
-growth.reg.mdl1c=lmer(h_apical.next~h_apical*log_herb_avg + (h_apical+log_herb_avg|site/transect)+(h_apical+log_herb_avg|year),data=metadata_sc, REML=T)
+growth.reg.mdl3=lmer(h_apical.next~h_apical*herb_avg + (h_apical|site/transect)+(h_apical+herb_avg|year),data=metadata_sc, REML=T)
+summary(growth.reg.mdl3)
 
-AIC(growth.reg.full, growth.reg.mdl1a, growth.reg.mdl1b, growth.reg.mdl1c)
+growth.reg.mdl4=lmer(h_apical.next~h_apical*herb_avg + (h_apical|site/transect)+(herb_avg|year),data=metadata_sc, REML=T)
+summary(growth.reg.mdl4)
 
-growth.reg.mdl2=lmer(h_apical.next~h_apical*log_herb_avg + (h_apical+log_herb_avg|site/transect)+(h_apical|year),data=metadata_sc, REML=T)
+growth.reg.mdl5=lmer(h_apical.next~h_apical*herb_avg + (h_apical|site/transect)+(1|year),data=metadata_sc, REML=T)
+summary(growth.reg.mdl5)
 
-growth.reg.mdl2a=lmer(h_apical.next~h_apical*log_herb_avg+(h_apical+log_herb_avg|site/transect)+(1|year),data=metadata_sc,REML=T)
+growth.reg.mdl6=lmer(h_apical.next~h_apical*herb_avg + (1|site/transect)+(1|year),data=metadata_sc, REML=T)
+summary(growth.reg.mdl6)
 
-growth.reg.mdl2b=lmer(h_apical.next~h_apical*log_herb_avg+(h_apical|site/transect)+(h_apical|year),data=metadata_sc,REML=T)
+aictab(list(growth.reg.full, growth.reg.mdl1, growth.reg.mdl2, growth.reg.mdl3, growth.reg.mdl4, growth.reg.mdl5, growth.reg.mdl6), modnames = c('growth.reg.full', 'growth.reg.mdl1', 'growth.reg.mdl2', 'growth.reg.mdl3', 'growth.reg.mdl4', 'growth.reg.mdl5', 'growth.reg.mdl6'))
 
-growth.reg.mdl2c=lmer(h_apical.next~h_apical*log_herb_avg+(log_herb_avg|site/transect)+(h_apical|year),data=metadata_sc,REML=T)
-
-gAICtab <- AIC(growth.reg.full, growth.reg.mdl1a, growth.reg.mdl1b, growth.reg.mdl1c, growth.reg.mdl2, growth.reg.mdl2a, growth.reg.mdl2b, growth.reg.mdl2c)
-gAICtab$dAIC <- min(gAICtab$AIC)-gAICtab$AIC
-gAICtab
-
-gBICtab <- BIC(growth.reg.full, growth.reg.mdl1a, growth.reg.mdl1b, growth.reg.mdl1c, growth.reg.mdl2, growth.reg.mdl2a, growth.reg.mdl2b, growth.reg.mdl2c)
-gBICtab$dBIC <- min(gBICtab$BIC)-gBICtab$BIC
-gBICtab
-
-# Seems to be the best for random effects with AIC
-# growth.reg.han2=lmer(h_apical.next~h_apical*log_herb_avg+(h_apical + log_herb_avg|site/transect)+(h_apical|year),data=metadata_sc,REML=T)
-
-# Seems to be the best for fixed effects
-# growth.reg.mdl4=lmer(h_apical.next~h_apical + (h_apical + herb_avg:munched|site/transect)+(h_apical|year),data=metadata_sc,REML=T)
+# Model 2 wins AIC
 ```
 
-Winner:
-```
-(h_apical + log_herb_avg|site/transect)+(h_apical|year)
-```
-
-Now fixed effects, with ML this time.
+Now fixed effects, with ML this time. Comparing all alternative models.
 
 ```{r}
-growth.reg.fmdl1=lmer(h_apical.next ~ h_apical*log_herb_avg + (h_apical + log_herb_avg|site/transect)+(h_apical|year), data=metadata_sc, REML=F)
+growth.reg.mdl2a=lmer(h_apical.next ~ h_apical*herb_avg + (h_apical|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, REML=F)
+#do single-term deletions to see which term needs to be dropped first
+drop1(growth.reg.mdl2a, scope=c("h_apical", "herb_avg", "h_apical:herb_avg"))
 
-drop1(growth.reg.fmdl1, scope=c("h_apical", "log_herb_avg", "h_apical:log_herb_avg"))
+# Looks like interaction goes first based on the drop1() results
+growth.reg.mdl2b=lmer(h_apical.next ~ h_apical+herb_avg + (h_apical|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, REML=F) #all 3 remaining terms
 
-# Looks like log_herb_avg goes
-growth.reg.fmdl2=lmer(h_apical.next ~ h_apical + h_apical:log_herb_avg + (h_apical+log_herb_avg|site/transect)+(h_apical|year), data=metadata_sc, REML=F)
+growth.reg.mdl2c=lmer(h_apical.next ~ h_apical + (h_apical|site/transect)+(h_apical + herb_avg|year), data=metadata_sc, REML=F) #2 remaining terms
+growth.reg.mdl2d=lmer(h_apical.next ~ h_apical + herb_avg - 1 + (h_apical|site/transect)+(h_apical + herb_avg|year), data=metadata_sc, REML=F)
+growth.reg.mdl2e=lmer(h_apical.next ~ herb_avg + (h_apical|site/transect)+(h_apical + herb_avg|year), data=metadata_sc, REML=F)
 
-growth.reg.fmdl2a=lmer(h_apical.next ~ h_apical + (h_apical+log_herb_avg|site/transect)+(h_apical|year), data=metadata_sc, REML=F)
+growth.reg.mdl2f=lmer(h_apical.next ~ h_apical - 1 + (h_apical|site/transect)+(h_apical + herb_avg|year), data=metadata_sc, REML=F) #1 remaining term
+growth.reg.mdl2g=lmer(h_apical.next ~ herb_avg - 1 + (h_apical|site/transect)+(h_apical + herb_avg|year), data=metadata_sc, REML=F)
+growth.reg.mdl2h=lmer(h_apical.next ~ 1 + (h_apical|site/transect)+(h_apical + herb_avg|year), data=metadata_sc, REML=F)
 
-growth.reg.fmdl2b=lmer(h_apical.next ~ h_apical + h_apical:log_herb_avg - 1 + (h_apical+log_herb_avg|site/transect)+(h_apical|year), data=metadata_sc, REML=F)
 
-growth.reg.fmdl2c=lmer(h_apical.next ~ h_apical:log_herb_avg + (h_apical+log_herb_avg|site/transect)+(h_apical|year), data=metadata_sc, REML=F)
+aictab(list(growth.reg.mdl2a, growth.reg.mdl2b, growth.reg.mdl2c, growth.reg.mdl2d, growth.reg.mdl2e, growth.reg.mdl2f, growth.reg.mdl2g, growth.reg.mdl2h), modnames = c('growth.reg.mdl2a', 'growth.reg.mdl2b', 'growth.reg.mdl2c', 'growth.reg.mdl2d', 'growth.reg.mdl2e', 'growth.reg.mdl2f', 'growth.reg.mdl2g', 'growth.reg.mdl2h'))
 
-# growth.reg.fmdl2b wins.  Let's try and drop one more...
-
-growth.reg.fmdl3a=lmer(h_apical.next ~ h_apical - 1 + (h_apical+log_herb_avg|site/transect)+(h_apical|year), data=metadata_sc, REML=F)
-
-growth.reg.fmdl3b=lmer(h_apical.next ~ h_apical:log_herb_avg - 1 + (h_apical+log_herb_avg|site/transect)+(h_apical|year), data=metadata_sc, REML=F)
-
-# fmdl2b still seems the best.  Let's combine and reassess
-gAICtab <- AIC(growth.reg.fmdl2, growth.reg.fmdl2a, growth.reg.fmdl2b, growth.reg.fmdl2c, growth.reg.fmdl3a, growth.reg.fmdl3b)
-gAICtab$dAIC <- gAICtab$AIC-min(gAICtab$AIC)
-gAICtab$wAIC <- exp(-0.5*gAICtab$dAIC)
-gAICtab$wAIC <- gAICtab$wAIC/sum(gAICtab$wAIC)
-(gAICtab <- gAICtab[order(gAICtab$AIC),])
-
-gBICtab <- BIC(growth.reg.fmdl2, growth.reg.fmdl2a, growth.reg.fmdl2b, growth.reg.fmdl2c, growth.reg.fmdl3a, growth.reg.fmdl3b)
-gBICtab$dBIC <- gBICtab$BIC-min(gBICtab$BIC)
-gBICtab[order(gBICtab$BIC),]
+# Models a, and b, are indistinguishable for AICc, so we will go with 2a.
 ```
 
 Need to refit with REML.
 
 ```{r}
-growth.reg.final=lmer(h_apical.next ~ h_apical + h_apical:log_herb_avg + (h_apical+log_herb_avg|site/transect) + (h_apical|year), data=metadata_sc, REML=T)
+growth.reg.final = lmer(h_apical.next ~ h_apical*herb_avg + (h_apical|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, REML=T)
 summary(growth.reg.final)
-
-# Create model class
-scaled <- list(h_apical = h_apical_sc, log_herb_avg = log_herb_avg_sc, h_apical.next = h_apical.next_sc)
-growth.fit <- mwMod(list(mdl = growth.reg.final, vars = c("h_apical", "log_herb_avg"), scaled = scaled))
-checkPars(growth.fit) # Check parameters
 ```
 
-Winner:
-```
-h_apical.next ~ h_apical + h_apical:log_herb_avg + (h_apical + log_herb_avg|site)+(h_apical|year)
-```
-
-Let's get the unscaled parameters:
-```{r, eval=FALSE}
-par_intercept_sc <- coef(summary(growth.reg.final))["(Intercept)","Estimate"]
-par_h_apical_sc <- coef(summary(growth.reg.final))["h_apical","Estimate"]
-par_log_herb_avg_sc <- 0
-par_interact_sc <- coef(summary(growth.reg.final))["h_apical:log_herb_avg","Estimate"]
-
-muha <- attributes(h_apical_sc)$'scaled:center'
-sdha <- attributes(h_apical_sc)$'scaled:scale'
-muhan <- attributes(h_apical.next_sc)$'scaled:center'
-sdhan <- attributes(h_apical.next_sc)$'scaled:scale'
-muhe <- attributes(log_herb_avg_sc)$'scaled:center'
-sdhe <- attributes(log_herb_avg_sc)$'scaled:scale'
-
-par_intercept_usc <- muhan + sdhan*(par_intercept_sc - par_h_apical_sc*(muha/sdha) - par_log_herb_avg_sc*(muhe/sdhe) + par_interact_sc*muha*muhe/(sdha*sdhe))
-par_h_apical_usc <- sdhan*(par_h_apical_sc/sdha - par_interact_sc*muhe/(sdha*sdhe))
-par_log_herb_avg_usc <- sdhan*(par_log_herb_avg_sc/sdhe - par_interact_sc*muha/(sdha*sdhe))
-par_interact_usc <- sdhan*(par_interact_sc/(sdha*sdhe))
-
-pars <- c(par_intercept_usc, par_h_apical_usc, par_log_herb_avg_usc, par_interact_usc)
-names(pars) <- c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
-pars
-
-par_sc <- coef(growth.reg.final)$site[c("(Intercept)","h_apical","log_herb_avg","h_apical:log_herb_avg")]
-par_usc <- par_sc
-for (i in 1:5) {
-  par_usc[i,"(Intercept)"] <- muhan + sdhan*(par_sc[i,"(Intercept)"] - par_sc[i,"h_apical"]*(muha/sdha) - par_sc[i,"log_herb_avg"]*(muhe/sdhe) + par_sc[i,"h_apical:log_herb_avg"]*muha*muhe/(sdha*sdhe))
-  par_usc[i,"h_apical"] <- sdhan*(par_sc[i,"h_apical"]/sdha - par_sc[i,"h_apical:log_herb_avg"]*muhe/(sdha*sdhe))
-  par_usc[i,"log_herb_avg"] <- sdhan*(par_sc[i,"log_herb_avg"]/sdhe - par_sc[i,"h_apical:log_herb_avg"]*muha/(sdha*sdhe))
-  par_usc[i,"h_apical:log_herb_avg"] <- sdhan*(par_sc[i,"h_apical:log_herb_avg"]/(sdha*sdhe))
-}
-par_usc
-```
-
-Let's check functions & compute standard deviation of residuals.
-```{r}
-# Get parameters from model
-pars <- getParameters(growth.reg.final, scaled = list(h_apical_sc = h_apical_sc, log_herb_avg_sc = log_herb_avg_sc, h_apical.next_sc = h_apical.next_sc), growth=TRUE)
-pars_usc <- pars$unscaled
-
-# Bertha
-h_apical <- metadata_usc$h_apical
-log_herb_avg <- metadata_usc$log_herb_avg
-estresp <- pars_usc['Bertha', '(Intercept)'] + pars_usc['Bertha', 'h_apical']*h_apical + pars_usc['Bertha', 'log_herb_avg']*log_herb_avg + pars_usc['Bertha', 'h_apical:log_herb_avg']*h_apical*log_herb_avg
-
-muhan <- attributes(h_apical.next_sc)$'scaled:center'
-sdhan <- attributes(h_apical.next_sc)$'scaled:scale'
-fitresp <- muhan+sdhan*predict(growth.reg.final, type="response", re.form=NA)
-
-(error <- max(abs(estresp-fitresp)))
-
-# Sites
-sites <- rownames(pars_usc)[-1]
-fitresp <- muhan+sdhan*predict(growth.reg.final, type="response", re.form=~(h_apical+log_herb_avg|site))
-E <- rep(0, 5)
-for (i in 1:length(sites)) {
-  isite <- sites[i]
-  h_apical <- (metadata_usc %>% filter(site == isite))$h_apical
-  log_herb_avg <- (metadata_usc %>% filter(site == isite))$log_herb_avg
-  estresp <- pars_usc[isite,'(Intercept)'] + pars_usc[isite,'h_apical']*h_apical + pars_usc[isite,'log_herb_avg']*log_herb_avg + pars_usc[isite,'h_apical:log_herb_avg']*h_apical*log_herb_avg
-  
-  E[i] <- max(abs(estresp-fitresp[which(metadata_usc$site == isite)]))
-}
-max(E)
-```
-
+### Model Validation and Diagnostics
 Now some diagnostics (aka model validation).
-
 ```{r}
 par(mfrow=c(2,2))
 plot(fitted(growth.reg.final), residuals(growth.reg.final, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
 plot(metadata_sc$h_apical, residuals(growth.reg.final, "deviance"), xlab="Apical height", ylab="Deviance residuals")
-plot(metadata_sc$log_herb_avg, residuals(growth.reg.final, "deviance"), xlab="Log(Herbivory average)", ylab="Deviance residuals")
+plot(metadata_sc$herb_avg, residuals(growth.reg.final, "deviance"), xlab="Herbivory average", ylab="Deviance residuals")
 par(mfrow=c(1,1))
 ```
 
-Let's plot full data.
-
+DHARMa Diagnostics
 ```{r}
-plot(NULL, axes=T, xlim=c(0,160), ylim=c(0, 200), xlab="", ylab="")
-xpts <- seq(min(metadata_usc$h_apical), max(metadata_usc$h_apical), length.out=100)
-for (i in 1:5) {
-  site <- rownames(par_usc)[i]
-  meanhe <- mean(metadata_usc[metadata_usc$site == site,]$log_herb_avg)
-  points(metadata_usc[metadata_usc$site == site,]$h_apical, metadata_usc[metadata_usc$site == site,]$h_apical.next, col=i)
-  ypred <- par_usc[site,'(Intercept)'] + par_usc[site,'h_apical']*xpts + par_usc[site,'log_herb_avg']*meanhe + par_usc[site,'h_apical:log_herb_avg']*xpts*meanhe
-  lines(xpts, ypred, col = i)
-}
-meanhe <- mean(metadata_usc$log_herb_avg)
-ypts = pars['(Intercept)'] + pars['h_apical']*xpts + pars['log_herb_avg']*meanhe + pars['h_apical:log_herb_avg']*xpts*meanhe
-lines(xpts, ypts, col="black", lwd=2, lty=2)
-
-legend("bottomright", sort(unique(as.character(metadata_usc$site))), col=1:5, pch=1)
+growth.simulationOutput = DHARMa::simulateResiduals(fittedModel = growth.reg.final, n=1000)
 ```
 
-Now site-specific models.
 ```{r}
-xyplot(h_apical.next ~ h_apical|site, data=metadata_usc, para=par_usc, metadata=metadata_usc, xpts=xpts, panel = function(x,y,metadata,para,xpts) {
-  panel.xyplot(x, y)
-  isite <- rownames(para)[packet.number()]
-  meanhe <- mean(metadata[metadata$site == isite,]$log_herb_avg)
-  allha <- metadata[metadata$site == isite,]$h_apical
-  allhe <- metadata[metadata$site == isite,]$log_herb_avg
-  coeff <- para[packet.number(),]
-  ymean <- coeff[,'(Intercept)'] + coeff[,'h_apical']*xpts + coeff[,'log_herb_avg']*meanhe + coeff[,'h_apical:log_herb_avg']*meanhe*xpts
-  ypred <- coeff[,'(Intercept)'] + coeff[,'h_apical']*allha + coeff[,'log_herb_avg']*allhe + coeff[,'h_apical:log_herb_avg']*allha*allhe
-  panel.lines(xpts, ymean, col = "red")
-  panel.xyplot(allha, ypred, col='red')
-})
+DHARMa::plotSimulatedResiduals(growth.simulationOutput)
+DHARMa::plotResiduals(metadata_sc$h_apical, growth.simulationOutput$scaledResiduals)
+DHARMa::plotResiduals(metadata_sc$herb_avg, growth.simulationOutput$scaledResiduals)
 ```
 
-Let's add year plots (just use predict function):
-```{r, eval=FALSE}
-xyplot(h_apical.next ~ h_apical|site, data=metadata_usc, para=ypar_usc, metadata=metadata_usc, xpts=xpts, fit=growth.reg.null, group=year, auto.key = TRUE, subscripts=FALSE, panel = function(x,y,groups=groups,subscripts=subscripts,metadata,para,xpts,fit) {
-  panel.xyplot(x, y, groups=groups,subscripts=subscripts)
-  site <- rownames(para)[packet.number()]
-  cols <- c(4,6,3)
-  for (i in 1:3) {
-    meanhe <- mean(metadata[(metadata$site == site & metadata$year == dimnames(para)[[3]][i]),]$herb_avg)
-    
-    # First, explicit function
-    coeff <- para[packet.number(),,i]
-    ypred <- coeff['(Intercept)'] + coeff['h_apical']*xpts + coeff['herb_avg']*meanhe
-    panel.lines(xpts, ypred, col = cols[i])
-    
-    # Now from fit
-    # ypred <- predict(fit, newdata = data.frame(h_apical = (xpts-muha)/sdha, herb_avg = rep((meanhe-muhe)/sdhe, length(xpts)), site = site, year = dimnames(para)[[3]][i]))
-    # panel.lines(xpts, ypred, col = cols[i], lty=2)
-  }
-})
+Low p-value again may be due to large sample. Plots look ok if you exclude the tails and concentrate on where most of the data is centered, however the shape could be improved.
+```{r}
+DHARMa::testUniformity(growth.simulationOutput)
 ```
 
-Slopes are for some reason looking backwards!  Let's do model validation now.
+#### Herb_avg transform
+Let's try transforming herb_avg and putting that into the existing model structure. Going with log and an arcsine transform on the herbivory average scaled to be 0<herb_avg<1. 
+```{r}
+growth.reg.final.log = lmer(h_apical.next ~ h_apical*log_herb_avg + (h_apical|site/transect)+(h_apical*log_herb_avg|year), data=metadata_sc, REML=T)
+summary(growth.reg.final.log)
+growth.reg.final.arcsin = lmer(h_apical.next ~ h_apical*arcsin_herb_avg + (h_apical|site/transect)+(h_apical*arcsin_herb_avg|year), data=metadata_sc, REML=T)
+summary(growth.reg.final.arcsin)
+
+#both transformations produce a much lower AIC, with log coming out on top
+aictab(list(growth.reg.final, growth.reg.final.log, growth.reg.final.arcsin), modnames = c('growth.reg.final', 'growth.reg.final.log', 'growth.reg.final.arcsin'))
+```
+
+Both have MUCH lower AICc than the final model, so let's see what model validation says.
+```{r}
+par(mfrow=c(2,2))
+plot(fitted(growth.reg.final.log), residuals(growth.reg.final.log, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
+plot(metadata_sc$h_apical, residuals(growth.reg.final.log, "deviance"), xlab="Apical height", ylab="Deviance residuals")
+plot(metadata_sc$herb_avg, residuals(growth.reg.final.log, "deviance"), xlab="log(Herbivory average)", ylab="Deviance residuals")
+par(mfrow=c(1,1))
+
+par(mfrow=c(2,2))
+plot(fitted(growth.reg.final.arcsin), residuals(growth.reg.final.arcsin, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
+plot(metadata_sc$h_apical, residuals(growth.reg.final.arcsin, "deviance"), xlab="Apical height", ylab="Deviance residuals")
+plot(metadata_sc$herb_avg, residuals(growth.reg.final.arcsin, "deviance"), xlab="arcsin(sqrt(Herbivory average))", ylab="Deviance residuals")
+par(mfrow=c(1,1))
+```
+
+None of these residual plots look any better, so we will see what DHARMa says.
+```{r}
+growth.simulationOutput.log = DHARMa::simulateResiduals(fittedModel = growth.reg.final.log, n=1000)
+growth.simulationOutput.arcsin = DHARMa::simulateResiduals(fittedModel = growth.reg.final.arcsin, n=1000)
+```
 
 ```{r}
-plot(growth.reg.final)
-E <- resid(growth.reg.final)
-hist(E, xlab = "Residuals", main = "")
-plot(metadata_usc$h_apical, E, xlab = "Apical height", ylab = "Residuals")
-plot(metadata_usc$log_herb_avg, E, xlab = "Avg. Herbivory Score", ylab = "Residuals")
+DHARMa::plotSimulatedResiduals(growth.simulationOutput.log)
+DHARMa::plotResiduals(metadata_sc$h_apical, growth.simulationOutput.log$scaledResiduals)
+DHARMa::plotResiduals(metadata_sc$log_herb_avg, growth.simulationOutput.log$scaledResiduals)
+
+DHARMa::plotSimulatedResiduals(growth.simulationOutput.arcsin)
+DHARMa::plotResiduals(metadata_sc$h_apical, growth.simulationOutput.arcsin$scaledResiduals)
+DHARMa::plotResiduals(metadata_sc$arcsin_herb_avg, growth.simulationOutput.arcsin$scaledResiduals)
+```
+
+These plots look marginally better at best. Also the QQ plots are no different. Given that the DHARMa diagnostics are at least similar, the only benfit we would get from transforming herb_avg would be a lower AICc, which would be questionable, given that there seem to be few other improvements. The aictab() function documentation warns against comparing model AICs between those that have transformed and untransformed response variables. While we do not transform the response variable, we believe that for the same reasons, it would not be ideal to compare models that have different transformations on the explanatories. Therefore, we will use our original final model as our best approximation, despite imperfect model validation results and a higher AICc. It should also be noted that we tried including a quadratic term for herb_avg, with similar results. The model selection for that as well a site by site and year by year break down validating the use of a linear model for growth can be found in the "Growth_Exploration.Rmd" script.
+
+```{r}
+# Create model class
+scaled <- list(h_apical = h_apical_sc, herb_avg = herb_avg_sc, h_apical.next = h_apical.next_sc)
+growth.fit <- mwMod(list(mdl = growth.reg.final, vars = c("h_apical", "herb_avg", "h_apical.next"), scaled = scaled))
+checkPars(growth.fit) # Check parameters
 ```
 
 ## Pods
-
+### Data
 ```{r}
 metadata_usc <- metadata %>% filter(!is.na(h_apical),
                                     !is.na(h_apical.next),
                                     !is.na(herb_avg),
-                                    fec.flower == 1,
-                                    surv == 1,
+                                    fec.flower == 1, #pods only result from the sexual pathway
+                                    surv == 1, #again, plants must survive to September
                                     !is.na(N_pods),
                                     h_apical.next > 50,
-                                    !(site == "YTB" & h_apical <= 50))
+                                    !(site == "YTB" & h_apical <= 50)) #necessary to compensate for an issue with some of the plants in YTB site
 
-metadata_sc <- metadata_usc %>% mutate_each(funs(sc = as.numeric(scale(.))), h_apical, h_apical.next, log_herb_avg)
+metadata_sc <- metadata_usc %>% mutate_at(.vars = vars(h_apical, h_apical.next, herb_avg),
+                                          .funs = funs(as.numeric(scale(.))))
 
 # Get scaling parameters (really just mean and sd)
 h_apical_sc <- scale(metadata_usc$h_apical)
 h_apical.next_sc <- scale(metadata_usc$h_apical.next)
-log_herb_avg_sc <- scale(metadata_usc$log_herb_avg)
+herb_avg_sc <- scale(metadata_usc$herb_avg)
 
 glmerCtrl <- glmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
 
-xyplot(N_pods ~ h_apical.next|site, data=metadata_sc, group=year, auto.key = TRUE)
+metadata_sc %>% ggplot(aes(x = h_apical.next, 
+                           y = N_pods, 
+                           color = year)) + 
+                geom_point(alpha = 0.3) +
+                facet_wrap(~ site)
 ```
 
-First, do full model.
-
+### June vs. September Height as a Predictor
+First, do full model. In this case, we will compare to see if height in June or September is a better predictor.
 ```{r}
-pods.reg.full_sept = glmer(N_pods ~ h_apical.next*log_herb_avg + (h_apical.next*log_herb_avg|site/transect)+(h_apical.next*log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
+pods.reg.full_sept = glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next*herb_avg|site/transect)+(h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
 
-pods.reg.full_june = glmer(N_pods ~ h_apical*log_herb_avg + (h_apical*log_herb_avg|site/transect)+(h_apical*log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
+pods.reg.full_june = glmer(N_pods ~ h_apical*herb_avg + (h_apical*herb_avg|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
 
-AIC(pods.reg.full_june, pods.reg.full_sept)
+aictab(list(pods.reg.full_june, pods.reg.full_sept), modnames = c('June', 'September'))
 summary(pods.reg.full_sept)
 ```
 
-We can try and drop h_apical.next:log_herb_avg in the random effect due to small variation.
-
+### Random Effects
+September wins, so we will continue to use this in our model instead of height in June (h_apical). Now onto selection for random effects. We can try and drop the herb_avg term in the site/transect random effect first due to small variation.
 ```{r}
-pods.reg.mdl1 = glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next*log_herb_avg|site/transect)+(h_apical.next+log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
+pods.reg.mdl1 = glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next+h_apical.next:herb_avg|site/transect)+(h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+summary(pods.reg.mdl1)
 
-pods.reg.mdl2 = glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next+log_herb_avg|site/transect)+(h_apical.next+log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
-
-pods.reg.mdl3a = glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect)+(h_apical.next+log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
-
-pods.reg.mdl3b = glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next+log_herb_avg|site/transect)+(log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
-
-pods.reg.mdl3c = glmer(N_pods ~ h_apical.next*herb_avg + (log_herb_avg|site/transect)+(h_apical.next+log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
-
-AIC(pods.reg.full_sept, pods.reg.mdl1, pods.reg.mdl2, pods.reg.mdl3a, pods.reg.mdl3b, pods.reg.mdl3c)
-
+#next dropping interaction term in site/transect
+pods.reg.mdl2 = glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect)+(h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
 summary(pods.reg.mdl2)
+
+#dropping h_apical.next in site/transect
+pods.reg.mdl3 = glmer(N_pods ~ h_apical.next*herb_avg + (1|site/transect)+(h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+summary(pods.reg.mdl3)
+
+#now dropping it in year
+pods.reg.mdl4 = glmer(N_pods ~ h_apical.next*herb_avg + (1|site/transect)+(herb_avg:h_apical.next+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+summary(pods.reg.mdl4)
+
+#dropping interaction in year
+pods.reg.mdl5 = glmer(N_pods ~ h_apical.next*herb_avg + (1|site/transect)+(herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+summary(pods.reg.mdl5)
+
+#trying dropping site/transect
+pods.reg.mdl6 = glmer(N_pods ~ h_apical.next*herb_avg + (herb_avg:h_apical.next+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+pods.reg.mdl7 = glmer(N_pods ~ h_apical.next*herb_avg + (herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+
+aictab(list(pods.reg.full_sept, pods.reg.mdl1, pods.reg.mdl2, pods.reg.mdl3, pods.reg.mdl4, pods.reg.mdl5, pods.reg.mdl6, pods.reg.mdl7), modnames = c('pods.reg.full_sept', 'pods.reg.mdl1', 'pods.reg.mdl2', 'pods.reg.mdl3', 'pods.reg.mdl4', 'pods.reg.mdl5', 'pods.reg.mdl6', 'pods.reg.mdl7'))
 ```
 
-Winner:
+### Fixed Effects
+Based on AICc, Model 2 is the best for random effects, continuing selection for fixed effects with this. Removing interaction term first, due to highest p-value.
+```{r}
+pods.reg.mdl2a = glmer(N_pods ~ h_apical.next+herb_avg + (h_apical.next|site/transect)+(h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+summary(pods.reg.mdl2a)
+
+#next goes the intercept
+pods.reg.mdl2b = glmer(N_pods ~ h_apical.next+herb_avg -1 + (h_apical.next|site/transect)+(h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+summary(pods.reg.mdl2b)
+
+#finally herb_avg
+pods.reg.mdl2c = glmer(N_pods ~ h_apical.next -1 + (h_apical.next|site/transect)+(h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+summary(pods.reg.mdl2c)
+
+aictab(list(pods.reg.mdl2, pods.reg.mdl2a, pods.reg.mdl2b, pods.reg.mdl2c), modnames = c('pods.reg.mdl2', 'pods.reg.mdl2a', 'pods.reg.mdl2b', 'pods.reg.mdl2c'))
+
+# Models b and c are indistinguishable, so we will go with 2b.
 ```
-(h_apical.next+log_herb_avg|site/transect)+(h_apical.next+log_herb_avg|year)
+
+We'll go with 2b after looking at AICc.
+```{r}
+pods.reg.final = glmer(N_pods ~ h_apical.next + herb_avg -1 + (h_apical.next|site/transect)+(h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+```
+
+### Model Validation and Diagnostics
+```{r}
+par(mfrow=c(2,2))
+plot(fitted(pods.reg.final), residuals(pods.reg.final, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
+plot(metadata_sc$h_apical, residuals(pods.reg.final, "deviance"), xlab="Apical height", ylab="Deviance residuals")
+plot(metadata_sc$herb_avg, residuals(pods.reg.final, "deviance"), xlab="Herbivory average", ylab="Deviance residuals")
+par(mfrow=c(1,1))
+```
+
+DHARMa Diagnostics
+```{r}
+pods.simulationOutput = DHARMa::simulateResiduals(fittedModel = pods.reg.final, n=1000)
 ```
 
 ```{r}
-pods.reg.fmdl1a = glmer(N_pods ~ h_apical.next + log_herb_avg + (h_apical.next+log_herb_avg|site/transect)+(h_apical.next+log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
-
-pods.reg.fmdl1b = glmer(N_pods ~ h_apical.next + h_apical.next:log_herb_avg + (h_apical.next+log_herb_avg|site/transect)+(h_apical.next+log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
-
-pods.reg.fmdl2a = glmer(N_pods ~ h_apical.next + log_herb_avg - 1 + (h_apical.next+log_herb_avg|site/transect)+(h_apical.next+log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
-
-pods.reg.fmdl2b = glmer(N_pods ~ h_apical.next +  (h_apical.next+log_herb_avg|site/transect)+(h_apical.next+log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
-
-pAICtab <- AIC(pods.reg.mdl2, pods.reg.fmdl1a, pods.reg.fmdl1b, pods.reg.fmdl2a, pods.reg.fmdl2b)
-pAICtab$dAIC <- pAICtab$AIC-min(pAICtab$AIC)
-pAICtab$wAIC <- exp(-0.5*pAICtab$dAIC)
-pAICtab$wAIC <- pAICtab$wAIC/sum(pAICtab$wAIC)
-(pAICtab <- pAICtab[order(pAICtab$AIC),])
-
-pBICtab <- BIC(pods.reg.mdl2, pods.reg.fmdl1a, pods.reg.fmdl1b, pods.reg.fmdl2a, pods.reg.fmdl2b)
-pBICtab$dBIC <- pBICtab$BIC-min(pBICtab$BIC)
-pBICtab
+DHARMa::plotSimulatedResiduals(pods.simulationOutput)
+DHARMa::plotResiduals(metadata_sc$h_apical, pods.simulationOutput$scaledResiduals)
+DHARMa::plotResiduals(metadata_sc$herb_avg, pods.simulationOutput$scaledResiduals)
 ```
 
+NAs are being produced in DHARMa's simulatedResponse because of the way it resimulates random effects. After consulting DHARMa's issues page on GitHub [here](https://github.com/florianhartig/DHARMa/issues/8), there are two ways around this issue:
+
+#### Conditional Random Effects
+1) Try not resimulating the random effects (i.e. calculate residuals conditional on the fitted random effects).
+```{r}
+pods.simulationOutput = DHARMa::simulateResiduals(fittedModel = pods.reg.final, n=1000, use.u = T)
+DHARMa::plotSimulatedResiduals(pods.simulationOutput)
+DHARMa::plotResiduals(metadata_sc$h_apical, pods.simulationOutput$scaledResiduals)
+DHARMa::plotResiduals(metadata_sc$herb_avg, pods.simulationOutput$scaledResiduals)
+```
+
+This looks like a pretty good fit! For the sake of completeness, we will also try... 2) changing the link function. In our case from log to sqrt.
+
+#### Sqrt Link Function
+Now onto selection for random effects. We can try and drop the interaction term in the site/transect random effect first due to small variation.
+```{r}
+pods.reg.sq1 = glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next+herb_avg|site/transect)+(h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='sqrt'), control=glmerCtrl)
+summary(pods.reg.mdl1)
+
+pods.reg.sq2 = glmer(N_pods ~ h_apical.next*herb_avg + (herb_avg|site/transect)+(h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='sqrt'), control=glmerCtrl)
+summary(pods.reg.mdl2)
+
+pods.reg.sq3 = glmer(N_pods ~ h_apical.next*herb_avg + (1|site/transect)+(h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='sqrt'), control=glmerCtrl)
+summary(pods.reg.mdl3)
+
+pods.reg.sq4 = glmer(N_pods ~ h_apical.next*herb_avg + (1|site/transect)+(h_apical.next+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='sqrt'), control=glmerCtrl)
+summary(pods.reg.mdl4)
+
+pods.reg.sq5 = glmer(N_pods ~ h_apical.next*herb_avg + (1|site/transect)+(h_apical.next|year), data=metadata_sc, nAGQ=1, family=poisson(link='sqrt'), control=glmerCtrl)
+summary(pods.reg.mdl5)
+
+pods.reg.sq6 = glmer(N_pods ~ h_apical.next*herb_avg + (1|site/transect)+(1|year), data=metadata_sc, nAGQ=1, family=poisson(link='sqrt'), control=glmerCtrl)
+summary(pods.reg.mdl6)
+
+#winner from older model selection for comparison
+pods.reg.sq7 = glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next+herb_avg|site/transect)+(h_apical.next+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link = 'sqrt'), control=glmerCtrl)
+  
+aictab(list(pods.reg.full_sept, pods.reg.sq1, pods.reg.sq2, pods.reg.sq3, pods.reg.sq4, pods.reg.sq5, pods.reg.sq6, pods.reg.sq7), modnames = c('pods.reg.full_sept', 'pods.reg.sq1', 'pods.reg.sq2', 'pods.reg.sq3', 'pods.reg.sq4', 'pods.reg.sq5', 'pods.reg.sq6', 'pods.reg.sq7'))
+
+# We'll move on to fixed effects with Model 1.
+```
+
+Fixed Effects.
+```{r}
+pods.reg.sq1a = glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next+herb_avg|site/transect)+(h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='sqrt'), control=glmerCtrl)
+summary(pods.reg.sq1a)
+
+# interaction gets dropped first since highest p-value
+pods.reg.sq1b = glmer(N_pods ~ h_apical.next + herb_avg + (h_apical.next+herb_avg|site/transect)+(h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='sqrt'), control=glmerCtrl)
+summary(pods.reg.sq1b) #all terms are now stat. sig.
+
+#and also compare a previous winner
+pods.reg.sq1c = glmer(N_pods ~ h_apical.next + herb_avg - 1 + (h_apical.next+herb_avg|site/transect)+(h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='sqrt'), control=glmerCtrl)
+
+aictab(list(pods.reg.sq1a, pods.reg.sq1b, pods.reg.sq1c), modnames = c('pods.reg.sq1a', 'pods.reg.sq1b', 'pods.reg.sq1c'))
+
+# Going with Model 1b
+```
+
+Setting final model.
+```{r}
+pods.reg.final.sq <- glmer(N_pods ~ h_apical.next + herb_avg + (h_apical.next+herb_avg|site/transect)+(h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='sqrt'), control=glmerCtrl)
+```
+
+DHARMa Diagnostics for model validation.
+```{r}
+pods.simulationOutput.sq = DHARMa::simulateResiduals(fittedModel = pods.reg.final.sq, n=1000)
+```
 
 ```{r}
-pods.reg.final <- pods.reg.fmdl2a
-summary(pods.reg.final)
+DHARMa::plotSimulatedResiduals(pods.simulationOutput.sq)
+DHARMa::plotResiduals(metadata_sc$h_apical, pods.simulationOutput.sq$scaledResiduals)
+DHARMa::plotResiduals(metadata_sc$herb_avg, pods.simulationOutput.sq$scaledResiduals)
+```
+These plots are not as strong as those for conditional random effects. Therefore we will keep a log link function and the winning model as our final model.
 
+```{r}
 # Create model class
-scaled <- list(h_apical = h_apical_sc, log_herb_avg = log_herb_avg_sc, h_apical.next = h_apical.next_sc)
-pods.fit <- mwMod(list(mdl = pods.reg.final, vars = c("h_apical.next", "log_herb_avg"), scaled = scaled))
+scaled <- list(h_apical = h_apical_sc, herb_avg = herb_avg_sc, h_apical.next = h_apical.next_sc)
+pods.fit <- mwMod(list(mdl = pods.reg.final, vars = c("h_apical.next", "herb_avg"), scaled = scaled))
 checkPars(pods.fit) # Check parameters
+summary(pods.reg.final)
 ```
 
-Winner:
-```
-h_apical.next + log_herb_avg - 1 + (h_apical.next+log_herb_avg|site/transect)+(h_apical.next+log_herb_avg|year)
-```
 ### Check for overdispersion
 
 From [GLMM Wiki](http://glmm.wikidot.com/faq), we grabbed and use the `overdisp_fun` function.
@@ -831,50 +734,6 @@ overdisp_fun <- function(model) {
 
 ```{r}
 overdisp_fun(pods.reg.final)
-```
-
-We have a ratio of $1.0073585$ and a "large" $p$-value, so it looks like Poisson is a good fit!
-
-Let's plot full data.
-
-```{r, eval=FALSE}
-plot(NULL, axes=T, xlim=c(50,160), ylim=c(0, 15), xlab="", ylab="")
-h_apical.next <- attributes(pods.fit$scaled$h_apical.next)$'scaled:center'+attributes(pods.fit$scaled$h_apical.next)$'scaled:scale'*pods.fit$scaled$h_apical.next
-log_herb_avg <- attributes(pods.fit$scaled$log_herb_avg)$'scaled:center'+attributes(pods.fit$scaled$log_herb_avg)$'scaled:scale'*pods.fit$scaled$log_herb_avg
-xpts <- seq(min(h_apical.next), max(h_apical.next), length.out=100)
-for (i in 1:5) {
-  isite <- rownames(pods.fit$pars$unscaled)[i]
-  I <- pods.fit$mdl@frame$site == isite
-  points(h_apical.next[I], pods.fit$mdl@frame$N_pods[I], col=i)
-}
-for (i in 1:5) {
-  isite <- rownames(pods.fit$pars$unscaled)[1+i]
-  I <- which(pods.fit$mdl@frame$site == isite)
-  meanhe <- mean(log_herb_avg[I])
-  ypred <- predict(pods.fit, newdata = list(h_apical.next = xpts, log_herb_avg = meanhe), type=isite)
-  lines(xpts, ypred, col = i, lwd=2)
-}
-meanhe <- mean(log_herb_avg)
-ypred <- predict(pods.fit, newdata = list(h_apical.next = xpts, log_herb_avg = meanhe))
-lines(xpts, ypred, col="black", lwd=4, lty=2)
-
-legend("topleft", sort(unique(as.character(pods.fit$mdl@frame$site))), col=1:5, pch=1)
-```
-
-Now site-specific models.
-```{r}
-xyplot(N_pods ~ h_apical.next|site, data=metadata_usc, para=par_usc, metadata=metadata_usc, xpts=xpts, panel = function(x,y,metadata,para,xpts) {
-  panel.xyplot(x, y)
-  isite <- rownames(para)[packet.number()]
-  meanhe <- mean(metadata[metadata$site == isite,]$log_herb_avg)
-  allha <- metadata[metadata$site == isite,]$h_apical.next
-  allhe <- metadata[metadata$site == isite,]$log_herb_avg
-  coeff <- para[packet.number(),]
-  ymean <- exp(coeff[,'(Intercept)'] + coeff[,'h_apical.next']*xpts + coeff[,'log_herb_avg']*meanhe + coeff[,'h_apical.next:log_herb_avg']*meanhe*xpts)
-  ypred <- exp(coeff[,'(Intercept)'] + coeff[,'h_apical.next']*allha + coeff[,'log_herb_avg']*allhe + coeff[,'h_apical.next:log_herb_avg']*allha*allhe)
-  panel.lines(xpts, ymean, col = "red")
-  panel.xyplot(allha, ypred, col='red')
-})
 ```
 
 # References

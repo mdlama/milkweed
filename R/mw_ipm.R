@@ -187,11 +187,11 @@ mwIPM <- function(x = list()) {
     saveresults <- x$saveresults
   }
   if (all(names(x) != "mdlargs")) {
-    x$mdlargs <- list(method = 'pow',
+    x$mdlargs <- list(method = 'linear',
                       input = 'full')
   } else {
     if (all(names(x$mdlargs) != "method")) {
-      x$mdlargs$method = "pow"
+      x$mdlargs$method = "linear"
     }
     if (all(names(x$mdlargs) != "input")) {
       x$mdlargs$input = "full"
@@ -457,7 +457,7 @@ setSeedlingEmergenceConst.mwIPM <- function(obj, compute = FALSE, saveresults = 
 
     fulldat <- bind_rows(data13_14, data14_15, data15_16, data16_17)
 
-    seedling.emergence[2:length(obj$all_sites)] <- (fulldat %>% group_by(site) %>% summarize(emergence = mean(emergence)))$emergence
+    seedling.emergence[2:length(obj$all_sites)] <- (fulldat %>% group_by(site) %>% summarize(emergence = mean(emergence, na.rm = TRUE)))$emergence
     cat("done!\n")
 
     if (saveresults) {
@@ -547,7 +547,7 @@ setSurvivalFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, upda
                                               .funs = funs(as.numeric(scale(.))))
 
     cat("Computing survival fit...")
-    surv.mdl <- lme4::glmer(surv ~ herb_avg + (h_apical+herb_avg|site/transect) + (h_apical+herb_avg|year),
+    surv.mdl <- lme4::glmer(surv ~ herb_avg + (h_apical|site/transect) + (h_apical+herb_avg|year),
                             data=metadata_sc,
                             family=binomial(),
                             nAGQ=1,
@@ -828,7 +828,7 @@ setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE,
         thissite <- obj$data %>% filter(!is.na(h_apical),
                                         !is.na(munched))
       } else { # Sites
-        thissite <- obj$data %>% filter(site == sites[i],
+        thissite <- obj$data %>% filter(site == obj$all_sites[i],
                                         !is.na(h_apical),
                                         !is.na(munched))
       }
@@ -842,7 +842,7 @@ setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE,
       pmunch <- sum(thissite$munched == 1)/nrow(thissite)
       herb_avg <- (thissite %>% filter(munched == 1))$herb_avg
 
-      cat("Computing herbivory distribution fit for", x$all_sites[i], "...")
+      cat("Computing herbivory distribution fit for", obj$all_sites[i], "...")
       f0 <- fitdistrplus::fitdist(herb_avg, mdls[i])
       cat("done!\n")
 
