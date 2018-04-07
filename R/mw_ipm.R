@@ -458,6 +458,8 @@ setSeedlingEmergenceConst.mwIPM <- function(obj, compute = FALSE, saveresults = 
     fulldat <- bind_rows(data13_14, data14_15, data15_16, data16_17)
 
     seedling.emergence[2:length(obj$all_sites)] <- (fulldat %>% group_by(site) %>% summarize(emergence = mean(emergence, na.rm = TRUE)))$emergence
+    # GRN is at 0 - set to Bertha
+    seedling.emergence["GRN"] <- seedling.emergence["Bertha"]
     cat("done!\n")
 
     if (saveresults) {
@@ -600,7 +602,10 @@ setGrowthFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update
 
 
     cat("Computing growth fit...")
-    growth.mdl <- lme4::lmer(h_apical.next ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical*herb_avg|year),
+    # growth.mdl <- lme4::lmer(h_apical.next ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical*herb_avg|year),
+    #                          data=metadata_sc,
+    #                          REML=T)
+    growth.mdl <- lme4::lmer(h_apical.next ~ h_apical + herb_avg + (h_apical|site/transect) + (h_apical*herb_avg|year),
                              data=metadata_sc,
                              REML=T)
     cat("done!\n")
@@ -957,13 +962,8 @@ setBudlingsPerStemFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALS
                 bdlgs_per_stem = mean(bdlgs_per_stem),
                 site = first(site))
 
-    # Using nls instead of lm even if linear for cleaner code - fits are the same
-    cat(paste0("Calculating budlings per stem fit (", obj$mdlargs$method, ")..."))
-    if (obj$mdlargs$method == 'pow') {
-      mdl <- nls(bdlgs_per_stem ~ a*herb_mean^b, data=merged, start=list(a = 1, b = 1))
-    } else {
-      mdl <- nls(bdlgs_per_stem ~ a + b*herb_mean, data=merged, start=list(a = 1, b = 1))
-    }
+    cat(paste0("Calculating budlings per stem fit..."))
+    mdl <- lm(bdlgs_per_stem ~ herb_mean, data=merged)
     cat("done!\n")
 
     # Add data, as nls doesn't store the data

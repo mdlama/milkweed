@@ -391,13 +391,16 @@ summary(growth.reg.mdl2)
 growth.reg.mdl3=lmer(h_apical.next~h_apical*herb_avg + (h_apical|site/transect)+(h_apical+herb_avg|year),data=metadata_sc, REML=T)
 summary(growth.reg.mdl3)
 
-growth.reg.mdl4=lmer(h_apical.next~h_apical*herb_avg + (h_apical|site/transect)+(herb_avg|year),data=metadata_sc, REML=T)
+growth.reg.mdl4=lmer(h_apical.next~h_apical*herb_avg + (1|site/transect)+(h_apical+herb_avg|year),data=metadata_sc, REML=T)
+# growth.reg.mdl4=lmer(h_apical.next~h_apical*herb_avg + (h_apical|site/transect)+(herb_avg|year),data=metadata_sc, REML=T)
 summary(growth.reg.mdl4)
 
-growth.reg.mdl5=lmer(h_apical.next~h_apical*herb_avg + (h_apical|site/transect)+(1|year),data=metadata_sc, REML=T)
+growth.reg.mdl5=lmer(h_apical.next~h_apical*herb_avg + (1|site/transect)+(h_apical|year),data=metadata_sc, REML=T)
+#growth.reg.mdl5=lmer(h_apical.next~h_apical*herb_avg + (h_apical|site/transect)+(1|year),data=metadata_sc, REML=T)
 summary(growth.reg.mdl5)
 
-growth.reg.mdl6=lmer(h_apical.next~h_apical*herb_avg + (1|site/transect)+(1|year),data=metadata_sc, REML=T)
+growth.reg.mdl6=lmer(h_apical.next~h_apical*herb_avg + (1|site/transect)+(herb_avg|year),data=metadata_sc, REML=T)
+#growth.reg.mdl6=lmer(h_apical.next~h_apical*herb_avg + (1|site/transect)+(1|year),data=metadata_sc, REML=T)
 summary(growth.reg.mdl6)
 
 aictab(list(growth.reg.full, growth.reg.mdl1, growth.reg.mdl2, growth.reg.mdl3, growth.reg.mdl4, growth.reg.mdl5, growth.reg.mdl6), modnames = c('growth.reg.full', 'growth.reg.mdl1', 'growth.reg.mdl2', 'growth.reg.mdl3', 'growth.reg.mdl4', 'growth.reg.mdl5', 'growth.reg.mdl6'))
@@ -415,9 +418,31 @@ drop1(growth.reg.mdl2a, scope=c("h_apical", "herb_avg", "h_apical:herb_avg"))
 # Looks like interaction goes first based on the drop1() results
 growth.reg.mdl2b=lmer(h_apical.next ~ h_apical+herb_avg + (h_apical|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, REML=F) #all 3 remaining terms
 
-growth.reg.mdl2c=lmer(h_apical.next ~ h_apical + (h_apical|site/transect)+(h_apical + herb_avg|year), data=metadata_sc, REML=F) #2 remaining terms
-growth.reg.mdl2d=lmer(h_apical.next ~ h_apical + herb_avg - 1 + (h_apical|site/transect)+(h_apical + herb_avg|year), data=metadata_sc, REML=F)
-growth.reg.mdl2e=lmer(h_apical.next ~ herb_avg + (h_apical|site/transect)+(h_apical + herb_avg|year), data=metadata_sc, REML=F)
+growth.reg.mdl2c=lmer(h_apical.next ~ h_apical + (h_apical|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, REML=F) #2 remaining terms
+growth.reg.mdl2d=lmer(h_apical.next ~ h_apical + herb_avg - 1 + (h_apical|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, REML=F)
+growth.reg.mdl2e=lmer(h_apical.next ~ herb_avg + (h_apical|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, REML=F)
+
+growth.reg.mdl2f=lmer(h_apical.next ~ h_apical - 1 + (h_apical|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, REML=F) #1 remaining term
+growth.reg.mdl2g=lmer(h_apical.next ~ herb_avg - 1 + (h_apical|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, REML=F)
+growth.reg.mdl2h=lmer(h_apical.next ~ 1 + (h_apical|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, REML=F)
+
+aictab(list(growth.reg.mdl2a, growth.reg.mdl2b, growth.reg.mdl2c, growth.reg.mdl2d, growth.reg.mdl2e, growth.reg.mdl2f, growth.reg.mdl2g, growth.reg.mdl2h), modnames = c('growth.reg.mdl2a', 'growth.reg.mdl2b', 'growth.reg.mdl2c', 'growth.reg.mdl2d', 'growth.reg.mdl2e', 'growth.reg.mdl2f', 'growth.reg.mdl2g', 'growth.reg.mdl2h'))
+
+# Models c, and b, are indistinguishable for AICc, so we will go with 2b.
+```
+
+Let's try with Model 1, as Model 2 above gives negative Sept height.
+```{r}
+growth.reg.mdl1a=lmer(h_apical.next ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, REML=F)
+#do single-term deletions to see which term needs to be dropped first
+drop1(growth.reg.mdl2a, scope=c("h_apical", "herb_avg", "h_apical:herb_avg"))
+
+# Looks like interaction goes first based on the drop1() results
+growth.reg.mdl1b=lmer(h_apical.next ~ h_apical+herb_avg + (h_apical+herb_avg|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, REML=F) #all 3 remaining terms
+
+growth.reg.mdl1c=lmer(h_apical.next ~ h_apical + (h_apical|site/transect)+(h_apical + herb_avg|year), data=metadata_sc, REML=F) #2 remaining terms
+growth.reg.mdl1d=lmer(h_apical.next ~ h_apical + herb_avg - 1 + (h_apical|site/transect)+(h_apical + herb_avg|year), data=metadata_sc, REML=F)
+growth.reg.mdl1e=lmer(h_apical.next ~ herb_avg + (h_apical|site/transect)+(h_apical + herb_avg|year), data=metadata_sc, REML=F)
 
 growth.reg.mdl2f=lmer(h_apical.next ~ h_apical - 1 + (h_apical|site/transect)+(h_apical + herb_avg|year), data=metadata_sc, REML=F) #1 remaining term
 growth.reg.mdl2g=lmer(h_apical.next ~ herb_avg - 1 + (h_apical|site/transect)+(h_apical + herb_avg|year), data=metadata_sc, REML=F)
@@ -432,7 +457,8 @@ aictab(list(growth.reg.mdl2a, growth.reg.mdl2b, growth.reg.mdl2c, growth.reg.mdl
 Need to refit with REML.
 
 ```{r}
-growth.reg.final = lmer(h_apical.next ~ h_apical*herb_avg + (h_apical|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, REML=T)
+# growth.reg.final = lmer(h_apical.next ~ h_apical*herb_avg + (h_apical|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, REML=T)
+growth.reg.final = lmer(h_apical.next ~ h_apical + (h_apical+herb_avg|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, REML=T)
 summary(growth.reg.final)
 ```
 

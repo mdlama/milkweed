@@ -66,7 +66,7 @@ p1 <- p1 + theme(axis.line = element_blank()) +
 # Add lines
 herb_ex <- data.frame(yintercept = c(0, 
                                      mean(herb_avg), 
-                                     6))
+                                     max(herb_avg)))
 
 p1 <- p1 + geom_hline(aes(yintercept = yintercept), 
                       data = herb_ex, 
@@ -177,7 +177,7 @@ p3 <- p3 + theme(axis.line = element_blank()) +
 # Add lines
 herb_ex <- data.frame(yintercept = c(0, 
                                      mean(herb_avg), 
-                                     6))
+                                     max(herb_avg)))
 
 p3 <- p3 + geom_hline(aes(yintercept = yintercept), 
                       data = herb_ex, 
@@ -250,10 +250,12 @@ g$widths <- grid::unit.pmax(g1$widths, g2$widths)
  
 g3 <- ggplotGrob(p3)
 g4 <- ggplotGrob(p4)
+g4 <- gtable::gtable_add_cols(g4, unit(0, "mm"))
+g4 <- gtable::gtable_add_cols(g4, unit(0, "mm"))
 gg <- rbind(g3, g4, size="first")
 gg$widths <- grid::unit.pmax(g3$widths, g4$widths)
 
-# p <- gridExtra::grid.arrange(g, gg, ncol=2)
-p <- gridExtra::grid.arrange(p2, p4, ncol=2)
-ggsave("Figure2_FloweringAndGrowth.png", width=7, height=4, device = "png", p)
+p <- gridExtra::grid.arrange(g, gg, ncol=2)
+# p <- gridExtra::grid.arrange(p2, p4, ncol=2)
+ggsave("Figure2_FloweringAndGrowth.png", width=7, height=5, device = "png", p)
 ```
