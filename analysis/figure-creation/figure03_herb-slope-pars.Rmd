@@ -11,8 +11,11 @@ library(milkweed)
 library(dplyr)
 library(ggplot2)
 requirePackages(c("grid", "gridExtra"))
+'%$%' <- magrittr::'%$%'
 ipm <- mwIPM()
 ```
+
+Random effect error bar reference:  https://stackoverflow.com/questions/13847936/in-r-plotting-random-effects-from-lmer-lme4-package-using-qqmath-or-dotplot
 
 ```{r}
 # Need to rescale standard errors!!!!
@@ -22,8 +25,9 @@ ipm <- mwIPM()
 #     sdh = attr(scaled$herb_avg, 'scaled:scale')
 # Then, seh_unscaled = seh_scaled*sdr/sdh - sea_scaled*sdr*mua/(sda*sdh).
 # Note that sea_scaled is zero when there is no interaction term.
+# Key: **h = herbivory; **a = apical height
 
-sitenames <- c("BLD1", "BLD2", "PWR", "SKY", "YTB")
+sitenames <- ipm$all_sites[-1]
 mydata <- tbl_df(data.frame())
 ```
 
@@ -33,21 +37,47 @@ mydata <- tbl_df(data.frame())
 
 ```{r}
 attach(ipm$pars)
+
+# Get se from random effect
 re <- lme4::ranef(surv.fit$mdl, condVar = TRUE, whichel = "site")[[1]]
 pv <- attr(re, "postVar")
-se <- sqrt(pv[2,2,])
+if (any(colnames(re) == "herb_avg")) {
+  ind <- which(colnames(re) == "herb_avg")
+  se <- sqrt(pv[ind,ind,])  # Index corresponds to slope parameter of interest
+} else {
+  se <- rep(0,length(sitenames))
+}
 
+# Get h_apical for survival
+h_apical <- ipm$data %>%
+  filter(!is.na(h_apical),
+         !is.na(herb_avg),
+         fec.flower == 1,
+         !is.na(surv)) %$%
+  h_apical
+  
+# Only necessary for adjustments based on interaction term
+qsadj <- surv.fit$pars$unscaled["Bertha", "h_apical:herb_avg"]*quantile(h_apical, probs = c(0.05, 0.5, 0.95))
+
+# Error bars for herb_avg random effect (NO interaction term)
 sdr <- 1
 mua <- attr(surv.fit$scaled$h_apical, "scaled:center")
 sda <- attr(surv.fit$scaled$h_apical, "scaled:scale")
 sdh <- attr(surv.fit$scaled$herb_avg, "scaled:scale")
 ci <- 1.96*se*sdr/sdh
 
-cis <- NA # No fixed herbivory effect
+# Adjust error bars for interaction term if present
+if (any(rownames(summary(surv.fit$mdl)$coefficients) == "h_apical:herb_avg")) {
+  sei <- summary(surv.fit$mdl)$coefficients["h_apical:herb_avg", "Std. Error"]
+  cis <- 1.96*sei*mua*sdr/(sda*sdh)
+} else {
+  cis <- 0;
+}
+ci <- ci - cis # Implement adjustment
 
 mydata <- bind_rows(mydata, data.frame(rate = "Survival Probability",
                                        site = sitenames, 
-                                       slope = surv.fit$pars$unscaled[-1,"herb_avg"],
+                                       slope = surv.fit$pars$unscaled[-1,"herb_avg"] + qsadj["50%"],
                                        ci = ci))
 detach(ipm$pars)
 ```
@@ -55,7 +85,16 @@ detach(ipm$pars)
 ## Flowering
 ```{r, warning=FALSE}
 attach(ipm$pars)
-## No random effect
+
+# Get se from random effect
+re <- lme4::ranef(flower.fit$mdl, condVar = TRUE, whichel = "site")[[1]]
+pv <- attr(re, "postVar")
+if (any(colnames(re) == "herb_avg")) {
+  ind <- which(colnames(re) == "herb_avg")
+  se <- sqrt(pv[ind,ind,])  # Index corresponds to slope parameter of interest
+} else {
+  se <- rep(0,length(sitenames))
+}
 
 h_apical <- ipm$data %>% 
   filter(!is.na(h_apical),
@@ -63,26 +102,46 @@ h_apical <- ipm$data %>%
          !is.na(fec.flower)) %$%
   h_apical
 
+# Only necessary for adjustments based on interaction term
 qfadj <- flower.fit$pars$unscaled["Bertha", "h_apical:herb_avg"]*quantile(h_apical, probs = c(0.05, 0.5, 0.95))
 
+# Error bars for herb_avg random effect (NO interaction term)
 sdr <- 1
 mua <- attr(flower.fit$scaled$h_apical, "scaled:center")
 sda <- attr(flower.fit$scaled$h_apical, "scaled:scale")
 sdh <- attr(flower.fit$scaled$herb_avg, "scaled:scale")
+ci <- 1.96*se*sdr/sdh
 
-sei <- summary(flower.fit$mdl)$coefficients["h_apical:herb_avg", "Std. Error"]
-cif <- 1.96*sei*mua/(sda*sdh)
+# Adjust error bars for interaction term if present
+if (any(rownames(summary(flower.fit$mdl)$coefficients) == "h_apical:herb_avg")) {
+  sei <- summary(flower.fit$mdl)$coefficients["h_apical:herb_avg", "Std. Error"]
+  cif <- 1.96*sei*mua*sdr/(sda*sdh)
+} else {
+  cif <- 0;
+}
+ci <- ci - cif # Implement adjustment
 
 mydata <- bind_rows(mydata, data.frame(rate = "Flowering Probability",
                                        site = sitenames,
-                                       slope = flower.fit$pars$unscaled[-1,"herb_avg"] + qfadj[2],
-                                       ci = rep(NA, 5)))
+                                       slope = flower.fit$pars$unscaled[-1,"herb_avg"] + qfadj["50%"],
+                                       ci = ci))
 detach(ipm$pars)
 ```
 
 ## Growth
 ```{r}
 attach(ipm$pars)
+
+# Get se from random effect
+re <- lme4::ranef(growth.fit$mdl, condVar = TRUE, whichel = "site")[[1]]
+pv <- attr(re, "postVar")
+if (any(colnames(re) == "herb_avg")) {
+  ind <- which(colnames(re) == "herb_avg")
+  se <- sqrt(pv[ind,ind,])  # Index corresponds to slope parameter of interest
+} else {
+  se <- rep(0,length(sitenames))
+}
+
 h_apical <- ipm$data %>% 
   filter(!is.na(h_apical),
          !is.na(h_apical.next),
@@ -91,24 +150,28 @@ h_apical <- ipm$data %>%
          surv == 1) %$%
   h_apical
 
+# Only necessary for adjustments based on interaction term
 qgadj <- growth.fit$pars$unscaled["Bertha", "h_apical:herb_avg"]*quantile(h_apical, probs = c(0.05, 0.5, 0.95))
 
-re <- lme4::ranef(growth.fit$mdl, condVar = TRUE, whichel = "site")[[1]]
-pv <- attr(re, "postVar")
-se <- sqrt(pv[3,3,])
-
+# Error bars for herb_avg random effect (NO interaction term)
 sdr <- attr(growth.fit$scaled$h_apical.next, "scaled:scale")
 mua <- attr(growth.fit$scaled$h_apical, "scaled:center")
 sda <- attr(growth.fit$scaled$h_apical, "scaled:scale")
 sdh <- attr(growth.fit$scaled$herb_avg, "scaled:scale")
 ci <- 1.96*se*sdr/sdh
 
-sei <- summary(growth.fit$mdl)$coefficients["h_apical:herb_avg", "Std. Error"]
-cig <- 1.96*sei*mua*sdr/(sda*sdh)
+# Adjust error bars for interaction term if present
+if (any(rownames(summary(growth.fit$mdl)$coefficients) == "h_apical:herb_avg")) {
+  sei <- summary(growth.fit$mdl)$coefficients["h_apical:herb_avg", "Std. Error"]
+  cig <- 1.96*sei*mua*sdr/(sda*sdh)
+} else {
+  cig <- 0;
+}
+ci <- ci - cig # Implement adjustment
 
 mydata <- bind_rows(mydata, data.frame(rate = "Growth",
                                        site = sitenames, 
-                                       slope = growth.fit$pars$unscaled[-1,"herb_avg"] + qgadj[2],
+                                       slope = growth.fit$pars$unscaled[-1,"herb_avg"] + qgadj["50%"],
                                        ci = ci))
 detach(ipm$pars)
 ```
@@ -116,22 +179,47 @@ detach(ipm$pars)
 ## Pods
 ```{r}
 attach(ipm$pars)
+
+# Get se from random effect
 re <- lme4::ranef(pods.fit$mdl, condVar = TRUE, whichel = "site")[[1]]
 pv <- attr(re, "postVar")
-se <- sqrt(pv[3,3,])
+if (any(colnames(re) == "herb_avg")) {
+  ind <- which(colnames(re) == "herb_avg")
+  se <- sqrt(pv[ind,ind,])  # Index corresponds to slope parameter of interest
+} else {
+  se <- rep(0,length(sitenames))
+}
 
+h_apical.next <- ipm$data %>% 
+  filter(!is.na(h_apical),
+         !is.na(h_apical.next),
+         !is.na(herb_avg),
+         fec.flower == 1,
+         surv == 1,
+         !is.na(N_pods)) %$%
+  h_apical.next
+
+# Only necessary for adjustments based on interaction term
+qpadj <- pods.fit$pars$unscaled["Bertha", "h_apical.next:herb_avg"]*quantile(h_apical.next, probs = c(0.05, 0.5, 0.95))
+
+# Error bars for herb_avg random effect (NO interaction term)
 sdr <- 1
 mua <- attr(pods.fit$scaled$h_apical.next, "scaled:center")
 sda <- attr(pods.fit$scaled$h_apical.next, "scaled:scale")
 sdh <- attr(pods.fit$scaled$herb_avg, "scaled:scale")
 ci <- 1.96*se*sdr/sdh
 
-sei <- summary(pods.fit$mdl)$coefficients["herb_avg", "Std. Error"]
-cip <- 1.96*sei/sdh
+# Adjust error bars for interaction term if present
+if (any(rownames(summary(pods.fit$mdl)$coefficients) == "h_apical.next:herb_avg")) {
+  sei <- summary(pods.fit$mdl)$coefficients["h_apical.next:herb_avg", "Std. Error"]
+  cip <- 1.96*sei/sdh
+} else {
+  cip <- 0
+}
 
 mydata <- bind_rows(mydata, data.frame(rate = "Pod Production",
                                        site = sitenames, 
-                                       slope = pods.fit$pars$unscaled[-1,"herb_avg"],
+                                       slope = pods.fit$pars$unscaled[-1,"herb_avg"] + qpadj["50%"],
                                        ci = ci))
 detach(ipm$pars)
 ```
@@ -143,10 +231,10 @@ rdata <- data.frame(rate = c("Survival Probability",
                              "Flowering Probability",
                              "Growth",
                              "Pod Production"),
-                    rslope = c(surv.fit$pars$unscaled["Bertha", "herb_avg"],
-                               flower.fit$pars$unscaled["Bertha", "herb_avg"]+qfadj[2],
-                               growth.fit$pars$unscaled["Bertha", "herb_avg"]+qgadj[2],
-                               pods.fit$pars$unscaled["Bertha", "herb_avg"]))
+                    rslope = c(surv.fit$pars$unscaled["Bertha", "herb_avg"]+qsadj["50%"],
+                               flower.fit$pars$unscaled["Bertha", "herb_avg"]+qfadj["50%"],
+                               growth.fit$pars$unscaled["Bertha", "herb_avg"]+qgadj["50%"],
+                               pods.fit$pars$unscaled["Bertha", "herb_avg"])+qpadj["50%"])
 
 # Fixed effect transparent bars
 fdata <- data.frame(rate = c("Survival Probability",
@@ -182,6 +270,9 @@ pf <- mydata %>% filter(rate == type) %>%
            ggplot(aes(x = slope, 
                       y = site)) + 
            geom_point() +
+           geom_errorbarh(aes(xmin = slope - ci, 
+                              xmax = slope + ci), 
+                          height=0) +
            geom_vline(data=filter(rdata, rate == type), 
                       aes(xintercept = rslope), 
                       linetype=2) + 
@@ -194,15 +285,17 @@ pf <- mydata %>% filter(rate == type) %>%
                  axis.title.y = element_blank(),
                  axis.title.x = element_blank())
 
-pf <- pf + annotate("point", 
-                    x = qfadj[1]-qfadj[2], 
-                    y = 0.55, 
-                    shape=25) +
-           annotate("point", 
-                    x = qfadj[3]-qfadj[2], 
-                    y = 0.55, 
-                    shape=25, 
-                    fill="black")
+if (any(qfadj > 0)) {
+  pf <- pf + annotate("point", 
+                      x = qfadj[1]-qfadj[2], 
+                      y = 0.55, 
+                      shape=25) +
+    annotate("point", 
+             x = qfadj[3]-qfadj[2], 
+             y = 0.55, 
+             shape=25, 
+             fill="black")
+}
 
 pf
 ```
@@ -220,7 +313,7 @@ pg <- mydata %>% filter(rate == type) %>%
            geom_vline(data=filter(rdata, rate == type), 
                       aes(xintercept = rslope), 
                       linetype = 2) + 
-           scale_x_continuous(limits = c(-5, 5)) + 
+           scale_x_continuous(limits = c(-2, 2)) + 
            theme_bw() +
            ggtitle(paste("(b)", type)) +
            theme(plot.title = element_text(family = "Trebuchet MS", 
@@ -231,15 +324,17 @@ pg <- mydata %>% filter(rate == type) %>%
                  axis.ticks.y = element_blank(),
                  axis.title.x = element_blank())
 
-pg <- pg + annotate("point", 
-                    x = qgadj[1]-qgadj[2], 
-                    y = 0.55, 
-                    shape=25) +
-           annotate("point", 
-                    x = qgadj[3]-qgadj[2], 
-                    y = 0.55, 
-                    shape=25, 
-                    fill="black")
+if (any(qgadj > 0)) {
+  pg <- pg + annotate("point", 
+                      x = qgadj[1]-qgadj[2], 
+                      y = 0.55, 
+                      shape=25) +
+    annotate("point", 
+             x = qgadj[3]-qgadj[2], 
+             y = 0.55, 
+             shape=25, 
+             fill="black")
+}
 
 pg
 ```
@@ -257,7 +352,7 @@ ps <- mydata %>% filter(rate == type) %>%
            geom_vline(data=filter(rdata, rate == type), 
                       aes(xintercept = rslope), 
                       linetype = 2) + 
-           scale_x_continuous(limits = c(-1, 1)) +
+           scale_x_continuous(limits = c(-2, 2)) +
            theme_bw() +
            ggtitle(paste("(d)", type)) +
            theme(plot.title = element_text(family = "Trebuchet MS", 
@@ -267,6 +362,18 @@ ps <- mydata %>% filter(rate == type) %>%
                  axis.text.y = element_blank(),
                  axis.ticks.y = element_blank(),
                  axis.title.x = element_blank())
+
+if (any(qsadj > 0)) {
+  ps <- ps + annotate("point", 
+                      x = qsadj[1]-qsadj[2], 
+                      y = 0.55, 
+                      shape=25) +
+    annotate("point", 
+             x = qsadj[3]-qsadj[2], 
+             y = 0.55, 
+             shape=25, 
+             fill="black")
+}
 
 ps
 ```
@@ -284,7 +391,7 @@ pp <- mydata %>% filter(rate == type) %>%
            geom_vline(data=filter(rdata, rate == type), 
                       aes(xintercept = rslope), 
                       linetype = 2) + 
-           scale_x_continuous(limits = c(-0.5, 0.5)) +
+           scale_x_continuous(limits = c(-1.0, 1.0)) +
            theme_bw() +
            ggtitle(paste("(c)", type)) +
            theme(plot.title = element_text(family = "Trebuchet MS", 
@@ -293,6 +400,18 @@ pp <- mydata %>% filter(rate == type) %>%
                  axis.title.y = element_blank(),
                  axis.title.x = element_blank())
 
+if (any(qpadj > 0)) {
+  pp <- pp + annotate("point", 
+                      x = qpadj[1]-qpadj[2], 
+                      y = 0.55, 
+                      shape=25) +
+    annotate("point", 
+             x = qpadj[3]-qpadj[2], 
+             y = 0.55, 
+             shape=25, 
+             fill="black")
+}
+
 pp
 ```
 
@@ -300,6 +419,6 @@ pp
 ```{r}
 pall <- gridExtra::grid.arrange(pf, pg, pp, ps, 
                      left="Site", 
-                     bottom=grid::textGrob(TeX('$\\beta_{z_{\\omega}}$')))
+                     bottom=grid::textGrob(latex2exp::TeX('$\\beta_{z_{\\omega}}$')))
 ggsave("Figure3_HerbSlopePars.png", width=6, device = "png", pall)
 ```
