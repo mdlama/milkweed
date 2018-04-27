@@ -652,7 +652,7 @@ setPodsFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update =
                                         surv == 1,
                                         !is.na(N_pods))
 
-    metadata_sc <- metadata_usc %>% mutate_at(.vars = vars(h_apical, h_apical.next, herb_avg),
+    metadata_sc <- metadata_usc %>% mutate_at(.vars = vars(h_apical.next, herb_avg),
                                               .funs = funs(as.numeric(scale(.))))
 
     cat("Computing pods fit...")
@@ -665,8 +665,7 @@ setPodsFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update =
 
     pods.fit <- mwMod(list(mdl = pods.mdl,
                            vars = c("h_apical.next", "herb_avg"),
-                           scaled = list(h_apical = scale(metadata_usc$h_apical),
-                                         h_apical.next = scale(metadata_usc$h_apical.next),
+                           scaled = list(h_apical.next = scale(metadata_usc$h_apical.next),
                                          herb_avg = scale(metadata_usc$herb_avg))))
     # Check parameters
     cat("Checking parameters:\n")
