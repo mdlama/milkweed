@@ -40,8 +40,8 @@ plotdata <- data.frame(herb_avg = ipm$vars$herb_avg$x[minind:maxind],
 # Bootstrap data with individual clonal herbivory
 Bootstrap the data to get 95% confidence ellipses for average herbivory and lambda over each site.
 ```{r}
-compute <- TRUE
-parallel <- TRUE
+compute <- FALSE
+parallel <- FALSE
 
 if (!file.exists(file.path(mwCache,"figure5a.RData")) | (compute)) {
   coreProcess <- function(ipm, sites) {
@@ -108,13 +108,13 @@ p <- p + geom_point(aes(x = herb_avg,
                           y = growth_rate, 
                           color = site),
                       alpha = 0.8,
-                      size = 0.2,
+                      size = 0.5,
                       data = results)
 
 # Change theme, scale, and labels
 p <- p + theme_bw() +
          scale_x_continuous(limits = c(0.0, 1.5)) + 
-         scale_y_continuous(limits = c(0.5, 1.1)) + 
+         scale_y_continuous(limits = c(0.5, 1.5)) + 
          xlab("Herbivory severity") +
          ylab(expression(paste("Population growth rate (", lambda, ")"))) + 
          labs(color = "Sites") + 

@@ -10,7 +10,7 @@ output:
 library(milkweed)
 library(dplyr)
 library(ggplot2)
-requirePackages(c("grid", "gridExtra"))
+requirePackages(c("grid", "gridExtra","latex2exp"))
 '%$%' <- magrittr::'%$%'
 ipm <- mwIPM()
 ```
