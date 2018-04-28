@@ -1200,7 +1200,7 @@ computeSexualKernel.mwIPM <- function(obj, update = TRUE, perturb = rep(0,2)) {
   attach(obj$pars, warn.conflicts = FALSE)
   attach(obj$matrices, warn.conflicts = FALSE)
 
-  Ks <- (seedling.emergence[[obj$site]]+perturb[1])*(seeds.per.pod+perturb[2])*R%*%(P*G*S*F)%*%H*herb_avg$dx*h_apical.next$dx*h_apical$dx
+  Ks <- (seedling.emergence[[obj$site]]+perturb[1])*(seeds.per.pod+perturb[2])*R%*%(P*G*S*obj$matrices$F)%*%H*herb_avg$dx*h_apical.next$dx*h_apical$dx
   # image.plot(h_apical, h_apical, t(Ks), col=topo.colors(100))
 
   detach(obj$vars)
@@ -1345,7 +1345,7 @@ computeMPM.mwIPM <- function(obj) {
       t(t(H[1+(0:(obj$N-1))*obj$N,1]))*herb_avg$dx
   }
 
-  Kss <- seedling.emergence[[obj$site]]*seeds.per.pod*(P*G*S*F)%*%H*herb_avg$dx*h_apical.next$dx*h_apical$dx
+  Kss <- seedling.emergence[[obj$site]]*seeds.per.pod*(P*G*S*obj$matrices$F)%*%H*herb_avg$dx*h_apical.next$dx*h_apical$dx
   alpha <- sum(Kss%*%t(t(seedling.fit$predict(h_apical$b, seedling.fit$fit$estimate))))
   beta <- sum(Kss%*%t(t(budling.fit[[obj$site]]$predict(h_apical$b,
                                                         budling.fit[[obj$site]]$fit$estimate))))
