@@ -12,7 +12,7 @@ output:
 library(milkweed)
 library(dplyr)
 library(ggplot2)
-requirePackages(c("doParallel", "latex2exp"))
+requirePackages(c("doParallel", "latex2exp", "gtable", "RColorBrewer", "gridExtra"))
 library(doParallel) # Normally, I don't load suggested packages, but this one requires and loads parallel, foreach, and iterators,
                     #   so, you know, it's easier this way.
 '%<>%' <- magrittr::'%<>%'
@@ -34,7 +34,7 @@ if (!file.exists(file.path(mwCache,"figure6.RData")) | (compute)) {
     library(milkweed)
     library(dplyr)
     '%<>%' <- magrittr::'%<>%'
-    ipm %<>% bootIPM() %>% analyzeParameters(distpars = TRUE)
+    ipm %<>% bootIPM() %>% analyzeParameters(distpars = FALSE)
     thisone <- ipm$analysis$parameters %>% select(type, name, elasticity)
     thisone
   })
@@ -47,13 +47,13 @@ if (!file.exists(file.path(mwCache,"figure6.RData")) | (compute)) {
 
 ## Spread elasticity over kernel for herbivory parameters
 ```{r}
-ipm %<>% analyzeStandard() %>% analyzeParameters(distpars = TRUE)
+ipm %<>% analyzeStandard() %>% analyzeParameters(distpars = FALSE)
 res <- ipm$analysis$parameters %>% 
     filter(type == "Herbivory") %>% 
     select(pars, elasticity)
 
 herbivory_func <- function(x) {
-  as.vector((ipm %>% setHerbivoryMatrix(perturb = x, distpars = TRUE))$kernels$K)
+  as.vector((ipm %>% setHerbivoryMatrix(perturb = x, distpars = FALSE))$kernels$K)
 }
 
 J <- numDeriv::jacobian(herbivory_func, rep(0,3))
@@ -95,8 +95,8 @@ new.levels <- c("Clonal", "Clonal", "Sexual", "Growth", "Herbivory", "Sexual", "
 plotdata$newtype <- factor(new.levels[plotdata$type])
 
 # Specify order of parameters in plot
-newlabelorder <- c("Clonal-(Intercept)", 
-                   "Clonal-log_herb_avg", 
+newlabelorder <- c("Clonal-a", 
+                   "Clonal-b", 
                    "Budlings-mean", 
                    "Budlings-sd", 
                    "Herbivory-pmunch", 
@@ -104,21 +104,20 @@ newlabelorder <- c("Clonal-(Intercept)",
                    "Herbivory-sd", 
                    "Flowering-(Intercept)", 
                    "Flowering-h_apical", 
-                   "Flowering-log_herb_avg", 
-                   "Flowering-h_apical:log_herb_avg", 
+                   "Flowering-herb_avg", 
                    "Pods-(Intercept)", 
                    "Pods-h_apical", 
-                   "Pods-log_herb_avg", 
+                   "Pods-herb_avg", 
                    "Seedlings-mean", 
                    "Seedlings-sd", 
                    "Sexual-seedling.emergence", 
                    "Sexual-seeds.per.pod", 
                    "Growth-(Intercept)", 
                    "Growth-h_apical", 
-                   "Growth-log_herb_avg", 
-                   "Growth-h_apical:log_herb_avg", 
+                   "Growth-herb_avg", 
                    "Growth-sd", 
-                   "Survival-(Intercept)")
+                   "Survival-(Intercept)",
+                   "Survival-herb_avg")
 
 # Corresponding mathematical symbols to above parameters
 # These really ought to be done through plotmath notation:
@@ -134,20 +133,19 @@ fancypantslabels[7] <- TeX('$\\sigma$')
 fancypantslabels[8] <- TeX('$\\alpha$')
 fancypantslabels[9] <- TeX('$\\beta_{z_{h}}$')
 fancypantslabels[10] <- TeX('$\\beta_{z_{\\omega}}$')
-fancypantslabels[11] <- TeX('$\\beta_{z_{h}:z_{\\omega}}$')
-fancypantslabels[12] <- TeX('$\\alpha$')
-fancypantslabels[13] <- TeX('$\\beta_{z_{h}}$')
-fancypantslabels[14] <- TeX('$\\beta_{z_{\\omega}}$')
-fancypantslabels[15] <- TeX('$\\mu$')
-fancypantslabels[16] <- TeX('$\\sigma$')
+fancypantslabels[11] <- TeX('$\\alpha$')
+fancypantslabels[12] <- TeX('$\\beta_{z_{h}}$')
+fancypantslabels[13] <- TeX('$\\beta_{z_{\\omega}}$')
+fancypantslabels[14] <- TeX('$\\mu$')
+fancypantslabels[15] <- TeX('$\\sigma$')
+fancypantslabels[16] <- TeX('$\\alpha$')
 fancypantslabels[17] <- TeX('$\\alpha$')
 fancypantslabels[18] <- TeX('$\\alpha$')
-fancypantslabels[19] <- TeX('$\\alpha$')
-fancypantslabels[20] <- TeX('$\\beta_{z_{h}}$')
-fancypantslabels[21] <- TeX('$\\beta_{z_{\\omega}}$')
-fancypantslabels[22] <- TeX('$\\beta_{z_{h}:z_{\\omega}}$')
-fancypantslabels[23] <- TeX('$\\sigma$')
-fancypantslabels[24] <- TeX('$\\alpha$')
+fancypantslabels[19] <- TeX('$\\beta_{z_{h}}$')
+fancypantslabels[20] <- TeX('$\\beta_{z_{\\omega}}$')
+fancypantslabels[21] <- TeX('$\\sigma$')
+fancypantslabels[22] <- TeX('$\\alpha$')
+fancypantslabels[23] <- TeX('$\\beta_{z_{\\omega}}$')
 
 # Legend ordering
 newtypeorder <- c("Clonal", "Herbivory", "Sexual", "Growth", "Survival")
@@ -173,30 +171,32 @@ elastiplot <- plotdata %>%
 # Highlight rects for functional forms
 ym <- 0.25
 al <- 0.1
-r_growth <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 2-ym, ymax = 6+ym, fill = "black", alpha = al)
+r_survival <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 1-ym, ymax = 2+ym, fill = "black", alpha = al)
+r_growth <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 3-ym, ymax = 6+ym, fill = "black", alpha = al)
 r_seedlings <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 9-ym, ymax = 10+ym, fill = "black", alpha = al)
 r_pods <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 11-ym, ymax = 13+ym, fill = "black", alpha = al)
-r_flowering <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 14-ym, ymax = 17+ym, fill = "black", alpha = al)
-r_herbivory <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 18-ym, ymax = 20+ym, fill = "black", alpha = al)
-r_budlings <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 21-ym, ymax = 22+ym, fill = "black", alpha = al)
-r_bdlgs_per_stem <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 23-ym, ymax = 24+ym, fill = "black", alpha = al)
+r_flowering <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 14-ym, ymax = 16+ym, fill = "black", alpha = al)
+r_herbivory <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 17-ym, ymax = 19+ym, fill = "black", alpha = al)
+r_budlings <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 20-ym, ymax = 21+ym, fill = "black", alpha = al)
+r_bdlgs_per_stem <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 22-ym, ymax = 23+ym, fill = "black", alpha = al)
 
 # Functional form labels
 xc <- -0.4
 sz <- 2.5
-t_bdlgs_per_stem <- annotate("text", x = xc, y = 23.5, label = "Buds per stem", size = sz)
-t_budlings <- annotate("text", x = xc, y = 21.5, label = "Budling recruits", size = sz)
-t_herbivory <- annotate("text", x = xc, y = 19, label = "Herbivory", size = sz)
-t_flowering <- annotate("text", x = xc, y = 15.5, label = "Flowering", size = sz)
+t_bdlgs_per_stem <- annotate("text", x = xc, y = 22.5, label = "Buds per stem", size = sz)
+t_budlings <- annotate("text", x = xc, y = 20.5, label = "Budling recruits", size = sz)
+t_herbivory <- annotate("text", x = xc, y = 18, label = "Herbivory", size = sz)
+t_flowering <- annotate("text", x = xc, y = 15, label = "Flowering", size = sz)
 t_pods <- annotate("text", x = xc, y = 12, label = "Pods", size = sz)
 t_seedlings <- annotate("text", x = xc, y = 9.5, label = "Seedling recruits", size = sz)
 t_seed_surv <- annotate("text", x = xc, y = 8, label = "Seed survival", size = sz)
 t_seeds_per_pod <- annotate("text", x = xc, y = 7, label = "Seeds per pod", size = sz)
-t_growth <- annotate("text", x = xc, y = 4, label = "Growth", size = sz)
-t_survival <- annotate("text", x = xc, y = 1, label = "Ramet survival", size = sz)
+t_growth <- annotate("text", x = xc, y = 4.5, label = "Growth", size = sz)
+t_survival <- annotate("text", x = xc, y = 1.5, label = "Ramet survival", size = sz)
 
 # Throw those puppies in...
 elastiplot <- elastiplot + 
+  r_survival + 
   t_survival +
   r_growth + 
   t_growth +
@@ -218,6 +218,7 @@ elastiplot <- elastiplot +
 # Labels and such
 elastiplot <- elastiplot + 
   scale_y_discrete(labels = rev(fancypantslabels)) +
+  scale_x_continuous(limits = c(-1.2, 1.2)) +
   xlab("Parameter elasticity") +
   ylab("Parameters") + 
   theme_bw() +
@@ -240,7 +241,7 @@ elastiplot
 ### Prep data for heatmap of expanded elasticities
 
 ```{r, warning=FALSE}
-M <- mesh(ipm$vars$h_apical$x, ipm$vars$h_apical$x)
+M <- plot3D::mesh(ipm$vars$h_apical$x, ipm$vars$h_apical$x)
 
 plotdata <- tbl_df(data.frame(h_apical_t0 = as.vector(M$x),
                               h_apical_t1 = as.vector(M$y),
@@ -256,7 +257,7 @@ plotdata %<>% bind_rows(tbl_df(data.frame(h_apical_t0 = as.vector(M$x),
 
 ```{r}
 maxval <- max(abs(c(as.vector(E1), as.vector(E3))))
-colorpal <- brewer.pal(3, "RdBu")
+colorpal <- RColorBrewer::brewer.pal(3, "RdBu")
 
 pmunch_elastiplot <- ggplot(plotdata, aes(x = h_apical_t0, 
                                           y = h_apical_t1, 
@@ -294,11 +295,11 @@ pmunch_elastiplot
 
 ```{r, fig.width=8, fig.height=4}
 g1 <- ggplotGrob(elastiplot)
-g1 <- gtable_add_rows(g1, unit(0, "mm"))
-g1 <- gtable_add_rows(g1, unit(0, "mm"))
+g1 <- gtable::gtable_add_rows(g1, unit(0, "mm"))
+g1 <- gtable::gtable_add_rows(g1, unit(0, "mm"))
 g2 <- ggplotGrob(pmunch_elastiplot)
 g <- cbind(g1, g2, size="first")
 
-p <- grid.arrange(g1, g2, ncol=2)
+p <- gridExtra::grid.arrange(g1, g2, ncol=2)
 ggsave("Figure6_ElasticityAnalysis.png", width=8, height=4, device = "png", p)
 ```
