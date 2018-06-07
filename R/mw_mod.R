@@ -28,11 +28,16 @@ mwMod <- function(x) {
 #' @param perturb Perturbation vector for sensitivity analysis.
 #'
 #' @export
-predict.mwMod <- function(obj, newdata, type="Bertha", perturb=rep(0,4)) {
+predict.mwMod <- function(obj, newdata, type="Bertha", perturb=rep(0,5)) {
+  cat("Hello, World!")
   pars <- obj$pars$unscaled
-  linpart <- (pars[type,"(Intercept)"]+perturb[1]) + (pars[type,obj$vars[1]]+perturb[2])*newdata[[obj$vars[1]]] + (pars[type,obj$vars[2]]+perturb[3])*newdata[[obj$vars[2]]] + (pars[type,paste0(obj$vars[1],":",obj$vars[2])]+perturb[4])*newdata[[obj$vars[1]]]*newdata[[obj$vars[2]]]
-  if (class(obj$mdl) == "glmerMod") {
-    predict.vrate <- obj$mdl@resp$family$linkinv(linpart)
+  linpart <- (pars[type,"(Intercept)"]+perturb[1])
+  for (i in 1:length(obj$vars)) {
+    linpart <- linpart + (pars[type,obj$vars[i]]+perturb[i+1])*newdata[[obj$vars[i]]]
+  }
+
+  if (class(obj$mdl)[1] == "glm") {
+    predict.vrate <- obj$mdl$family$linkinv(linpart)
   } else {
     predict.vrate <- linpart
   }
@@ -46,12 +51,16 @@ predict.mwMod <- function(obj, newdata, type="Bertha", perturb=rep(0,4)) {
 #'
 #' @return List of scaled and unscaled parameters.
 calcPars <- function(mdl, scaled, vars) {
-  num_sites <- length(c("Bertha", levels(stemdata$site)))
-  growth <- (class(mdl) == "lmerMod")
+  num_sites <- 1
+  num_vars <- length(vars)
   pars <- list(scaled=NA, unscaled=NA)
-  pars$scaled <- matrix(rep(0,num_sites*4), byrow=TRUE, nrow=num_sites)
-  colnames(pars$scaled) <- c("(Intercept)", vars[1], vars[2], paste0(vars[1], ":", vars[2]))
-  rownames(pars$scaled) <- c("Bertha", levels(stemdata$site))
+  pars$scaled <- matrix(rep(0,num_sites*(1+num_vars)), byrow=TRUE, nrow=num_sites)
+  colnames(pars$scaled) <- c("(Intercept)", vars)
+  rownames(pars$scaled) <- c("Bertha")
+
+  pars$unscaled <- pars$scaled
+  colnames(pars$unscaled) <- c("(Intercept)", vars)
+  rownames(pars$unscaled) <- c("Bertha")
 
   # Assign values for Bertha
   assignme <- rownames(coef(summary(mdl)))
@@ -59,38 +68,19 @@ calcPars <- function(mdl, scaled, vars) {
     pars$scaled["Bertha", assignme[i]] <- coef(summary(mdl))[assignme[i], "Estimate"]
   }
 
-  # Assign values for sites
-  for (i in 1:ncol(coef(mdl)$site)) {
-    varexp <- colnames(coef(mdl)$site)[i]
-    pars$scaled[2:num_sites,varexp] <- coef(mdl)$site[,varexp]
-  }
-
-  mur <- 0
-  sdr <- 1
-  if (growth) {
-    mur <- attributes(scaled$h_apical.next)$'scaled:center'
-    sdr <- attributes(scaled$h_apical.next)$'scaled:scale'
-
-    pars$sd <- rep(0,num_sites)
-    names(pars$sd) <- rownames(pars$scaled)
-    pars$sd['Bertha'] <- sdr*sd(mdl@frame$h_apical.next - predict(mdl, type="response", re.form=NA))
-    pars$sd[2:num_sites] <- sdr*sd(mdl@frame$h_apical.next - predict(mdl, type="response", re.form=~(h_apical|site)))
-  }
-  mux <- c(0,0)
-  sdx <- c(0,0)
-  for (i in 1:2) {
+  mux <- rep(0,num_vars)
+  sdx <- rep(0,num_vars)
+  for (i in 1:num_vars) {
     mux[i] <- attributes(scaled[[vars[i]]])$'scaled:center'
     sdx[i] <- attributes(scaled[[vars[i]]])$'scaled:scale'
   }
 
   # Calculate unscaled parameters
-  pars$unscaled <- pars$scaled %*% diag(c(sdr, sdr/sdx[1], sdr/sdx[2], sdr/(sdx[1]*sdx[2]))) %*%
-    cbind(c(1, -1*mux[1], -1*mux[2], mux[1]*mux[2]),
-          c(0,         1,         0,     -1*mux[2]),
-          c(0,         0,         1,     -1*mux[1]),
-          c(0,         0,         0,            1)) +
-    cbind(rep(mur, num_sites), matrix(rep(0, 3*num_sites), nrow=num_sites))
-  colnames(pars$unscaled) <- c("(Intercept)", vars[1], vars[2], paste0(vars[1], ":", vars[2]))
+  pars$unscaled[1] <- pars$scaled[1]
+  for (i in 1:num_vars) {
+    pars$unscaled[1] <- pars$unscaled[1] - pars$scaled[1+i]*mux[i]/sdx[i]
+    pars$unscaled[1+i] <- pars$scaled[1+i]/sdx[i]
+  }
 
   return(pars)
 }
@@ -102,46 +92,22 @@ calcPars <- function(mdl, scaled, vars) {
 #'
 #' @export
 checkPars <- function(obj) {
-  growth <- (class(obj$mdl) == "lmerMod")
-  mux <- c(0,0)
-  sdx <- c(0,0)
-  for (i in 1:2) {
+  num_vars <- length(obj$vars)
+  mux <- rep(0,num_vars)
+  sdx <- rep(0,num_vars)
+  for (i in 1:num_vars) {
     mux[i] <- attributes(obj$scaled[[obj$vars[i]]])$'scaled:center'
     sdx[i] <- attributes(obj$scaled[[obj$vars[i]]])$'scaled:scale'
   }
 
-  mur <- 0
-  sdr <- 1
-  if (growth) {
-    mur <- attributes(obj$scaled$h_apical.next)$'scaled:center'
-    sdr <- attributes(obj$scaled$h_apical.next)$'scaled:scale'
+  newdata <- data.frame(row.names = 1:nrow(obj$mdl$data))
+  for (i in 1:num_vars) {
+    newdata[[obj$vars[i]]] <- mux[i] + sdx[i]*obj$scaled[[obj$vars[i]]]
   }
-  newdata <- data.frame(row.names = 1:nrow(obj$mdl@frame))
-  newdata[[obj$vars[1]]] <- mux[1] + sdx[1]*obj$scaled[[obj$vars[1]]]
-  newdata[[obj$vars[2]]] <- mux[2] + sdx[2]*obj$scaled[[obj$vars[2]]]
 
   # First, check Bertha
   estresp <- predict(obj, newdata=newdata, type='Bertha')
-  fitresp <- mur + sdr*predict(obj$mdl, type="response", re.form=NA)
+  fitresp <- predict(obj$mdl, type="response", re.form=NA)
   E <- max(estresp - fitresp)
   cat(sprintf("Bertha error: %g\n", E))
-
-  # Now for sites
-  sites <- rownames(obj$pars$unscaled)[-1]
-  # Get random effect terms
-  terms <- sapply(lme4::findbars(formula(obj$mdl)), deparse)
-  # Get location of site random effect (space is necessary in front)
-  I <- which(grepl(" site", terms))
-  # Reformulate with ~
-  re.form <- reformulate(paste0("(", terms[I], ")"))
-  fitresp <- mur + sdr*predict(obj$mdl, type="response", re.form=re.form)
-  E <- rep(0, length(sites)-1)
-  for (i in 1:length(sites)) {
-    isite <- sites[i]
-    I <- which(obj$mdl@frame$site == isite)
-    newsitedata <- newdata[I,]
-    estresp <- predict(obj, newdata=newsitedata, type=isite)
-    E[i] <- max(abs(estresp-fitresp[I]))
-  }
-  cat(sprintf("Max site errors: %g\n", max(E)))
 }

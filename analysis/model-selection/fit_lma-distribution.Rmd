@@ -1,5 +1,5 @@
 ---
-title: "Fit Budling Distribution"
+title: "Fit LMA Distribution"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
   html_document:
@@ -18,25 +18,24 @@ sites <- c("Bertha", "BLD", "PWR", "SKY", "YTB")
 
 Read, filter and transform data.
 ```{r}
-metadata <- dem.data
+metadata <- full.data
 
-h_apical <- metadata %>% 
-  filter(seedling == 0,         #since we are fitting budling distribution
-         !is.na(h_apical)) %$%
-  h_apical
+LMA <- metadata %>% 
+  filter(!is.na(LMA)) %$%
+  LMA
 ```
 
 # Bertha
 
-Fits of h_apical for budlings.
+Fits of cardenolide concentrations.
 ```{r, message=FALSE, warning=FALSE}
 distnames <- c("norm", "lnorm", "gamma", "exp", "weibull")
 
-f0 <- fitdist(h_apical, distnames[1])
-f1 <- fitdist(h_apical, distnames[2])
-f2 <- fitdist(h_apical, distnames[3])
-f3 <- fitdist(h_apical, distnames[4])
-f4 <- fitdist(h_apical, distnames[5])
+f0 <- fitdist(LMA, distnames[1])
+f1 <- fitdist(LMA, distnames[2])
+f2 <- fitdist(LMA, distnames[3])
+f3 <- fitdist(LMA, distnames[4])
+f4 <- fitdist(LMA, distnames[5])
 ```
 
 Plot results.
@@ -58,24 +57,23 @@ Goodness-of-fit measures.
 gofstat(list(f0, f1, f2, f3, f4), fitnames = distnames)
 ```
 
-Weibull looks the best when looking at AIC, but normal is close and it makes for easier interpretation and implementation of parameter perturbation for elasticity analysis. Going with that.
+Weibull looks the best when looking at AIC, normal is very close and would be easier interpretation and implementation of parameter perturbation for elasticity analysis. Going with that.
 
 # Sites
 
 ```{r}
 fit_site <- function(mysite) {
   cat(mysite)
-  h_apical <- metadata %>% 
-    filter(seedling == 0,
-           !is.na(h_apical),
-           site == mysite) %$%
-    h_apical
+  LMA <- metadata %>% 
+    filter(!is.na(LMA),
+           site == mysite)  %$%
+    LMA
 
-  f0 <- fitdist(h_apical, distnames[1])
-  f1 <- fitdist(h_apical, distnames[2])
-  f2 <- fitdist(h_apical, distnames[3])
-  f3 <- fitdist(h_apical, distnames[4])
-  f4 <- fitdist(h_apical, distnames[5])
+  f0 <- fitdist(LMA, distnames[1])
+  f1 <- fitdist(LMA, distnames[2])
+  f2 <- fitdist(LMA, distnames[3])
+  f3 <- fitdist(LMA, distnames[4])
+  f4 <- fitdist(LMA, distnames[5])
   
   cat("\n-------\n")
   print(gofstat(list(f0, f1, f2, f3, f4), fitnames = distnames))
@@ -92,7 +90,7 @@ fit_site <- function(mysite) {
 fit_site("BLD")
 ```
 
-Results suggest going with a Weibull or normal distribution.
+Results suggest going with a normal or Weibull distribution.
 
 
 
@@ -102,7 +100,7 @@ Results suggest going with a Weibull or normal distribution.
 fit_site("PWR")
 ```
 
-Results suggest going with a normal distribution.
+Results suggest going with a Weibull or normal distribution.
 
 ## SKY
 

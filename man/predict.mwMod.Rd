@@ -4,7 +4,7 @@
 \alias{predict.mwMod}
 \title{Method for mwMod prediction}
 \usage{
-\method{predict}{mwMod}(obj, newdata, type = "Bertha", perturb = rep(0, 4))
+\method{predict}{mwMod}(obj, newdata, type = "Bertha", perturb = rep(0, 5))
 }
 \arguments{
 \item{obj}{Object of class mwMod.}

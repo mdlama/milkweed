@@ -7,12 +7,17 @@ output: html_document
 We use the `fdistrplus` package (https://cran.r-project.org/web/packages/fitdistrplus/vignettes/paper2JSS.pdf)
 
 ```{r, warning=FALSE, message=FALSE}
-source("../../.Rprofile")
+library(milkweed)
+library(fitdistrplus)
+library(dplyr)
+library(magrittr)
+sites <- c("Bertha", "BLD", "PWR", "SKY", "YTB")
 ```
 
 Read, filter and transform data.
 ```{r}
-metadata <- tbl_df(read.csv(mwROOT("data","stemdata.csv")))
+data("stemdata")
+metadata <- dem.data
 ```
 
 Fits of h_apical for seedlings.
@@ -26,9 +31,9 @@ distnames <- c("norm", "lnorm", "gamma", "exp", "weibull")
 
 f0 <- fitdist(h_apical, distnames[1])
 f1 <- fitdist(h_apical, distnames[2])
-f2 <- fitdist(h_apical, distnames[3])
+f2 <- fitdist(h_apical, distnames[3]) #produces some NaNs
 f3 <- fitdist(h_apical, distnames[4])
-f4 <- fitdist(h_apical, distnames[5])
+f4 <- fitdist(h_apical, distnames[5]) #produces some NaNs
 ```
 
 Plot results.
@@ -50,4 +55,4 @@ Goodness-of-fit measures.
 gofstat(list(f0, f1, f2, f3, f4), fitnames = distnames)
 ```
 
-Looks like gamma is the best fit, but lognormal distribution is somewhat close.  We'll go with lognormal for ease in implementing parameter perturbation and elasticity analysis.
+Weibull and normal are indistinguishable. So let's go with normal for ease of analysis.

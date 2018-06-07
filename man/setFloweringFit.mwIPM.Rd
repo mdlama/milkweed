@@ -2,7 +2,7 @@
 % Please edit documentation in R/mw_ipm.R
 \name{setFloweringFit.mwIPM}
 \alias{setFloweringFit.mwIPM}
-\title{Sets the flowering mixed-model.}
+\title{Sets the flowering model.}
 \usage{
 \method{setFloweringFit}{mwIPM}(obj, compute = FALSE, saveresults = FALSE,
   update = TRUE)
@@ -20,5 +20,5 @@
 A mwIPM model object.
 }
 \description{
-Sets the flowering mixed-model.
+Sets the flowering model.
 }

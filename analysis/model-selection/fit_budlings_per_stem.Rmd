@@ -6,80 +6,91 @@ output:
     toc: true
 ---
 
-```{r, echo=FALSE, warning=FALSE, message=FALSE}
-source("../../.Rprofile")
-```
-
 Load data.
 ```{r}
-stemdata <- tbl_df(read.csv(mwROOT("data","stemdata.csv")))
+
 ```
 
 Compute budlings per stem.
 ```{r}
-data_gp <- stemdata %>% 
-  mutate(log_herb_avg = log(0.01 + herb_avg)) %>%
+data_gp <- dem.data %>% 
   group_by(year, transect) %>% 
   summarize(N_seedlings = sum(seedling, na.rm=T), 
             N_total = sum(aliveJune, na.rm=T), 
             N_budlings = N_total - N_seedlings,
-            log_herb_mean = mean(log_herb_avg, na.rm=T),
+            herb_mean = mean(herb_avg, na.rm=T),
             site = first(site))
 
-data13_14 <- data_gp %>% filter(year %in% 2013:2014) %>% 
+data15_16 <- data_gp %>% filter(transect != 80) %>% #transect 80 was abandoned after 2015 so was not included
   group_by(transect) %>% 
   summarize(bdlgs_per_stem = last(N_budlings)/first(N_total),
-            log_herb_mean = first(log_herb_mean),
+            herb_mean = first(herb_mean),
             site = first(site))
 
-data14_15 <- data_gp %>% filter(year %in% 2014:2015 & transect != 70) %>%
-  group_by(transect) %>% 
-  summarize(bdlgs_per_stem = last(N_budlings)/first(N_total),
-            log_herb_mean = first(log_herb_mean),
-            site = first(site))
+traits_15 = trait.data %>%
+  group_by(transect) %>%
+  summarize(N_mean = mean(N, na.rm=T),
+            LMA_mean = mean(LMA, na.rm=T),
+            Card_mean = mean(Cardenolides, na.r=T))
 
-fulldat <- bind_rows(data13_14, data14_15)
-```
-
-Let's average over transects.
-
-```{r}
-merged <- fulldat %>% group_by(transect) %>% 
-  summarize(log_herb_mean = mean(log_herb_mean),
-            bdlgs_per_stem = mean(bdlgs_per_stem),
-            site = first(site))
+transects = levels(traits_15$transect)
+merged = merge(filter(data15_16, transect %in% transects), traits_15) #already averaged over transects -> only one year transition
 ```
 
 Model fits.
 ```{r}
-exp.model <- lm(log(bdlgs_per_stem) ~ log_herb_mean, data=merged)
-lin.model <- lm(bdlgs_per_stem ~ log_herb_mean, data=merged)
+exp.model <- lm(log(bdlgs_per_stem) ~ herb_mean, data=merged)
+lin.model = lm(bdlgs_per_stem ~ herb_mean, data=merged)
+
+lin.model1 <- lm(bdlgs_per_stem ~ herb_mean + N_mean + LMA_mean + Card_mean, data=merged)
+
+lin.model2a = lm(bdlgs_per_stem ~ N_mean + LMA_mean + Card_mean, data=merged)
+lin.model2b = lm(bdlgs_per_stem ~ herb_mean + LMA_mean + Card_mean, data=merged)
+lin.model2c = lm(bdlgs_per_stem ~ herb_mean + N_mean + Card_mean, data=merged)
+lin.model2d = lm(bdlgs_per_stem ~ herb_mean + N_mean + LMA_mean, data=merged)
+aictab(list(lin.model1, lin.model2a, lin.model2b, lin.model2c, lin.model2d), modnames = c('1','2a','2b','2c','2d'), second.order=T)
+
+lin.model3a = lm(bdlgs_per_stem ~ LMA_mean + Card_mean, data=merged)
+lin.model3b = lm(bdlgs_per_stem ~ N_mean + Card_mean, data=merged)
+lin.model3c = lm(bdlgs_per_stem ~ N_mean + LMA_mean, data=merged)
+aictab(list(lin.model2a, lin.model3a, lin.model3b, lin.model3c), modnames = c('2a','3a','3b','3c'), second.order=T)
+
+lin.model4a = lm(bdlgs_per_stem ~ herb_mean, data=merged)
+lin.model4b = lm(bdlgs_per_stem ~ N_mean, data=merged)
+lin.model4c = lm(bdlgs_per_stem ~ LMA_mean, data=merged)
+lin.model4d = lm(bdlgs_per_stem ~ Card_mean, data=merged)
+aictab(list(lin.model4a, lin.model4b, lin.model4c, lin.model4d), modnames = c('4a','4b','4c','4d'), second.order=T)
+
+lin.model2 = lm(bdlgs_per_stem ~ N_mean, data=merged)
+drop1(lin.model2)
+
 cst.model <- lm(bdlgs_per_stem ~ 1, data=merged)
-AICc(cst.model)
-AICc(lin.model)
+
 AICc(exp.model)
+AICc(lin.model)
+AICc(cst.model)
 ```
 
 All three models are rather similar - in this case we will go with the exponential model, as it makes more biological sense (it won't go negative, although neither will a constant model!!!)
 ```{r}
 fit <- exp.model 
 
-plotdata <- data.frame(log_herb_avg = fit$model$log_herb_mean, 
+plotdata <- data.frame(herb_avg = fit$model$herb_mean, 
                        buds_per_stem = exp(fit$model$`log(bdlgs_per_stem)`),
                        site = merged$site)
 
-p <- plotdata %>% ggplot(aes(x = log_herb_avg, 
+p <- plotdata %>% ggplot(aes(x = herb_avg, 
                              y = buds_per_stem,
                              color = site)) + 
                   geom_point()
 
-xpts <- seq(from=log(0.01), to=log(6.01), length.out = 1000)
+xpts <- seq(from=0, to=6, length.out = 1000)
 ypts <- predict(fit, 
-                new = data.frame(log_herb_mean = xpts), 
+                new = data.frame(herb_mean = xpts), 
                 level=0.95,
                 interval="confidence",
                 se.fit=TRUE)
-plotdata <- data.frame(log_herb_avg = xpts, 
+plotdata <- data.frame(herb_avg = xpts, 
                        buds_per_stem = exp(ypts$fit[,"fit"]),
                        lwr = exp(ypts$fit[,"lwr"]),
                        upr = exp(ypts$fit[,"upr"]),
@@ -95,7 +106,7 @@ p <- p + geom_line(data = plotdata,
          scale_y_continuous(limits = c(0, 2.8))
          
 p <- p + theme_bw() +
-         xlab("ln(Herbivory Score)") +
+         xlab("Herbivory Score") +
          ylab("Per capita clonal reproduction\n (sprouts/stem)") +
          labs(color="Sites") + 
          theme(legend.background = element_rect(fill="lightgrey",

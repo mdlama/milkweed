@@ -1,0 +1,965 @@
+---
+title: "Transect Blocking"
+author: "Soren Struckman"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: true
+---
+
+```{r}
+library(dplyr)
+library(tidyr)
+```
+
+# Data
+We are starting with the XY coordinates of all the mapped plants in years 2013-2016.
+```{r}
+map.data = read.csv(file = "../../inst/extdata/allXY2013to2016.csv")
+map.data = map.data %>% separate(col = TranYr, into = c('transect', 'year'), sep = 2) %>%
+                        mutate(transect = as.character(transect), 
+                               year = as.integer(year)) %>%
+                        filter(year %in% c(2014, 2015))
+colnames(map.data)[3] = 'plantID'
+```
+
+Then we have to do some rearranging of the demographic and trait data, so we can join it all nicely into one big sheet... will have huge NA chunks.
+dem.data is all the demographic data from 2015-2016
+trait.data is all the trait data from 2015
+full.data is the demographic data from 2015 joined to the trait data from 2015... retaining only the plants with both sets of data
+map.data now contains all the map data from 2015-2016
+
+We need to pull in demographic data from 2014, do a left join of traits (not full) to dem, then another left join of map to this.
+```{r}
+dem14_15 = read.csv(file = '../../inst/extdata/stemdata.csv')
+dem14_15 = dem14_15 %>% filter(year %in% c(2014, 2015))
+dem14_15$transect = factor(dem14_15$transect)
+dem14_15$site = as.character(dem14_15$site)
+for (i in 1:nrow(dem14_15)) {
+  if(dem14_15$site[i] %in% c('BLD1','BLD2')){
+    dem14_15$site[i] = 'BLD'
+  }
+}
+dem14_15$site = as.factor(dem14_15$site)
+trait.data$year = 2015
+tmp = left_join(dem14_15, trait.data, by = c("year" = "year", "site" = "site", "transect" = "transect", "plantID" = "plantID"))
+tmp$aliveJune[which(tmp$aliveJune == 2)] = 1
+allDat = left_join(tmp, map.data, by = c("year" = "year", "transect" = "transect", "plantID" = "plantID"))
+```
+We should have allDat with the same nnumber of rows as dem.data
+
+## Problem Plants
+We have a ton of plants where their live status was not taken... maybe from mismatching tags... but that shouldnt matter, because we are averaging over block ans transects, so individual tags don't contribute.
+```{r}
+#only have full sets of data for these 4 transects
+Problem_Plants = filter(allDat, transect %in% c(42,80,81,83), !is.na(x), (is.na(aliveJune) | aliveJune == 0))
+Problem_Plants$aliveJune = 1
+others = filter(allDat, transect %in% c(42,80,81,83), !is.na(x), aliveJune == 1)
+allDat = bind_rows(others, Problem_Plants)
+```
+
+
+# Transect Blocking
+## Compute transect endpoints
+```{r}
+endPtsDat <- map.data %>% filter(grepl("end", tolower(plantID))) %>%
+                          slice(-which(year == 2015 & transect == 42 & grepl("end", plantID))) #%>% # Remove extra endpoints in 2015, transect 42
+                          #slice(-which(year == 2015 & transect == 47 & grepl("end", plantID))) # Remove extra endpoints in 2015, transect 47
+
+#no end point problems for 2014
+```
+
+
+
+THESE FUNCTIONS NEED TO BE DEBUGGED... HARD... OR REWRITTEN ENTIRELY
+Calculating budlings/stem for each transect by hand instead... although still using getTransectGeometry... WHICH IS STILL PLOTTING MAPPED DEAD PLANTS
+
+
+
+## This function transforms (if desired) and plots transects spatially
+```{r}
+getTransectGeometry <- function(ends = NULL, locs = NULL, w = 1.0, rotate = T, view = FALSE) {
+  if (is.null(ends)) {
+    ends = data.frame(x = c(-1.0, 1.0), y = c(-1.0, 1.0))
+  }
+  vec <- ends[1,]-ends[2,]
+  if (rotate) {
+    theta <- -1*atan(vec$y/vec$x)
+    center <- (ends[1,] + ends[2,])/2
+    C = data.frame(x = center$x*c(1,1), y=center$y*c(1,1))
+    M = matrix(c(cos(theta), -sin(theta), sin(theta), cos(theta)), nrow=2, byrow=TRUE)
+    ends <- as.data.frame(t(M%*%t(ends-C)))
+    colnames(ends) <- c("x","y")
+    perp <- c(0, 0.5)
+    xL <- c(min(ends)-1, max(ends)+1)
+    yL <- c(-1, 1)
+  } else {
+    cc <- 1/(2*sqrt(1+(vec$x^2)/(vec$y^2)))
+    perp <- cc*c(1, -1*vec$x/vec$y)
+    xL <- c(min(ends)-1, max(ends)+1)
+    yL <- xL
+  }
+  
+  if (view) {
+    plot(ends, col='red', xlim=xL, ylim=yL)
+    lines(ends)
+    lines(rbind(ends[1,]-perp, ends[1,]+perp))
+    lines(rbind(ends[2,]-perp, ends[2,]+perp))
+    lines(rbind(ends[1,]+perp, ends[2,]+perp))
+    lines(rbind(ends[1,]-perp, ends[2,]-perp))
+
+    if (rotate) {
+      if (w <= (max(ends$x)-min(ends$x))) {
+        block_ends <- seq(from = min(ends$x), to = max(ends$x), by=w)
+      } else {
+        block_ends <- c(1, max(ends$x))
+      }
+      for (i in 2:length(block_ends)) {
+        abline(v=block_ends[i])
+      }
+    }
+  }
+  
+  if (!is.null(locs)) {
+    if (rotate) {
+      C = data.frame(x = center$x*rep(1,nrow(locs)), y=center$y*rep(1,nrow(locs)))
+      locs <- t(M%*%t(locs-C))
+      colnames(locs) <- c("x","y")
+    }
+    
+    if (view) {
+      points(locs, pch=16, col="blue", cex=0.5)
+    }
+  }
+  
+  out = list(ends = ends, locs = locs)
+  return(list(ends = ends, locs = locs))
+}
+```
+
+## This function computes buds per stem over transect blocks with width w
+```{r, eval=F}
+computeBudsPerStem <- function(w = 1.0, view = FALSE) {
+  transects <- data.frame(Years = c(rep(2014, 4), rep(2015, 4)),
+                          Transects = rep(c(42, 80, 81, 83), 2)) #these are the only transect years that we have all 2015 data for and 2014 map data for
+  
+  sumTab <- data.frame()
+  for (i in 1:8) {
+    (yr <- transects$Years[i])
+    (tr <- transects$Transects[i])
+    
+    ends <- endPtsDat %>% filter(year == yr & transect == tr) %>% 
+      select(x, y)
+    locs <- allDat %>% filter(year == yr & transect == tr) %>% 
+      select(x, y)
+    
+    out <- getTransectGeometry(ends, locs, view=view, w=w)
+    if (w <= (max(out$ends[,1])-min(out$ends[,1]))) {
+      bounds <- seq(from = min(out$ends[,1]), to = max(out$ends[,1]), by=w)
+      bounds[length(bounds)+1] = max(out$ends[,1])
+      rbounds <- bounds[2:length(bounds)]
+    } else {
+      rbounds <- c(1, max(out$ends[,1]))
+    }  
+
+    sumTab <- bind_rows(sumTab, allDat %>% filter(year == yr & transect == tr) %>% 
+                          mutate(xr = out$locs[,1], 
+                                 yr = out$locs[,2]) %>%
+                          filter(aliveJune == 1, !is.na(x)) %>%
+                          mutate(block = sapply(xr, function(i) ifelse(is.na(i), NA, min(which(i < rbounds)))))) #%>%
+                          # group_by(block) %>%
+                          # summarize(n_seedlings = sum(seedling, na.rm=T),
+                          #           n_total = sum(aliveJune, na.rm=T), 
+                          #           n_budlings = n_total - n_seedlings,
+                          #           herb_mean = mean(herb_avg, na.rm=T),
+                          #           h_apical_mean = mean(h_apical, na.rm=T),
+                          #           N_mean = mean(N, na.rm=T),
+                          #           LMA_mean = mean(LMA, na.rm=T),
+                          #           Card_mean = mean(Cardenolides, na.r=T),
+                          #           site = first(site)) %>%
+                          # mutate(year = yr, transect = tr))
+    #sumTab$block[which(is.infinite(sumTab$block))] = sumTab$block[which(sumTab$block == max(sumTab$block))-1]+1
+    cat(paste(yr, tr, '\n', sep=' '))
+  }
+  
+  # tmp <- sumTab %>% unite(TranBlock, transect, block) %>%
+  #   group_by(TranBlock) %>% summarize(buds_per_stem = last(n_budlings)/first(n_total), 
+  #                                     herb_mean = mean(herb_mean, na.rm=T),
+  #                                     h_apical_mean = mean(h_apical_mean, na.rm=T),
+  #                                     N_mean = mean(N_mean, na.rm=T),
+  #                                     LMA_mean = mean(LMA_mean, na.rm=T),
+  #                                     Card_mean = mean(Card_mean, na.rm=T),
+  #                                     site = first(site),
+  #                                     n_2014 = first(n_total),       #reporters to check for false 0s 
+  #                                     n_2015 = last(n_budlings),     #where there were no stems in a block in 2014
+  #                                     year = paste(year[1], year[2]))     
+  # tmp[is.na(tmp)] = NA
+  # final <- tmp %>% separate(TranBlock, c("transect", "block"))
+  
+  #return(final)
+  return(sumTab)
+}
+```
+
+##By Hand
+Since the loop code is not working... guess we have to do them by hand for each transect!
+```{r}
+bud.data = data.frame() #initialize a master dataframe to hold all the final data
+```
+
+##Transect 80
+```{r}
+#transect 80
+tr = 80
+w = 1.0 #width of blocks
+
+#initialize
+yr = 2014
+sumTab <- data.frame()
+
+#get ends and locations
+ends <- endPtsDat %>% filter(year == yr & transect == tr) %>% 
+                      select(x, y)
+locs <- allDat %>% filter(year == yr & transect == tr) %>% 
+                   select(x, y)
+
+#rotate
+# vec <- ends[1,]-ends[2,]
+# theta <- -1*atan(vec$y/vec$x)
+# center <- (ends[1,] + ends[2,])/2
+# C = data.frame(x = center$x*c(1,1), y=center$y*c(1,1))
+# M = matrix(c(cos(theta), -sin(theta), sin(theta), cos(theta)), nrow=2, byrow=TRUE)
+# ends <- as.data.frame(t(M%*%t(ends-C)))
+# colnames(ends) <- c("x","y")
+# perp <- c(0, 0.5)
+# xL <- c(min(ends)-1, max(ends)+1)
+# yL <- c(-1, 1)
+# 
+# C = data.frame(x = center$x*rep(1,nrow(locs)), y=center$y*rep(1,nrow(locs)))
+# locs <- t(M%*%t(locs-C))
+# colnames(locs) <- c("x","y")
+# 
+# out = list(ends = ends, locs = locs)
+out = getTransectGeometry(ends = ends, locs = locs, w=w, rotate = T, view = T)
+#commented code above does just the rotating and not the plotting
+
+#set block boundaries
+if (w <= (max(out$ends[,1])-min(out$ends[,1]))) {
+  bounds <- seq(from = min(out$ends[,1]), to = max(out$ends[,1]), by=w)
+  bounds[length(bounds)+1] = max(out$ends[,1])
+  rbounds <- bounds[2:length(bounds)]
+} else {
+  rbounds <- c(1, max(out$ends[,1]))
+}
+
+#append blocked data to sumTab... stores the number of budlings and other stuff summarized for the transect-year level
+sumTab <- bind_rows(sumTab, allDat %>% filter(year == yr & transect == tr) %>% 
+                                       mutate(xr = out$locs[,1], 
+                                              yr = out$locs[,2]) %>%
+                                       filter(aliveJune == 1, !is.na(x)) %>%
+                                       mutate(block = sapply(xr, function(i) ifelse(is.na(i), NA, min(which(i < rbounds))))) %>%
+                                       filter(!is.infinite(block)) %>% #remove INF blocks that are created when a rogue plant is past the end of the transect
+                                       group_by(block) %>%
+                                       summarize(n_seedlings = sum(seedling, na.rm=T),
+                                                 n_total = sum(aliveJune, na.rm=T),
+                                                 n_budlings = n_total - n_seedlings,
+                                                 herb_mean = mean(herb_avg, na.rm=T),
+                                                 h_apical_mean = mean(h_apical, na.rm=T),
+                                                 N_mean = mean(N, na.rm=T),                 # these should all be NA 
+                                                 LMA_mean = mean(LMA, na.rm=T),             # for all the 2014
+                                                 Card_mean = mean(Cardenolides, na.rm=T),   # transect-years
+                                                 site = first(site)) %>%
+                                       mutate(year = yr, transect = tr))
+
+#to figure out the difference in what is on the plot and what should be
+nrow(filter(allDat, transect == tr, year == yr, !is.na(x))) - nrow(filter(allDat, transect == tr, year == yr, !is.na(x), aliveJune == 1))
+
+#initialize again for 2015
+yr = 2015
+
+#get ends and locations
+ends <- endPtsDat %>% filter(year == yr & transect == tr) %>% 
+                      select(x, y)
+locs <- allDat %>% filter(year == yr & transect == tr) %>% 
+                   select(x, y)
+
+#rotate
+out = getTransectGeometry(ends = ends, locs = locs, w=w, rotate = T, view = T)
+
+#set block boundaries
+if (w <= (max(out$ends[,1])-min(out$ends[,1]))) {
+  bounds <- seq(from = min(out$ends[,1]), to = max(out$ends[,1]), by=w)
+  bounds[length(bounds)+1] = max(out$ends[,1])
+  rbounds <- bounds[2:length(bounds)]
+} else {
+  rbounds <- c(1, max(out$ends[,1]))
+}
+
+#append blocked data to sumTab... stores the number of budlings and other stuff summarized for the transect-year level
+sumTab <- bind_rows(sumTab, allDat %>% filter(year == yr & transect == tr) %>% 
+                                       mutate(xr = out$locs[,1], 
+                                              yr = out$locs[,2]) %>%
+                                       filter(aliveJune == 1, !is.na(x)) %>%
+                                       mutate(block = sapply(xr, function(i) ifelse(is.na(i), NA, min(which(i < rbounds))))) %>%
+                                       filter(!is.infinite(block)) %>% #remove INF blocks that are created when a rogue plant is past the end of the transect
+                                       group_by(block) %>%
+                                       summarize(n_seedlings = sum(seedling, na.rm=T),
+                                                 n_total = sum(aliveJune, na.rm=T),
+                                                 n_budlings = n_total - n_seedlings,
+                                                 herb_mean = mean(herb_avg, na.rm=T),
+                                                 h_apical_mean = mean(h_apical, na.rm=T),
+                                                 N_mean = mean(N, na.rm=T),                 # these should all not be NA 
+                                                 LMA_mean = mean(LMA, na.rm=T),             # for all the 2015
+                                                 Card_mean = mean(Cardenolides, na.rm=T),   # transect-years, but not all blocks
+                                                 site = first(site)) %>%
+                                       mutate(year = yr, transect = tr))
+sumTab[is.na(sumTab)] = NA #changes NaNs to NAs
+
+#make transect-specific changes
+# sumTab[nrow(sumTab)+1,] = c(2,0,0,0,NA,NA,NA,NA,NA,'PWR',2015,80) #these are adding in 0s where there were no plants in a block
+# sumTab[nrow(sumTab)+1,] = c(3,0,0,0,NA,NA,NA,NA,NA,'PWR',2015,80)
+# sumTab[nrow(sumTab)+1,] = c(4,0,0,0,NA,NA,NA,NA,NA,'PWR',2015,80)
+# sumTab[nrow(sumTab)+1,] = c(5,0,0,0,NA,NA,NA,NA,NA,'PWR',2015,80)
+# sumTab[nrow(sumTab)+1,] = c(6,0,0,0,NA,NA,NA,NA,NA,'PWR',2015,80)
+# sumTab[nrow(sumTab)+1,] = c(8,0,0,0,NA,NA,NA,NA,NA,'PWR',2015,80)
+# sumTab[nrow(sumTab)+1,] = c(9,0,0,0,NA,NA,NA,NA,NA,'PWR',2015,80)
+sumTab[nrow(sumTab)+1,] = c(10,0,0,0,NA,NA,NA,NA,NA,'PWR',2014,80)
+##NOTE there are no plants in block 10 in 2014, so it has been omitted... this transect now has 9 blocks (numbered 1-9)
+
+#homogenizing the data, fixes an error in below summarize call that I suspect arises from hardcoding in the zeros
+sumTab$block = as.numeric(sumTab$block)
+sumTab$n_seedlings = as.numeric(sumTab$n_seedlings)
+sumTab$n_total = as.numeric(sumTab$n_total)
+sumTab$n_budlings = as.numeric(sumTab$n_budlings)
+sumTab$herb_mean = as.numeric(sumTab$herb_mean)
+sumTab$h_apical_mean = as.numeric(sumTab$h_apical_mean)
+sumTab$N_mean = as.numeric(sumTab$N_mean)
+sumTab$LMA_mean = as.numeric(sumTab$LMA_mean)
+sumTab$Card_mean = as.numeric(sumTab$Card_mean)
+sumTab$site = as.character(sumTab$site)
+sumTab$year = as.numeric(sumTab$year)
+sumTab$transect = as.numeric(sumTab$transect)
+
+#calculate Buds/stem and average over year for each transect-block
+tmp = sumTab %>% group_by(block) %>% summarize(buds_per_stem = last(n_budlings)/first(n_total),
+                                               herb_mean = first(herb_mean),
+                                               h_apical_mean = first(h_apical_mean),
+                                               N_mean = mean(N_mean, na.rm=T),
+                                               LMA_mean = mean(LMA_mean, na.rm=T),
+                                               Card_mean = mean(Card_mean, na.rm=T),
+                                               site = first(site),
+                                               n_2014 = first(n_total),             #reporters to check for false 0s
+                                               n_2015 = last(n_budlings),           #where there were no stems in a block in 2014
+                                               year = paste(year[1], year[2])) %>%  #reporter to see if it is grouping correctly
+                                     mutate(transect = tr)
+tmp[is.na(tmp)] = NA
+tmp$buds_per_stem[which(tmp$block == 10)] = NA #doing this because block 10 doesn't have plants in 2014
+final = tmp %>% select(-n_2014, -n_2015, year)
+
+bud.data = bind_rows(bud.data, final) #appends the data for each transect to a master dataframe
+
+#to figure out the difference in what is on the plot and what should be
+nrow(filter(allDat, transect == tr, year == yr, !is.na(x))) - nrow(filter(allDat, transect == tr, year == yr, !is.na(x), aliveJune == 1))
+```
+
+##Transect 81
+```{r}
+#transect 81
+tr = 81
+w = 0.75 #width of blocks
+
+#initialize
+yr = 2014
+sumTab <- data.frame()
+
+#get ends and locations
+ends <- endPtsDat %>% filter(year == yr & transect == tr) %>% 
+                      select(x, y)
+locs <- allDat %>% filter(year == yr & transect == tr) %>% 
+                   select(x, y)
+
+#rotate
+out = getTransectGeometry(ends = ends, locs = locs, w=w, rotate = T, view = T)
+
+#set block boundaries
+if (w <= (max(out$ends[,1])-min(out$ends[,1]))) {
+  bounds <- seq(from = min(out$ends[,1]), to = max(out$ends[,1]), by=w)
+  bounds[length(bounds)+1] = max(out$ends[,1])
+  rbounds <- bounds[2:length(bounds)]
+} else {
+  rbounds <- c(1, max(out$ends[,1]))
+}
+
+#append blocked data to sumTab... stores the number of budlings and other stuff summarized for the transect-year level
+sumTab <- bind_rows(sumTab, allDat %>% filter(year == yr & transect == tr) %>% 
+                                       mutate(xr = out$locs[,1], 
+                                              yr = out$locs[,2]) %>%
+                                       filter(aliveJune == 1, !is.na(x)) %>%
+                                       mutate(block = sapply(xr, function(i) ifelse(is.na(i), NA, min(which(i < rbounds))))) %>%
+                                       filter(!is.infinite(block)) %>% #remove INF blocks that are created when a rogue plant is past the end of the transect
+                                       group_by(block) %>%
+                                       summarize(n_seedlings = sum(seedling, na.rm=T),
+                                                 n_total = sum(aliveJune, na.rm=T),
+                                                 n_budlings = n_total - n_seedlings,
+                                                 herb_mean = mean(herb_avg, na.rm=T),
+                                                 h_apical_mean = mean(h_apical, na.rm=T),
+                                                 N_mean = mean(N, na.rm=T),                 # these should all be NA 
+                                                 LMA_mean = mean(LMA, na.rm=T),             # for all the 2014
+                                                 Card_mean = mean(Cardenolides, na.rm=T),   # transect-years
+                                                 site = first(site)) %>%
+                                       mutate(year = yr, transect = tr))
+
+#to figure out the difference in what is on the plot and what should be
+nrow(filter(allDat, transect == tr, year == yr, !is.na(x))) - nrow(filter(allDat, transect == tr, year == yr, !is.na(x), aliveJune == 1))
+
+#initialize again for 2015
+yr = 2015
+
+#get ends and locations
+ends <- endPtsDat %>% filter(year == yr & transect == tr) %>% 
+                      select(x, y)
+locs <- allDat %>% filter(year == yr & transect == tr) %>% 
+                   select(x, y)
+
+#rotate
+out = getTransectGeometry(ends = ends, locs = locs, w=w, rotate = T, view = T)
+
+#set block boundaries
+if (w <= (max(out$ends[,1])-min(out$ends[,1]))) {
+  bounds <- seq(from = min(out$ends[,1]), to = max(out$ends[,1]), by=w)
+  bounds[length(bounds)+1] = max(out$ends[,1])
+  rbounds <- bounds[2:length(bounds)]
+} else {
+  rbounds <- c(1, max(out$ends[,1]))
+}
+
+#append blocked data to sumTab... stores the number of budlings and other stuff summarized for the transect-year level
+sumTab <- bind_rows(sumTab, allDat %>% filter(year == yr & transect == tr) %>% 
+                                       mutate(xr = out$locs[,1], 
+                                              yr = out$locs[,2]) %>%
+                                       filter(aliveJune == 1, !is.na(x)) %>%
+                                       mutate(block = sapply(xr, function(i) ifelse(is.na(i), NA, min(which(i < rbounds))))) %>%
+                                       filter(!is.infinite(block)) %>% #remove INF blocks that are created when a rogue plant is past the end of the transect
+                                       group_by(block) %>%
+                                       summarize(n_seedlings = sum(seedling, na.rm=T),
+                                                 n_total = sum(aliveJune, na.rm=T),
+                                                 n_budlings = n_total - n_seedlings,
+                                                 herb_mean = mean(herb_avg, na.rm=T),
+                                                 h_apical_mean = mean(h_apical, na.rm=T),
+                                                 N_mean = mean(N, na.rm=T),                 # these should all not be NA 
+                                                 LMA_mean = mean(LMA, na.rm=T),             # for all the 2015
+                                                 Card_mean = mean(Cardenolides, na.rm=T),   # transect-years, but not all blocks
+                                                 site = first(site)) %>%
+                                       mutate(year = yr, transect = tr))
+sumTab[is.na(sumTab)] = NA #changes NaNs to NAs
+
+#make transect-specific changes
+#sumTab[nrow(sumTab)+1,] = c(6,0,0,0,NA,NA,NA,NA,NA,'PWR',2015,81) #these are adding in 0s where there were no plants in a block
+sumTab[nrow(sumTab)+1,] = c(14,0,0,0,NA,NA,NA,NA,NA,'PWR',2015,81)
+##NOTE there are no plants in block 1 in either year, so it has been omitted... this transect now has 9 blocks (numbered 2-10)
+
+#homogenizing the data, fixes an error in below summarize call that I suspect arises from hardcoding in the zeros
+sumTab$block = as.numeric(sumTab$block)
+sumTab$n_seedlings = as.numeric(sumTab$n_seedlings)
+sumTab$n_total = as.numeric(sumTab$n_total)
+sumTab$n_budlings = as.numeric(sumTab$n_budlings)
+sumTab$herb_mean = as.numeric(sumTab$herb_mean)
+sumTab$h_apical_mean = as.numeric(sumTab$h_apical_mean)
+sumTab$N_mean = as.numeric(sumTab$N_mean)
+sumTab$LMA_mean = as.numeric(sumTab$LMA_mean)
+sumTab$Card_mean = as.numeric(sumTab$Card_mean)
+sumTab$site = as.character(sumTab$site)
+sumTab$year = as.numeric(sumTab$year)
+sumTab$transect = as.numeric(sumTab$transect)
+
+#calculate Buds/stem and average over year for each transect-block... using 2014 values for height and herb, 2015 trait values
+tmp = sumTab %>% group_by(block) %>% summarize(buds_per_stem = last(n_budlings)/first(n_total),
+                                               herb_mean = first(herb_mean),
+                                               h_apical_mean = first(h_apical_mean),
+                                               N_mean = mean(N_mean, na.rm=T),
+                                               LMA_mean = mean(LMA_mean, na.rm=T),
+                                               Card_mean = mean(Card_mean, na.rm=T),
+                                               site = first(site),
+                                               n_2014 = first(n_total),             #reporters to check for false 0s
+                                               n_2015 = last(n_budlings),           #where there were no stems in a block in 2014
+                                               year = paste(year[1], year[2])) %>%  #reporter to see if it is grouping correctly
+                                     mutate(transect = tr)
+tmp[is.na(tmp)] = NA
+final = tmp %>% select(-n_2014, -n_2015, year)
+
+bud.data = bind_rows(bud.data, final) #appends the data for each transect to a master dataframe
+
+#to figure out the difference in what is on the plot and what should be
+nrow(filter(allDat, transect == tr, year == yr, !is.na(x))) - nrow(filter(allDat, transect == tr, year == yr, !is.na(x), aliveJune == 1))
+```
+
+##Transect 83
+```{r}
+#transect 83
+tr = 83
+w = 1.0 #width of blocks
+
+#initialize
+yr = 2014
+sumTab <- data.frame()
+
+#get ends and locations
+ends <- endPtsDat %>% filter(year == yr & transect == tr) %>% 
+                      select(x, y)
+locs <- allDat %>% filter(year == yr & transect == tr) %>% 
+                   select(x, y)
+
+#rotate
+out = getTransectGeometry(ends = ends, locs = locs, w=w, rotate = T, view = T)
+
+#set block boundaries
+if (w <= (max(out$ends[,1])-min(out$ends[,1]))) {
+  bounds <- seq(from = min(out$ends[,1]), to = max(out$ends[,1]), by=w)
+  bounds[length(bounds)+1] = max(out$ends[,1])
+  rbounds <- bounds[2:length(bounds)]
+} else {
+  rbounds <- c(1, max(out$ends[,1]))
+}
+
+#append blocked data to sumTab... stores the number of budlings and other stuff summarized for the transect-year level
+sumTab <- bind_rows(sumTab, allDat %>% filter(year == yr & transect == tr) %>% 
+                                       mutate(xr = out$locs[,1], 
+                                              yr = out$locs[,2]) %>%
+                                       filter(aliveJune == 1, !is.na(x)) %>%
+                                       mutate(block = sapply(xr, function(i) ifelse(is.na(i), NA, min(which(i < rbounds))))) %>%
+                                       filter(!is.infinite(block)) %>% #remove INF blocks that are created when a rogue plant is past the end of the transect
+                                       group_by(block) %>%
+                                       summarize(n_seedlings = sum(seedling, na.rm=T),
+                                                 n_total = sum(aliveJune, na.rm=T),
+                                                 n_budlings = n_total - n_seedlings,
+                                                 herb_mean = mean(herb_avg, na.rm=T),
+                                                 h_apical_mean = mean(h_apical, na.rm=T),
+                                                 N_mean = mean(N, na.rm=T),                 # these should all be NA 
+                                                 LMA_mean = mean(LMA, na.rm=T),             # for all the 2014
+                                                 Card_mean = mean(Cardenolides, na.rm=T),   # transect-years
+                                                 site = first(site)) %>%
+                                       mutate(year = yr, transect = tr))
+
+#to figure out the difference in what is on the plot and what should be
+nrow(filter(allDat, transect == tr, year == yr, !is.na(x))) - nrow(filter(allDat, transect == tr, year == yr, !is.na(x), aliveJune == 1))
+
+#initialize again for 2015
+yr = 2015
+
+#get ends and locations
+ends <- endPtsDat %>% filter(year == yr & transect == tr) %>% 
+                      select(x, y)
+locs <- allDat %>% filter(year == yr & transect == tr) %>% 
+                   select(x, y)
+
+#rotate
+out = getTransectGeometry(ends = ends, locs = locs, w=w, rotate = T, view = T)
+
+#set block boundaries
+if (w <= (max(out$ends[,1])-min(out$ends[,1]))) {
+  bounds <- seq(from = min(out$ends[,1]), to = max(out$ends[,1]), by=w)
+  bounds[length(bounds)+1] = max(out$ends[,1])
+  rbounds <- bounds[2:length(bounds)]
+} else {
+  rbounds <- c(1, max(out$ends[,1]))
+}
+
+#append blocked data to sumTab... stores the number of budlings and other stuff summarized for the transect-year level
+sumTab <- bind_rows(sumTab, allDat %>% filter(year == yr & transect == tr) %>% 
+                                       mutate(xr = out$locs[,1], 
+                                              yr = out$locs[,2]) %>%
+                                       filter(aliveJune == 1, !is.na(x)) %>%
+                                       mutate(block = sapply(xr, function(i) ifelse(is.na(i), NA, min(which(i < rbounds))))) %>%
+                                       filter(!is.infinite(block)) %>% #remove INF blocks that are created when a rogue plant is past the end of the transect
+                                       group_by(block) %>%
+                                       summarize(n_seedlings = sum(seedling, na.rm=T),
+                                                 n_total = sum(aliveJune, na.rm=T),
+                                                 n_budlings = n_total - n_seedlings,
+                                                 herb_mean = mean(herb_avg, na.rm=T),
+                                                 h_apical_mean = mean(h_apical, na.rm=T),
+                                                 N_mean = mean(N, na.rm=T),                 # these should all not be NA 
+                                                 LMA_mean = mean(LMA, na.rm=T),             # for all the 2015
+                                                 Card_mean = mean(Cardenolides, na.rm=T),   # transect-years, but not all blocks
+                                                 site = first(site)) %>%
+                                       mutate(year = yr, transect = tr))
+sumTab[is.na(sumTab)] = NA #changes NaNs to NAs
+
+#make transect-specific changes
+# Only zeros in this transect were for blocks 17 and 18 in 2014, but assigning them as zeros would lead to infinite buds/stem, so making that correction after the calculation
+##NOTE after the buds/stem correction... this transect now has 16 blocks (numbered 1-16) that can be used for buds/stem models
+
+#homogenizing the data, fixes an error in below summarize call that I suspect arises from hardcoding in the zeros
+sumTab$block = as.numeric(sumTab$block)
+sumTab$n_seedlings = as.numeric(sumTab$n_seedlings)
+sumTab$n_total = as.numeric(sumTab$n_total)
+sumTab$n_budlings = as.numeric(sumTab$n_budlings)
+sumTab$herb_mean = as.numeric(sumTab$herb_mean)
+sumTab$h_apical_mean = as.numeric(sumTab$h_apical_mean)
+sumTab$N_mean = as.numeric(sumTab$N_mean)
+sumTab$LMA_mean = as.numeric(sumTab$LMA_mean)
+sumTab$Card_mean = as.numeric(sumTab$Card_mean)
+sumTab$site = as.character(sumTab$site)
+sumTab$year = as.numeric(sumTab$year)
+sumTab$transect = as.numeric(sumTab$transect)
+
+#calculate Buds/stem and average over year for each transect-block
+tmp = sumTab %>% group_by(block) %>% summarize(buds_per_stem = last(n_budlings)/first(n_total),
+                                               herb_mean = first(herb_mean),
+                                               h_apical_mean = first(h_apical_mean),
+                                               N_mean = mean(N_mean, na.rm=T),
+                                               LMA_mean = mean(LMA_mean, na.rm=T),
+                                               Card_mean = mean(Card_mean, na.rm=T),
+                                               site = first(site),
+                                               n_2014 = first(n_total),             #reporters to check for false 0s
+                                               n_2015 = last(n_budlings),           #where there were no stems in a block in 2014
+                                               year = paste(year[1], year[2])) %>%  #reporter to see if it is grouping correctly
+                                     mutate(transect = tr)
+tmp[is.na(tmp)] = NA
+tmp$buds_per_stem[which(tmp$block %in% c(17,18))] = NA #doing this because blocks 17 and 18 did not have any stems in 2014, but had some in 2015
+final = tmp %>% select(-n_2014, -n_2015, year)
+
+bud.data = bind_rows(bud.data, final) #appends the data for each transect to a master dataframe
+
+#to figure out the difference in what is on the plot and what should be
+nrow(filter(allDat, transect == tr, year == yr, !is.na(x))) - nrow(filter(allDat, transect == tr, year == yr, !is.na(x), aliveJune == 1))
+```
+
+##Transect 42
+The doozy.
+```{r}
+##NOTE: transect 42 was shortened on both ends in 2015, so we are matching up the centers, and blocking that way,
+##      so we will have to get creative and do the centering and rotating a bit differently.
+
+#transect 42
+tr = 42
+w = 1.0 #width of blocks
+
+#initializing 2015 first, since it's shorter and we need it's dimensions to block both years out the same
+yr = 2015
+
+#get ends and locations
+ends <- endPtsDat %>% filter(year == yr & transect == tr) %>% 
+                      select(x, y)
+locs <- allDat %>% filter(year == yr & transect == tr) %>% 
+                   select(x, y)
+
+#rotate
+vec <- ends[1,]-ends[2,]
+theta <- -1*atan(vec$y/vec$x)
+center <- (ends[1,] + ends[2,])/2
+C = data.frame(x = center$x*c(1,1), y=center$y*c(1,1))
+M = matrix(c(cos(theta), -sin(theta), sin(theta), cos(theta)), nrow=2, byrow=TRUE)
+ends <- as.data.frame(t(M%*%t(ends-C)))
+colnames(ends) <- c("x","y")
+perp <- c(0, 0.5)
+xL <- c(min(ends)-1, max(ends)+1)
+yL <- c(-1, 1)
+
+C = data.frame(x = center$x*rep(1,nrow(locs)), y=center$y*rep(1,nrow(locs)))
+locs <- t(M%*%t(locs-C))
+colnames(locs) <- c("x","y")
+
+out = list(ends = ends, locs = locs)
+
+#set block boundaries... should only have to do this once
+if (w <= (max(out$ends[,1])-min(out$ends[,1]))) {
+  bounds <- seq(from = min(out$ends[,1])-w, to = max(out$ends[,1])+w, by=w) #extending out by w to get INF plants and keep the transect a bit longer
+  rbounds <- bounds[2:length(bounds)]
+} else {
+  rbounds <- c(1, max(out$ends[,1]))
+}
+
+#saving for later
+out42_15 = out
+
+#now let's reinitialize for 2014 and the work with the actual data
+yr = 2014
+sumTab = data.frame()
+
+#get ends and locations
+ends <- endPtsDat %>% filter(year == yr & transect == tr) %>% 
+                      select(x, y)
+locs <- allDat %>% filter(year == yr & transect == tr) %>% 
+                   select(x, y)
+
+#rotate
+vec <- ends[1,]-ends[2,]
+theta <- -1*atan(vec$y/vec$x)
+center <- (ends[1,] + ends[2,])/2
+C = data.frame(x = center$x*c(1,1), y=center$y*c(1,1))
+M = matrix(c(cos(theta), -sin(theta), sin(theta), cos(theta)), nrow=2, byrow=TRUE)
+ends <- as.data.frame(t(M%*%t(ends-C)))
+colnames(ends) <- c("x","y")
+perp <- c(0, 0.5)
+xL <- c(min(ends)-1, max(ends)+1)
+yL <- c(-1, 1)
+
+C = data.frame(x = center$x*rep(1,nrow(locs)), y=center$y*rep(1,nrow(locs)))
+locs <- t(M%*%t(locs-C))
+colnames(locs) <- c("x","y")
+
+out = list(ends = ends, locs = locs)
+
+#now I should just be able to apply the 2015 boundaries to the rotated 2014 points to block them out the same, since after rotating, the centers are both (0,0)
+
+#append blocked data to sumTab... stores the number of budlings and other stuff summarized for the transect-year level
+sumTab <- bind_rows(sumTab, allDat %>% filter(year == yr & transect == tr) %>% 
+                                       mutate(xr = out$locs[,1], 
+                                              yr = out$locs[,2]) %>%
+                                       filter(aliveJune == 1, !is.na(x)) %>%
+                                       mutate(block = sapply(xr, function(i) ifelse(is.na(i), NA, ifelse(i< min(rbounds)-w, 0, min(which(i < rbounds)))))) %>% #made a change to this function to omit plants outside left boundary ... in "block zero"
+                                       filter(block != 0, !is.infinite(block)) %>% #remove INF blocks that are created when a rogue plant is past the end of the transect
+                                       group_by(block) %>%
+                                       summarize(n_seedlings = sum(seedling, na.rm=T),
+                                                 n_total = sum(aliveJune, na.rm=T),
+                                                 n_budlings = n_total - n_seedlings,
+                                                 herb_mean = mean(herb_avg, na.rm=T),
+                                                 h_apical_mean = mean(h_apical, na.rm=T),
+                                                 N_mean = mean(N, na.rm=T),                 # these should all be NA 
+                                                 LMA_mean = mean(LMA, na.rm=T),             # for all the 2014
+                                                 Card_mean = mean(Cardenolides, na.rm=T),   # transect-years
+                                                 site = first(site)) %>%
+                                       mutate(year = yr, transect = tr))
+
+#to figure out the difference in what is on the plot and what should be
+nrow(filter(allDat, transect == tr, year == yr, !is.na(x))) - nrow(filter(allDat, transect == tr, year == yr, !is.na(x), aliveJune == 1))
+
+#initialize again for 2015
+yr = 2015
+
+#output of original rotation stored in out42_15
+#boundaries being used are the same ones from before
+
+#append blocked data to sumTab... stores the number of budlings and other stuff summarized for the transect-year level
+sumTab <- bind_rows(sumTab, allDat %>% filter(year == yr & transect == tr) %>% 
+                                       mutate(xr = out42_15$locs[,1], 
+                                              yr = out42_15$locs[,2]) %>%
+                                       filter(aliveJune == 1, !is.na(x)) %>%
+                                       mutate(block = sapply(xr, function(i) ifelse(is.na(i), NA, min(which(i < rbounds))))) %>%
+                                       filter(!is.infinite(block)) %>% #remove INF blocks that are created when a rogue plant is past the end of the transect
+                                       group_by(block) %>%
+                                       summarize(n_seedlings = sum(seedling, na.rm=T),
+                                                 n_total = sum(aliveJune, na.rm=T),
+                                                 n_budlings = n_total - n_seedlings,
+                                                 herb_mean = mean(herb_avg, na.rm=T),
+                                                 h_apical_mean = mean(h_apical, na.rm=T),
+                                                 N_mean = mean(N, na.rm=T),                 # these should all not be NA 
+                                                 LMA_mean = mean(LMA, na.rm=T),             # for all the 2015
+                                                 Card_mean = mean(Cardenolides, na.rm=T),   # transect-years, but not all blocks
+                                                 site = first(site)) %>%
+                                       mutate(year = yr, transect = tr))
+sumTab[is.na(sumTab)] = NA #changes NaNs to NAs
+
+#make transect-specific changes
+#no zeros on this transect
+##this transect now has 18 blocks (numbered 1-18)
+
+#homogenizing the data, fixes an error in below summarize call that I suspect arises from hardcoding in the zeros
+sumTab$block = as.numeric(sumTab$block)
+sumTab$n_seedlings = as.numeric(sumTab$n_seedlings)
+sumTab$n_total = as.numeric(sumTab$n_total)
+sumTab$n_budlings = as.numeric(sumTab$n_budlings)
+sumTab$herb_mean = as.numeric(sumTab$herb_mean)
+sumTab$h_apical_mean = as.numeric(sumTab$h_apical_mean)
+sumTab$N_mean = as.numeric(sumTab$N_mean)
+sumTab$LMA_mean = as.numeric(sumTab$LMA_mean)
+sumTab$Card_mean = as.numeric(sumTab$Card_mean)
+sumTab$site = as.character(sumTab$site)
+sumTab$year = as.numeric(sumTab$year)
+sumTab$transect = as.numeric(sumTab$transect)
+
+#calculate Buds/stem and average over year for each transect-block
+tmp = sumTab %>% group_by(block) %>% summarize(buds_per_stem = last(n_budlings)/first(n_total),
+                                               herb_mean = first(herb_mean),
+                                               h_apical_mean = first(h_apical_mean),
+                                               N_mean = mean(N_mean, na.rm=T),
+                                               LMA_mean = mean(LMA_mean, na.rm=T),
+                                               Card_mean = mean(Card_mean, na.rm=T),
+                                               site = first(site),
+                                               n_2014 = first(n_total),             #reporters to check for false 0s
+                                               n_2015 = last(n_budlings),           #where there were no stems in a block in 2014
+                                               year = paste(year[1], year[2])) %>%  #reporter to see if it is grouping correctly
+                                     mutate(transect = tr)
+tmp[is.na(tmp)] = NA
+final = tmp %>% select(-n_2014, -n_2015, year)
+
+bud.data = bind_rows(bud.data, final) #appends the data for each transect to a master dataframe
+
+#to figure out the difference in what is on the plot and what should be
+nrow(filter(allDat, transect == tr, year == yr, !is.na(x))) - nrow(filter(allDat, transect == tr, year == yr, !is.na(x), aliveJune == 1))
+```
+
+
+#Fitting Budlings/Stem
+Okay, now that that's over... we can finally model clonal growth...maybe.
+```{r}
+#our data for this is called bud.data
+bud.data = filter(bud.data, !is.na(buds_per_stem), !is.na(herb_mean), !is.na(Card_mean)) #all the traits have the same NAs
+
+exp.model = lm(log(buds_per_stem) ~ herb_mean + h_apical_mean + N_mean + LMA_mean + Card_mean, data=bud.data)
+lin.model = lm(buds_per_stem ~ herb_mean + h_apical_mean + N_mean + LMA_mean + Card_mean, data=bud.data)
+cst.model = lm(buds_per_stem ~ 1, data=bud.data)
+
+AICc(exp.model)
+AICc(lin.model)
+AICc(cst.model)
+```
+
+
+Wait, whaaaaat... The exponential model is miles better than the others!.. but none of the coefficients are stat. sig.... What does that even mean?.. and cardenolides are the worst? Not sure about that.
+```{r}
+summary(exp.model)
+exp.model.1a = lm(log(buds_per_stem) ~ herb_mean + h_apical_mean + N_mean + LMA_mean, data=bud.data)
+exp.model.1b = lm(log(buds_per_stem) ~ herb_mean + h_apical_mean + N_mean + Card_mean, data=bud.data)
+exp.model.1c = lm(log(buds_per_stem) ~ herb_mean + h_apical_mean + LMA_mean + Card_mean, data=bud.data)
+exp.model.1d = lm(log(buds_per_stem) ~ herb_mean + N_mean + LMA_mean + Card_mean, data=bud.data)
+exp.model.1e = lm(log(buds_per_stem) ~ h_apical_mean + N_mean + LMA_mean + Card_mean, data=bud.data)
+aictab(list(exp.model, exp.model.1a, exp.model.1b, exp.model.1c, exp.model.1d, exp.model.1e), modnames = c('full','1a','1b','1c','1d','1e'), second.order=T)
+```
+
+a,b, and d are all indistinguishable... concerned with traits here so lets drop height.
+```{r}
+exp.model.2a = lm(log(buds_per_stem) ~ herb_mean + N_mean + LMA_mean, data=bud.data)
+exp.model.2b = lm(log(buds_per_stem) ~ herb_mean + N_mean + Card_mean, data=bud.data)
+exp.model.2c = lm(log(buds_per_stem) ~ herb_mean + LMA_mean + Card_mean, data=bud.data)
+exp.model.2d = lm(log(buds_per_stem) ~ N_mean + LMA_mean + Card_mean, data=bud.data)
+aictab(list(exp.model.1d, exp.model.2a, exp.model.2b, exp.model.2c, exp.model.2d), modnames = c('1d','2a','2b','2c','2d'), second.order=T)
+```
+
+2a and 2c are indistinguishable... Cardenolides are more important and N shows up nowhere else, so lets drop that.
+```{r}
+exp.model.3a = lm(log(buds_per_stem) ~ herb_mean + LMA_mean, data=bud.data)
+exp.model.3b = lm(log(buds_per_stem) ~ herb_mean + Card_mean, data=bud.data)
+exp.model.3c = lm(log(buds_per_stem) ~ LMA_mean + Card_mean, data=bud.data)
+aictab(list(exp.model.2c, exp.model.3a, exp.model.3b, exp.model.3c), modnames = c('2c','3a','3b','3c'), second.order=T)
+```
+
+```{r}
+exp.model.4a = lm(log(buds_per_stem) ~ Card_mean, data=bud.data)
+exp.model.4b = lm(log(buds_per_stem) ~ LMA_mean, data=bud.data)
+exp.model.4c = lm(log(buds_per_stem) ~ herb_mean, data=bud.data)
+exp.model.5 = lm(log(buds_per_stem) ~ 1, data = bud.data)
+aictab(list(exp.model.3a, exp.model.4a, exp.model.4b, exp.model.4c, exp.model.5), modnames = c('3a','4a','4b','4c', 'null'), second.order=T)
+```
+
+Alright, so it looks like an exponential with Cardenolides by themselves is our best model with an AICc of 64.94. Deciding to disregard null, becasue it is just another way to write the constant model and should produce the same AICc, but for some numerical reason is not. That's interesting and seems to match relatively well with the other models! Weird, that herbivory does so poorly. Expoential also makes sense since it won't go negative.
+```{r}
+fit <- exp.model.4a 
+
+plotdata <- data.frame(Cardenolides = fit$model$Card_mean, 
+                       buds_per_stem = exp(fit$model$`log(buds_per_stem)`),
+                       transect = as.factor(bud.data$transect))
+
+p <- plotdata %>% ggplot(aes(x = Cardenolides, 
+                             y = buds_per_stem,
+                             color = transect)) + 
+                  geom_point()
+
+xpts <- seq(from=0, to=3, length.out = 1000)
+ypts <- predict(fit, 
+                new = data.frame(Card_mean = xpts), 
+                level=0.95,
+                interval="confidence",
+                se.fit=TRUE)
+plotdata <- data.frame(Cardenolides = xpts, 
+                       buds_per_stem = exp(ypts$fit[,"fit"]),
+                       lwr = exp(ypts$fit[,"lwr"]),
+                       upr = exp(ypts$fit[,"upr"]),
+                       transect = NA)
+
+p <- p + geom_line(data = plotdata, 
+                   color = "black", 
+                   linetype = "solid") +
+         geom_ribbon(data = plotdata, 
+                     aes(ymin=lwr, 
+                         ymax=upr), 
+                     alpha = 0.2)
+         
+p <- p + theme_bw() +
+         xlab("Cardenolides") +
+         ylab("Per capita clonal reproduction\n (sprouts/stem)") +
+         labs(color="Transect") + 
+         theme(legend.background = element_rect(fill="lightgrey",
+                                                size=0.1,
+                                                linetype="solid"),
+               legend.key.size =  unit(0.2, "in"),
+               legend.position = c(0.875, 0.50)) + 
+        theme(axis.text=element_text(size=12),
+              axis.title=element_text(size=20,face="bold"))
+
+p
+
+ggsave('budsperstem.png', width = 6.5, height = 5, units = 'in', device = 'png')
+```
+
+##Outlier(s)
+It seems that there may be some high points swaying the model. Let's take a look.
+```{r}
+#this is actually the distance in 5 dimensions from the distribution of all the data
+dist_data = select(bud.data, -c(1,8:10))
+m_dist = mahalanobis(dist_data, colMeans(dist_data), cov(dist_data))
+tmp = bind_cols(bud.data, as.data.frame(m_dist))
+hist(m_dist, breaks = 25)
+```
+
+
+Let's remove them and take a look.
+```{r, eval=F}
+#eval=F for now, so I don't accidentally run this code and remove points if I run whole script.
+bud.data = filter(bud.data, !(transect == 81 & block == 9), !(transect == 80 & block == 1))
+
+exp.model = lm(log(buds_per_stem) ~ herb_mean + h_apical_mean + N_mean + LMA_mean + Card_mean, data=bud.data)
+lin.model = lm(buds_per_stem ~ herb_mean + h_apical_mean + N_mean + LMA_mean + Card_mean, data=bud.data)
+cst.model = lm(buds_per_stem ~ 1, data=bud.data)
+
+AICc(exp.model)
+AICc(lin.model)
+AICc(cst.model)
+```
+
+With the two farther points in 5d space removed, we still get an exponential as the best fit.
+
+
+# New plot
+```{r}
+fit <- exp.model.4a 
+
+plotdata <- data.frame(Cardenolides = fit$model$Card_mean, 
+                       buds_per_stem = exp(fit$model$`log(buds_per_stem)`),
+                       transect = as.factor(bud.data$transect))
+
+p <- plotdata %>% ggplot(aes(x = Cardenolides, 
+                             y = buds_per_stem)) + 
+                  geom_point(alpha = 0.75)
+
+xpts <- seq(from=0, to=3, length.out = 1000)
+ypts <- predict(fit, 
+                new = data.frame(Card_mean = xpts), 
+                level=0.95,
+                interval="confidence",
+                se.fit=TRUE)
+plotdata <- data.frame(Cardenolides = xpts, 
+                       buds_per_stem = exp(ypts$fit[,"fit"]),
+                       lwr = exp(ypts$fit[,"lwr"]),
+                       upr = exp(ypts$fit[,"upr"]),
+                       transect = NA)
+
+p <- p + geom_line(data = plotdata, 
+                   color = "blue", 
+                   linetype = "solid") +
+         geom_ribbon(data = plotdata, 
+                     aes(ymin=lwr, 
+                         ymax=upr), 
+                     alpha = 0.2)
+         
+p <- p + theme_bw() +
+         xlab("Cardenolides") +
+         ylab("Per capita clonal reproduction\n (sprouts/stem)") +
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=20,face="bold"))
+
+p
+
+ggsave('budsimple.png', width = 6.5, height = 5, units = 'in', device = 'png')
+```
+

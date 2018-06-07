@@ -2,7 +2,7 @@
 % Please edit documentation in R/mw_ipm.R
 \name{setSurvivalFit.mwIPM}
 \alias{setSurvivalFit.mwIPM}
-\title{Sets the survival mixed-model.}
+\title{Sets the survival model.}
 \usage{
 \method{setSurvivalFit}{mwIPM}(obj, compute = FALSE, saveresults = FALSE,
   update = TRUE)
@@ -20,5 +20,5 @@
 A mwIPM model object.
 }
 \description{
-Sets the survival mixed-model.
+Sets the survival model.
 }
