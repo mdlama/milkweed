@@ -4,17 +4,17 @@
 \alias{setVarDistMatrices.mwIPM}
 \title{Create herbivory matrix.}
 \usage{
-\method{setVarDistMatrices}{mwIPM}(obj, dist.herb = NA, update = TRUE,
-  perturb = rep(0, 3), distpars = FALSE)
+\method{setVarDistMatrices}{mwIPM}(obj, compute = FALSE,
+  saveresults = FALSE, update = TRUE, perturb = rep(0, 7))
 }
 \arguments{
 \item{obj}{A mwIPM model object.}
 
-\item{dist.herb}{Herbivory distribution.}
-
 \item{update}{Update dependencies?}
 
 \item{perturb}{Parameter perturbation vector for sensitivity analysis.}
+
+\item{dist.herb}{Herbivory distribution.}
 
 \item{distpars}{Determines in which scale (log or linear) perturbation is occurring.}
 }

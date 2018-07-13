@@ -4,7 +4,8 @@
 \alias{setSurvivalMatrix.mwIPM}
 \title{Create survival matrix.}
 \usage{
-\method{setSurvivalMatrix}{mwIPM}(obj, update = TRUE, perturb = rep(0, 5))
+\method{setSurvivalMatrix}{mwIPM}(obj, compute = FALSE, saveresults = FALSE,
+  update = TRUE, perturb = rep(0, 5))
 }
 \arguments{
 \item{obj}{A mwIPM model object.}

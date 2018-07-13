@@ -123,8 +123,8 @@ renderHerbivoryDistFit <- function(obj) UseMethod("renderHerbivoryDistFit")
 # Helpers & Globals
 
 glmerCtrl <- lme4::glmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
-mwCache <- file.path(rappdirs::app_dir("Milkweed", "LaMar")$data(), "calculated")
-options(milkweed.cache = mwCache) # Store this for outside use in vignettes
+#mwCache <- file.path(rappdirs::app_dir("Milkweed", "LaMar")$data(), "calculated") # Commented out when new Cache created explicitly, same with below line
+#options(milkweed.cache = mwCache) # Store this for outside use in vignettes
 
 # Keeping these commented here as a record
 # ParsToMoms <- function(x)
@@ -172,7 +172,7 @@ mwIPM <- function(x = list()) {
     compute <- x$compute
   }
   if (all(names(x) != "saveresults")) {
-    saveresults = (length(list.files(mwCache, pattern=".RData")) == 0)
+    saveresults = (length(list.files('data/mwCache', pattern=".RData")) == 0)
   } else if (!is.logical(x$saveresults)) {
     stop(paste("Variable 'saveresults' must be TRUE or FALSE."))
   } else {
@@ -214,7 +214,6 @@ mwIPM <- function(x = list()) {
                                                       dx = NA)),
                       pars = list(flower.fit = NA,     # vital rate
                                   surv.fit = NA,       # vital rate
-                                  growth.fit = NA,
                                   pods.fit = NA,       # vital rate
                                   seedling.fit = NA,   # height dist
                                   budling.fit = NA,    # height dist
@@ -223,8 +222,7 @@ mwIPM <- function(x = list()) {
                                   card.fit = NA,       # trait dist
                                   budlings.per.stem.fit = NA, # vital rate
                                   seedling.emergence = NA,    # constant (actually recruitment of establishment in sexual pathway)
-                                  seeds.per.pod = NA,         # constant
-                                  dist.herb = NA),            # PROBABLY NOT NEEDED
+                                  seeds.per.pod = NA),         # constant
                       matrices = list(F = NA,
                                       S = NA,                 # F, S, and P are the vital rate matrices, N x N^4
                                       P = NA,
@@ -259,12 +257,16 @@ mwIPM <- function(x = list()) {
 #' @examples
 #' ipm %<>% bootIPM()
 bootIPM.mwIPM <- function (obj) {
-  obj$data <- obj$data_orig %>% group_by(site) %>%
-                                sample_frac(replace=TRUE) %>%
-                                ungroup()
-  obj %<>% setPars(compute = TRUE, update = FALSE) %>%
-           setSite(compute = TRUE) %>%
-           computeMPM()
+  obj$data <- list(stem = sample_frac(obj$data_orig$stem, replace=T),
+                   seed = sample_frac(obj$data_orig$seed, replace=T),
+                   dem = sample_frac(obj$data_orig$dem, replace=T),
+                   trait = obj$data_orig$trait,
+                   full = sample_frac(obj$data_orig$full, replace=T),
+                   map = obj$data_orig$map,
+                   bud = sample_frac(obj$data_orig$bud, replace=T))
+  obj %<>% setPars(compute = TRUE, update = FALSE) %>% # why FALSE?
+           setSite(compute = TRUE) #%>%
+           #computeMPM() ## commented out by Soren
 
   return(obj)
 }
@@ -399,18 +401,18 @@ setPars.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TR
 #'
 #' @importFrom magrittr %>%
 setSeedsPerPodConst.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
-  if (!file.exists(file.path(mwCache,"seedsPerPodConst.RData")) | (compute)) {
-    seeds_per_pod_data <- seeddata
+  if (!file.exists(file.path('data/mwCache',"seedsPerPodConst.RData")) | (compute)) {
+    seeds_per_pod_data <- obj$data$seed
 
     cat("Computing seeds per pod constant...")
     seeds.per.pod = mean(seeds_per_pod_data$total_seed)
     cat("done!\n")
 
     if (saveresults) {
-      save(seeds.per.pod, file = file.path(mwCache,"seedsPerPodConst.RData"))
+      save(seeds.per.pod, file = file.path('data/mwCache',"seedsPerPodConst.RData"))
     }
   } else {
-    load(file.path(mwCache,"seedsPerPodConst.RData"))
+    load(file.path('data/mwCache',"seedsPerPodConst.RData"))
   }
 
   obj$pars$seeds.per.pod <- seeds.per.pod
@@ -430,16 +432,9 @@ setSeedsPerPodConst.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE,
 #' @importFrom magrittr %>%
 #' @import dplyr
 setSeedlingEmergenceConst.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
-  if (!file.exists(file.path(mwCache,"seedlingEmergenceConst.RData")) | (compute)) {
-    seedling.emergence <- rep(NA, length(obj$all_sites))
-    names(seedling.emergence) <- obj$all_sites
+  if (!file.exists(file.path('data/mwCache',"seedlingEmergenceConst.RData")) | (compute)) {
+    seedling.emergence <- NA
 
-    # Need seeds per pod, so compute if needed
-    if (is.na(obj$pars$seeds.per.pod)) {
-      cat("Need seeds per pod to compute seedling emergence.  Loading now...")
-      obj <- setSeedsPerPodConst(obj)
-      cat("done!\n")
-    }
     seeds.per.pod <- obj$pars$seeds.per.pod
 
     # Bertha
@@ -447,39 +442,14 @@ setSeedlingEmergenceConst.mwIPM <- function(obj, compute = FALSE, saveresults = 
     data_gp <- obj$data$stem %>% group_by(year) %>% summarize(N_seedlings = sum(seedling, na.rm=T),
                                                               N_seeds = seeds.per.pod*sum(N_pods, na.rm=T))
 
-    seedling.emergence[1] <- mean(data_gp$N_seedlings[1:nrow(data_gp)-1]/data_gp$N_seeds[2:nrow(data_gp)])
-
-    # Sites - really need to map this one
-    data_gp <- obj$data$stem %>% group_by(year, site) %>%
-                                 summarize(N_seedlings = sum(seedling, na.rm=T),
-                                           N_seeds = seeds.per.pod*sum(N_pods, na.rm=T))
-
-    data13_14 <- data_gp %>% filter(year %in% 2013:2014) %>%
-                             group_by(site) %>%
-                             summarize(emergence = last(N_seedlings)/first(N_seeds))
-
-    data14_15 <- data_gp %>% filter(year %in% 2014:2015) %>%
-                             group_by(site) %>%
-                             summarize(emergence = last(N_seedlings)/first(N_seeds))
-
-    data15_16 <- data_gp %>% filter(year %in% 2015:2016) %>%
-      group_by(site) %>%
-      summarize(emergence = last(N_seedlings)/first(N_seeds))
-
-    data16_17 <- data_gp %>% filter(year %in% 2016:2017) %>%
-      group_by(site) %>%
-      summarize(emergence = last(N_seedlings)/first(N_seeds))
-
-    fulldat <- bind_rows(data13_14, data14_15, data15_16, data16_17)
-
-    seedling.emergence[2:length(obj$all_sites)] <- (fulldat %>% group_by(site) %>% summarize(emergence = mean(emergence)))$emergence
+    seedling.emergence <- mean(data_gp$N_seedlings[1:nrow(data_gp)-1]/data_gp$N_seeds[2:nrow(data_gp)])
     cat("done!\n")
 
     if (saveresults) {
-      save(seedling.emergence, file = file.path(mwCache,"seedlingEmergenceConst.RData"))
+      save(seedling.emergence, file = file.path('data/mwCache',"seedlingEmergenceConst.RData"))
     }
   } else {
-    load(file.path(mwCache,"seedlingEmergenceConst.RData"))
+    load(file.path('data/mwCache',"seedlingEmergenceConst.RData"))
   }
 
   obj$pars$seedling.emergence <- seedling.emergence
@@ -503,7 +473,7 @@ setSeedlingEmergenceConst.mwIPM <- function(obj, compute = FALSE, saveresults = 
 #' @importFrom magrittr %>%
 #' @import dplyr
 setFloweringFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
-  if (!file.exists(file.path(mwCache,"flowerFit.RData")) | (compute)) {
+  if (!file.exists(file.path('data/mwCache',"flowerFit.RData")) | (compute)) {
     metadata_usc <- obj$data$full %>% filter(!is.na(h_apical),
                                         !is.na(herb_avg),
                                         !is.na(fec.flower),
@@ -528,10 +498,10 @@ setFloweringFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, upd
     checkPars(flower.fit)
 
     if (saveresults) {
-      save(flower.fit, file = file.path(mwCache,"flowerFit.RData"))
+      save(flower.fit, file = file.path('data/mwCache',"flowerFit.RData"))
     }
   } else {
-    load(file.path(mwCache,"flowerFit.RData"))
+    load(file.path('data/mwCache',"flowerFit.RData"))
   }
 
   obj$pars$flower.fit <- flower.fit
@@ -551,9 +521,8 @@ setFloweringFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, upd
 #' @importFrom magrittr %>%
 #' @import dplyr
 setSurvivalFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
-  if (!file.exists(file.path(mwCache,"survivalFit.RData")) | (compute)) {
+  if (!file.exists(file.path('data/mwCache',"survivalFit.RData")) | (compute)) {
     metadata_usc <- obj$data$full %>% filter(!is.na(h_apical),
-                                        !is.na(h_apical.next),
                                         !is.na(herb_avg),
                                         fec.flower == 1,
                                         !is.na(surv),
@@ -573,17 +542,21 @@ setSurvivalFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, upda
                            scaled = list(h_apical = scale(metadata_usc$h_apical),
                                          herb_avg = scale(metadata_usc$herb_avg),
                                          Cardenolides = scale(metadata_usc$Cardenolides),
-                                         LMA = scale(metadata_usc$LMA))))
+                                         LMA = scale(metadata_usc$LMA)),
+                           perturb.mdl = surv.mdl))
+
+    #test code to see if manual perturbation of beta_c in survival vr function changes lambda how we think it will
+    #obj$pars$surv.fit$perturb.mdl$coefficients[4] = obj$pars$surv.fit$mdl$coefficients[4] + 16
 
     # Check parameters
     cat("Checking parameters:\n")
     checkPars(surv.fit)
 
     if (saveresults) {
-      save(surv.fit, file = file.path(mwCache,"survivalFit.RData"))
+      save(surv.fit, file = file.path('data/mwCache',"survivalFit.RData"))
     }
   } else {
-    load(file.path(mwCache,"survivalFit.RData"))
+    load(file.path('data/mwCache',"survivalFit.RData"))
   }
 
   obj$pars$surv.fit <- surv.fit
@@ -603,7 +576,7 @@ setSurvivalFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, upda
 #' @importFrom magrittr %>%
 #' @import dplyr
 setPodsFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
-  if (!file.exists(file.path(mwCache,"podsFit.RData")) | (compute)) {
+  if (!file.exists(file.path('data/mwCache',"podsFit.RData")) | (compute)) {
     # We only want stems that flowered, survived and have data for pods
     metadata_usc <- obj$data$full %>% filter(!is.na(h_apical),
                                         !is.na(h_apical.next),
@@ -626,16 +599,17 @@ setPodsFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update =
                            scaled = list(h_apical = scale(metadata_usc$h_apical),
                                          herb_avg = scale(metadata_usc$herb_avg),
                                          Cardenolides = scale(metadata_usc$Cardenolides),
-                                         LMA = scale(metadata_usc$LMA))))
+                                         LMA = scale(metadata_usc$LMA)),
+                           perturb.mdl = pods.mdl))
     # Check parameters
     cat("Checking parameters:\n")
     checkPars(pods.fit)
 
     if (saveresults) {
-      save(pods.fit, file = file.path(mwCache,"podsFit.RData"))
+      save(pods.fit, file = file.path('data/mwCache',"podsFit.RData"))
     }
   } else {
-    load(file.path(mwCache,"podsFit.RData"))
+    load(file.path('data/mwCache',"podsFit.RData"))
   }
 
   obj$pars$pods.fit <- pods.fit
@@ -657,7 +631,7 @@ setPodsFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update =
 #' @importFrom magrittr %>%
 #' @import dplyr
 setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
-  if (!file.exists(file.path(mwCache,"seedlingDistFit.RData")) | (compute)) {
+  if (!file.exists(file.path('data/mwCache',"seedlingDistFit.RData")) | (compute)) {
     h_apical <- (obj$data$dem %>% filter(seedling == 1, !is.na(h_apical)))$h_apical
 
     cat("Computing seedling distribution fit...")
@@ -668,7 +642,7 @@ setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, 
     seedling.fit[[1]] <- f0
 
     seedling.fit[[2]] <- function(x, pars, perturb = rep(0,2)) {
-           pars <- perturbTrans(pars, perturb)
+           pars = pars + perturb
            N <- length(x)
            dx <- x[2]-x[1]
            y <- rep(0, N-1)
@@ -682,11 +656,11 @@ setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, 
     names(seedling.fit) <- c("fit", "predict")
 
     if (saveresults) {
-      save(seedling.fit, file = file.path(mwCache,"seedlingDistFit.RData"))
+      save(seedling.fit, file = file.path('data/mwCache',"seedlingDistFit.RData"))
     }
 
   } else {
-    load(file.path(mwCache,"seedlingDistFit.RData"))
+    load(file.path('data/mwCache',"seedlingDistFit.RData"))
   }
 
   obj$pars$seedling.fit <- seedling.fit
@@ -706,7 +680,7 @@ setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, 
 #' @importFrom magrittr %>%
 #' @import dplyr
 setBudlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
-  if (!file.exists(file.path(mwCache,"budlingDistFit.RData")) | (compute)) {
+  if (!file.exists(file.path('data/mwCache',"budlingDistFit.RData")) | (compute)) {
     h_apical <- (obj$data$dem %>% filter(seedling == 0,
                                      !is.na(h_apical)))$h_apical
 
@@ -717,7 +691,7 @@ setBudlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, u
     budling.fit <- vector("list", 2)
     budling.fit[[1]] <- f0
     budling.fit[[2]] <- function(x, pars, perturb = rep(0,2)) {
-      pars <- perturbTrans(pars, perturb)
+      pars = pars + perturb
       N <- length(x)
       dx <- x[2]-x[1]
       y <- rep(0, N-1)
@@ -731,11 +705,11 @@ setBudlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, u
     names(budling.fit) <- c("fit", "predict")
 
     if (saveresults) {
-      save(budling.fit, file = file.path(mwCache,"budlingDistFit.RData"))
+      save(budling.fit, file = file.path('data/mwCache',"budlingDistFit.RData"))
     }
 
   } else {
-    load(file.path(mwCache,"budlingDistFit.RData"))
+    load(file.path('data/mwCache',"budlingDistFit.RData"))
   }
 
   obj$pars$budling.fit <- budling.fit
@@ -757,7 +731,7 @@ setBudlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, u
 #' @importFrom magrittr %>%
 #' @import dplyr
 setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
-  if (!file.exists(file.path(mwCache,"herbivoryDistFit.RData")) | (compute)) {
+  if (!file.exists(file.path('data/mwCache',"herbivoryDistFit.RData")) | (compute)) {
     metadata = obj$data$dem %>% filter(!is.na(h_apical),
                                        !is.na(munched))
     herb_avg <- (metadata %>% filter(munched == 1))$herb_avg
@@ -770,30 +744,33 @@ setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE,
     munched.fit <- vector('list', 3)
     munched.fit[[1]] <- f1
     munched.fit[[2]] <- pmunch
-    munched.fit[[3]] <- function(x, justmunch=FALSE) {
-      par = perturbTrans(pars, perturb)
+    munched.fit[[3]] <- function(x, pars, perturb = rep(0,3), justmunch=FALSE) {
+      pars[1] = pars[1] + perturb[1]
+      # pars <- perturbTrans(pars, perturb)  #two lines below replace perturbTrans() call
+      MSD <- ParsToMoms(x = pars[2:3], type = "lnorm")
+      pars[2:3] <- MomsToPars(y = MSD+perturb[2:3], type = "lnorm")
       N <- length(x)
       dx <- x[2]-x[1]
       y <- rep(0, N-1)
       for (j in 1:(N-1)) {
-        y[j] = plnorm(x[j+1], pars[1], pars[2]) - plnorm(x[j], pars[1], pars[2])
+        y[j] = plnorm(x[j+1], pars[2], pars[3]) - plnorm(x[j], pars[2], pars[3])
       }
-      y[1] <- y[1] + plnorm(x[1], pars[1], pars[2])
-      y[N-1] <- y[N-1] + plnorm(x[N], pars[1], pars[2], lower.tail=FALSE)
-      y <- pmunch*y
+      y[1] <- y[1] + plnorm(x[1], pars[2], pars[3])
+      y[N-1] <- y[N-1] + plnorm(x[N], pars[2], pars[3], lower.tail=FALSE)
+      y <- pars[1]*y
       if (!justmunch) {
-        y[1] <- y[1] + (1-pmunch) #not sure if pmunch can be perturbed like this, not as a reference to pars[]
+        y[1] <- y[1] + (1-pars[1])
       }
       y <- y/dx
     }
     names(munched.fit) <- c("fit", "pmunch", "predict")
 
     if (saveresults) {
-      save(munched.fit, file = file.path(mwCache,"herbivoryDistFit.RData"))
+      save(munched.fit, file = file.path('data/mwCache',"herbivoryDistFit.RData"))
     }
 
   } else {
-    load(file.path(mwCache,"herbivoryDistFit.RData"))
+    load(file.path('data/mwCache',"herbivoryDistFit.RData"))
   }
 
   obj$pars$munched.fit <- munched.fit
@@ -815,7 +792,7 @@ setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE,
 #' @importFrom magrittr %>%
 #' @import dplyr
 setCardenolideDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
-  if (!file.exists(file.path(mwCache,"cardenolideDistFit.RData")) | (compute)) {
+  if (!file.exists(file.path('data/mwCache',"cardenolideDistFit.RData")) | (compute)) {
     metadata = obj$data$full %>% filter(!is.na(Cardenolides))
 
     Cardenolides <- metadata$Cardenolides
@@ -827,7 +804,7 @@ setCardenolideDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALS
     card.fit <- vector('list', 2)
     card.fit[[1]] <- f0
     card.fit[[2]]  <- function(x, pars, perturb = rep(0,2)) {
-      pars <- perturbTrans(pars, perturb)
+      pars <- pars + perturb
       N <- length(x)
       dx <- x[2]-x[1]
       y <- rep(0, N-1)
@@ -841,11 +818,11 @@ setCardenolideDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALS
     names(card.fit) <- c("fit", "predict")
 
     if (saveresults) {
-      save(card.fit, file = file.path(mwCache,"cardenolideDistFit.RData"))
+      save(card.fit, file = file.path('data/mwCache',"cardenolideDistFit.RData"))
     }
 
   } else {
-    load(file.path(mwCache,"cardenolideDistFit.RData"))
+    load(file.path('data/mwCache',"cardenolideDistFit.RData"))
   }
 
   obj$pars$card.fit <- card.fit
@@ -867,7 +844,7 @@ setCardenolideDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALS
 #' @importFrom magrittr %>%
 #' @import dplyr
 setLMADistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
-  if (!file.exists(file.path(mwCache,"lmaDistFit.RData")) | (compute)) {
+  if (!file.exists(file.path('data/mwCache',"lmaDistFit.RData")) | (compute)) {
     metadata = obj$data$full %>% filter(!is.na(LMA))
 
     LMA <- metadata$LMA
@@ -879,7 +856,7 @@ setLMADistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, updat
     lma.fit <- vector('list', 2)
     lma.fit[[1]] <- f0
     lma.fit[[2]]  <- function(x, pars, perturb = rep(0,2)) {
-      pars <- perturbTrans(pars, perturb)
+      pars <- pars + perturb
       N <- length(x)
       dx <- x[2]-x[1]
       y <- rep(0, N-1)
@@ -893,11 +870,11 @@ setLMADistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, updat
     names(lma.fit) <- c("fit", "predict")
 
     if (saveresults) {
-      save(lma.fit, file = file.path(mwCache,"lmaDistFit.RData"))
+      save(lma.fit, file = file.path('data/mwCache',"lmaDistFit.RData"))
     }
 
   } else {
-    load(file.path(mwCache,"lmaDistFit.RData"))
+    load(file.path('data/mwCache',"lmaDistFit.RData"))
   }
 
   obj$pars$lma.fit <- lma.fit
@@ -917,23 +894,23 @@ setLMADistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, updat
 #' @importFrom magrittr %>%
 #' @import dplyr
 setBudlingsPerStemFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE) {
-  if (!file.exists(file.path(mwCache,"budlingsPerStemFit.RData")) | (compute)) {
+  if (!file.exists(file.path('data/mwCache',"budlingsPerStemFit.RData")) | (compute)) {
 
     ## Results from Transect-Blocking.Rmd
-
     bud.data = obj$data$bud %>% filter(!is.na(buds_per_stem),
                                        !is.na(herb_mean),
-                                       !is.na(Card_mean)) #all the traits have the same NAs)
+                                       !is.na(Card_mean)) %>% #all the traits have NAs in identical rows)
+                                mutate(Cardenolides = Card_mean) #makes new column to keep names the same for predictions in clonal kernal
 
     cat(paste0("Calculating budlings per stem fit..."))
-    mdl = lm(log(buds_per_stem) ~ Card_mean, data=bud.data)
+    mdl = lm(log(buds_per_stem) ~ Cardenolides, data=bud.data)
     cat("done!\n")
 
     budlings.per.stem.fit <- vector("list", 2)
     budlings.per.stem.fit[[1]] = mdl
     budlings.per.stem.fit[[2]] <- function (x, pars, perturb = rep(0,2)) {
       pars <- pars + perturb
-      y <- pars[1]*exp(pars[2])*x
+      y <- exp(pars[1] + pars[2]*x) #reversing log from lm
     }
 
     names(budlings.per.stem.fit) <- c("fit","predict")
@@ -961,10 +938,10 @@ setBudlingsPerStemFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALS
     # names(budlings.per.stem.fit) <- c("fit","site","predict")
 
     if (saveresults) {
-      save(budlings.per.stem.fit, file = file.path(mwCache,"budlingsPerStemFit.RData"))
+      save(budlings.per.stem.fit, file = file.path('data/mwCache',"budlingsPerStemFit.RData"))
     }
   } else {
-    load(file.path(mwCache,"budlingsPerStemFit.RData"))
+    load(file.path('data/mwCache',"budlingsPerStemFit.RData"))
   }
 
   obj$pars$budlings.per.stem.fit <- budlings.per.stem.fit
@@ -983,25 +960,35 @@ setBudlingsPerStemFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALS
 #' @return A mwIPM model object.
 #'
 #' @importFrom magrittr %>%
-setFloweringMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
+setFloweringMatrix.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE, perturb = rep(0,4)) {
   # Flowering
   # N x N^4
 
-  cat(paste0("Computing flowering matrix..."))
-  cards = obj$vars$Cardenolides$x
-  #start off the matrix for the first card class
-  obj$matrices$F = t(c(outer(obj$vars$h_apical$x, obj$vars$herb_avg$x, function(h,w) {predict(obj$pars$flower.fit, newdata = data.frame(h_apical = h, herb_avg = w, Cardenolides = cards[1]), type=obj$site, perturb=perturb)})))[rep(1,obj$N),]
-  #then recompute the y values for each card class and append to the matrix horizontally
-  for (i in 2:obj$N) {
-    obj$matrices$F = cbind(obj$matrices$F, t(c(outer(obj$vars$h_apical$x, obj$vars$herb_avg$x, function(h,w) {predict(obj$pars$flower.fit, newdata = data.frame(h_apical = h, herb_avg = w, Cardenolides = cards[i]), type=obj$site, perturb=perturb)})))[rep(1,obj$N),])
-  }
-  #need to repeat the whole thing from above N times horizontally for LMA classes
-  obj$matrices$F = do.call("cbind", rep(list(obj$matrices$F), obj$N))
-  cat(paste0("done!\n"))
+  if (!file.exists(file.path('data/mwCache',"flowerMat.RData")) | (compute)) {
 
-  if (update) {
-    obj <- obj %>% computeSexualKernel()
-    obj <- computeMPM(obj)
+    cat(paste0("Computing flowering matrix..."))
+    cards = obj$vars$Cardenolides$x
+    #start off the matrix for the first card class
+    obj$matrices$F = t(c(outer(obj$vars$h_apical$x, obj$vars$herb_avg$x, function(h,w) {predict(obj$pars$flower.fit, newdata = data.frame(h_apical = h, herb_avg = w, Cardenolides = cards[1]), type=obj$site, perturb=perturb)})))[rep(1,obj$N),]
+    #then recompute the y values for each card class and append to the matrix horizontally
+    for (i in 2:obj$N) {
+      obj$matrices$F = cbind(obj$matrices$F, t(c(outer(obj$vars$h_apical$x, obj$vars$herb_avg$x, function(h,w) {predict(obj$pars$flower.fit, newdata = data.frame(h_apical = h, herb_avg = w, Cardenolides = cards[i]), type=obj$site, perturb=perturb)})))[rep(1,obj$N),])
+    }
+    #need to repeat the whole thing from above N times horizontally for LMA classes
+    obj$matrices$F = do.call("cbind", rep(list(obj$matrices$F), obj$N))
+    cat(paste0("done!\n"))
+
+    if (update) {
+      obj <- obj %>% computeSexualKernel()
+      #obj <- computeMPM(obj)
+    }
+
+    if (saveresults) {
+      save(obj$matrices$F, file = file.path('data/mwCache',"flowerMat.RData"))
+    }
+
+  } else {
+    load(file.path('data/mwCache',"flowerMat.RData"))
   }
 
   return(obj)
@@ -1016,54 +1003,67 @@ setFloweringMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
 #' @return A mwIPM model object.
 #'
 #' @importFrom magrittr %>%
-setSurvivalMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,5)) {
+setSurvivalMatrix.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE, perturb = rep(0,5)) {
   # Survival
   # N x N^4
 
   N = obj$N
   n = N^4
 
-  cat(paste0("Computing survival matrix..."))
-  # lma = obj$vars$LMA$x
-  # cards = obj$vars$Cardenolides$x
-  # #start off the matrix for the first card and herb class
-  # obj$matrices$S = t(c(outer(obj$vars$h_apical$x, obj$vars$herb_avg$x, function(h,w) {predict(obj$pars$surv.fit, newdata = data.frame(h_apical = h, herb_avg = w, Cardenolides = cards[1], LMA = lma[1]), type=obj$site, perturb=perturb)})))[rep(1,obj$N),]
-  # for (i in 2:obj$N) {
-  #   obj$matrices$S = cbind(obj$matrices$S, t(c(outer(obj$vars$h_apical$x, obj$vars$herb_avg$x, function(h,w) {predict(obj$pars$surv.fit, newdata = data.frame(h_apical = h, herb_avg = w, Cardenolides = cards[i], LMA = lma[1]), type=obj$site, perturb=perturb)})))[rep(1,obj$N),])
-  # }
-  # #then recompute y values for each card and lma class and append them to the matrix horizontally
-  # for (j in 2:obj$N) {
-  #   cat(paste0("j = ", j, "\n")) #testing progress
-  #   for (i in 2:obj$N) {
-  #     obj$matrices$S = cbind(obj$matrices$S, t(c(outer(obj$vars$h_apical$x, obj$vars$herb_avg$x, function(h,w) {predict(obj$pars$surv.fit, newdata = data.frame(h_apical = h, herb_avg = w, Cardenolides = cards[i], LMA = lma[j]), type=obj$site, perturb=perturb)})))[rep(1,obj$N),])
-  #   }
-  # }
+  if (!file.exists(file.path('data/mwCache',"survivalMat.RData")) | (compute)) {
 
-  # combinations, going from h being first inner-most (left) layer to l being last outer-most (right) layer
-  mtx <- data.matrix(
-    expand.grid(
-      h = obj$vars$h_apical$x,
-      w = obj$vars$herb_avg$x,
-      c = obj$vars$Cardenolides$x,
-      l = obj$vars$LMA$x
+    cat(paste0("Computing survival matrix..."))
+    # lma = obj$vars$LMA$x
+    # cards = obj$vars$Cardenolides$x
+    # #start off the matrix for the first card and herb class
+    # obj$matrices$S = t(c(outer(obj$vars$h_apical$x, obj$vars$herb_avg$x, function(h,w) {predict(obj$pars$surv.fit, newdata = data.frame(h_apical = h, herb_avg = w, Cardenolides = cards[1], LMA = lma[1]), type=obj$site, perturb=perturb)})))[rep(1,obj$N),]
+    # for (i in 2:obj$N) {
+    #   obj$matrices$S = cbind(obj$matrices$S, t(c(outer(obj$vars$h_apical$x, obj$vars$herb_avg$x, function(h,w) {predict(obj$pars$surv.fit, newdata = data.frame(h_apical = h, herb_avg = w, Cardenolides = cards[i], LMA = lma[1]), type=obj$site, perturb=perturb)})))[rep(1,obj$N),])
+    # }
+    # #then recompute y values for each card and lma class and append them to the matrix horizontally
+    # for (j in 2:obj$N) {
+    #   cat(paste0("j = ", j, "\n")) #testing progress
+    #   for (i in 2:obj$N) {
+    #     obj$matrices$S = cbind(obj$matrices$S, t(c(outer(obj$vars$h_apical$x, obj$vars$herb_avg$x, function(h,w) {predict(obj$pars$surv.fit, newdata = data.frame(h_apical = h, herb_avg = w, Cardenolides = cards[i], LMA = lma[j]), type=obj$site, perturb=perturb)})))[rep(1,obj$N),])
+    #   }
+    # }
+
+    # combinations, going from h being first inner-most (left) layer to l being last outer-most (right) layer
+    mtx <- data.matrix(
+      expand.grid(
+        h = obj$vars$h_apical$x,
+        w = obj$vars$herb_avg$x,
+        c = obj$vars$Cardenolides$x,
+        l = obj$vars$LMA$x
+      )
     )
-  )
 
-  # using scaled version for the faster predict method
-  hs <- (obj$vars$h_apical$x - attr(obj$pars$surv.fit$scaled$h_apical,"scaled:center"))/attr(obj$pars$surv.fit$scaled$h_apical,"scaled:scale")
-  ws <- (obj$vars$herb_avg$x - attr(obj$pars$surv.fit$scaled$herb_avg,"scaled:center"))/attr(obj$pars$surv.fit$scaled$herb_avg,"scaled:scale")
-  cs <- (obj$vars$Cardenolides$x - attr(obj$pars$surv.fit$scaled$Cardenolides,"scaled:center"))/attr(obj$pars$surv.fit$scaled$Cardenolides,"scaled:scale")
-  ls <- (obj$vars$LMA$x - attr(obj$pars$surv.fit$scaled$LMA,"scaled:center"))/attr(obj$pars$surv.fit$scaled$LMA,"scaled:scale")
-  mtx <- data.matrix(expand.grid(h_apical = hs, herb_avg = ws, Cardenolides = cs, LMA = ls))
-  K <- predict(obj$pars$surv.fit$mdl, newdata = data.frame(mtx), type="response")
+    # using scaled version for the faster predict method
+    hs <- (obj$vars$h_apical$x - attr(obj$pars$surv.fit$scaled$h_apical,"scaled:center"))/attr(obj$pars$surv.fit$scaled$h_apical,"scaled:scale")
+    ws <- (obj$vars$herb_avg$x - attr(obj$pars$surv.fit$scaled$herb_avg,"scaled:center"))/attr(obj$pars$surv.fit$scaled$herb_avg,"scaled:scale")
+    cs <- (obj$vars$Cardenolides$x - attr(obj$pars$surv.fit$scaled$Cardenolides,"scaled:center"))/attr(obj$pars$surv.fit$scaled$Cardenolides,"scaled:scale")
+    ls <- (obj$vars$LMA$x - attr(obj$pars$surv.fit$scaled$LMA,"scaled:center"))/attr(obj$pars$surv.fit$scaled$LMA,"scaled:scale")
+    mtx <- data.matrix(expand.grid(h_apical = hs, herb_avg = ws, Cardenolides = cs, LMA = ls))
 
-  S = t(K)[rep(1,N),]
-  obj$matrices$S <- S
-  cat(paste0("done!\n"))
+    #copy model, coefficients + perturb --> into predict
+    obj$pars$surv.fit$perturb.mdl$coefficients = obj$pars$surv.fit$perturb.mdl$coefficients + perturb
+    K <- predict(obj$pars$surv.fit$perturb.mdl, newdata = data.frame(mtx), type="response")
 
-  if (update) {
-    obj <- obj %>% computeSexualKernel()
-    obj <- computeMPM(obj)
+    S = t(K)[rep(1,N),]
+    obj$matrices$S <- S
+    cat(paste0("done!\n"))
+
+    if (update) {
+      obj <- obj %>% computeSexualKernel()
+      #obj <- computeMPM(obj)
+    }
+
+    if (saveresults) {
+      save(obj$matrices$S, file = file.path('data/mwCache',"survivalMat.RData"))
+    }
+
+  } else {
+    load(file.path('data/mwCache',"survivalMat.RData"))
   }
 
   return(obj)
@@ -1078,52 +1078,65 @@ setSurvivalMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,5)) {
 #' @return A mwIPM model object.
 #'
 #' @importFrom magrittr %<>%
-setPodsMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
+setPodsMatrix.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE, perturb = rep(0,5)) {
   # Pods
   # N x N^4
 
   N = obj$N
   n = N^4
 
-  cat(paste0("Computing pods matrix..."))
-  # combinations, going from h being first inner-most (left) layer to l being last outer-most (right) layer
-  mtx <- data.matrix(
-    expand.grid(
-      h = obj$vars$h_apical$x,
-      w = obj$vars$herb_avg$x,
-      c = obj$vars$Cardenolides$x,
-      l = obj$vars$LMA$x
+  if (!file.exists(file.path('data/mwCache',"podsMat.RData")) | (compute)) {
+
+    cat(paste0("Computing pods matrix..."))
+    # combinations, going from h being first inner-most (left) layer to l being last outer-most (right) layer
+    mtx <- data.matrix(
+      expand.grid(
+        h = obj$vars$h_apical$x,
+        w = obj$vars$herb_avg$x,
+        c = obj$vars$Cardenolides$x,
+        l = obj$vars$LMA$x
+      )
     )
-  )
 
-  # Scaled version
-  hs <- (obj$vars$h_apical$x - attr(obj$pars$pods.fit$scaled$h_apical,"scaled:center"))/attr(obj$pars$pods.fit$scaled$h_apical,"scaled:scale")
-  ws <- (obj$vars$herb_avg$x - attr(obj$pars$pods.fit$scaled$herb_avg,"scaled:center"))/attr(obj$pars$pods.fit$scaled$herb_avg,"scaled:scale")
-  cs <- (obj$vars$Cardenolides$x - attr(obj$pars$pods.fit$scaled$Cardenolides,"scaled:center"))/attr(obj$pars$pods.fit$scaled$Cardenolides,"scaled:scale")
-  ls <- (obj$vars$LMA$x - attr(obj$pars$pods.fit$scaled$LMA,"scaled:center"))/attr(obj$pars$pods.fit$scaled$LMA,"scaled:scale")
-  mtx <- data.matrix(expand.grid(h_apical = hs, herb_avg = ws, Cardenolides = cs, LMA = ls))
-  K <- predict(obj$pars$pods.fit$mdl, newdata = data.frame(mtx), type="response", re.form=NA)
+    # Scaled version
+    hs <- (obj$vars$h_apical$x - attr(obj$pars$pods.fit$scaled$h_apical,"scaled:center"))/attr(obj$pars$pods.fit$scaled$h_apical,"scaled:scale")
+    ws <- (obj$vars$herb_avg$x - attr(obj$pars$pods.fit$scaled$herb_avg,"scaled:center"))/attr(obj$pars$pods.fit$scaled$herb_avg,"scaled:scale")
+    cs <- (obj$vars$Cardenolides$x - attr(obj$pars$pods.fit$scaled$Cardenolides,"scaled:center"))/attr(obj$pars$pods.fit$scaled$Cardenolides,"scaled:scale")
+    ls <- (obj$vars$LMA$x - attr(obj$pars$pods.fit$scaled$LMA,"scaled:center"))/attr(obj$pars$pods.fit$scaled$LMA,"scaled:scale")
+    mtx <- data.matrix(expand.grid(h_apical = hs, herb_avg = ws, Cardenolides = cs, LMA = ls))
 
-  P = t(K)[rep(1,N),]
+    #copy model, coefficients + perturb --> into predict
+    obj$pars$pods.fit$perturb.mdl$coefficients = obj$pars$pods.fit$perturb.mdl$coefficients + perturb
+    K <- predict(obj$pars$pods.fit$perturb.mdl, newdata = data.frame(mtx), type="response", re.form=NA)
 
-  # K <- array(0, dim=c(N,n))  # initialize with zeros
+    P = t(K)[rep(1,N),]
 
-  # imtx <- data.matrix( expand.grid(h=1:N, w=1:N, c=1:N, l=1:N) )  # Matrix of indices
+    # K <- array(0, dim=c(N,n))  # initialize with zeros
 
-  #K[imtx] <- apply(mtx, 1, function(x) {
-  #  predict(obj$pars$pods.fit, newdata = data.frame(h_apical = x["h"], herb_avg = x["w"], Cardenolides = x["c"], LMA = x["l"]))
+    # imtx <- data.matrix( expand.grid(h=1:N, w=1:N, c=1:N, l=1:N) )  # Matrix of indices
+
+    #K[imtx] <- apply(mtx, 1, function(x) {
+    #  predict(obj$pars$pods.fit, newdata = data.frame(h_apical = x["h"], herb_avg = x["w"], Cardenolides = x["c"], LMA = x["l"]))
     # predict(obj$pars$pods.fit, newdata = data.frame(h_apical = x["h"], herb_avg = x["w"], card = x["c"], lma = x["l"]))
     # cat(paste0('h_apical = ', x["h"], ' herb_avg = ', x["w"], ' card = ', x["c"], ' lma = ', x["l"], '\n', ' y = ', y)) #test output
-  #  })
-  # c(K) will give you ONE row of the matrix that you want.  Replicate this row N times
-  # P = c(K)[rep(1,N),]
+    #  })
+    # c(K) will give you ONE row of the matrix that you want.  Replicate this row N times
+    # P = c(K)[rep(1,N),]
 
-  obj$matrices$P <- P
-  cat(paste0("done!\n"))
+    obj$matrices$P <- P
+    cat(paste0("done!\n"))
 
-  if (update) {
-    obj %<>% computeSexualKernel()
-    obj <- computeMPM(obj)
+    if (update) {
+      obj %<>% computeSexualKernel()
+      #obj <- computeMPM(obj)
+    }
+
+    if (saveresults) {
+      save(obj$matrices$P, file = file.path('data/mwCache',"podsMat.RData"))
+    }
+
+  } else {
+    load(file.path('data/mwCache',"podsMat.RData"))
   }
 
   return(obj)
@@ -1141,64 +1154,75 @@ setPodsMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
 #' @export
 #'
 #' @importFrom magrittr %<>%
-setVarDistMatrices.mwIPM <- function(obj, dist.herb = NA, update = TRUE, perturb = rep(0,3), distpars = FALSE) {
+setVarDistMatrices.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TRUE, perturb = rep(0,7)) {
   # Herbivory matrix
   # N^4 x N
 
-  library(pracma)
+  if (!file.exists(file.path('data/mwCache',"varDistMats.RData")) | (compute)) {
 
-  N = obj$N
-  n = N^4
-  iA <- cbind(1:n, 1+pracma::mod(0:(n-1), N)) #matrix of indices
+    library(pracma)
+    attach(obj$vars, warn.conflicts = FALSE)
+    attach(obj$pars, warn.conflicts = FALSE)
 
-  #combinations, going from h being first inner-most (left) layer to l being last outer-most (right) layer
-  cat('expanding grid and initializing...')
-  mtx <- data.matrix(
-    expand.grid(
-      h = obj$vars$h_apical$x,
-      w = obj$vars$herb_avg$x,
-      c = obj$vars$Cardenolides$x,
-      l = obj$vars$LMA$x
+    N = obj$N
+    n = N^4
+    iA <- cbind(1:n, 1+pracma::mod(0:(n-1), N)) #matrix of indices
+
+    #combinations, going from h being first inner-most (left) layer to l being last outer-most (right) layer
+    cat('expanding grid and initializing...')
+    mtx <- data.matrix(
+      expand.grid(
+        h = h_apical$x, #the value of this doesn't actually matter, we just need the dimensions to match properly (need combinations of height)... see ?expand.grid
+        w = munched.fit$predict(herb_avg$b,
+                                c(munched.fit$pmunch,
+                                  munched.fit$fit$estimate),
+                                perturb[1:3]),
+        c = card.fit$predict(Cardenolides$b,
+                             stats::coef(card.fit$fit),
+                             perturb[4:5]),
+        l = lma.fit$predict(LMA$b,
+                            stats::coef(lma.fit$fit),
+                            perturb[6:7])
+      )
     )
-  )
 
-  # Initialize with zeros
-  H <- array(0, dim=c(n, N))
-  C <- array(0, dim=c(n, N))
-  L <- array(0, dim=c(n, N))
-  cat('done!\n')
+    detach(obj$vars)
+    detach(obj$pars)
 
-  #uses iA indices to store given column of mtx, which has our values for the given variable
-  cat('setting herbivory matrix...')
-  H[iA] <- mtx[,"w"]
-  obj$matrices$H <- H
-  cat('done!\n')
+    # Initialize with zeros
+    H <- array(0, dim=c(n, N))
+    C <- array(0, dim=c(n, N))
+    L <- array(0, dim=c(n, N))
+    cat('done!\n')
 
-  cat('setting cardenolide matrix...')
-  C[iA] <- mtx[,"c"]
-  obj$matrices$C <- C
-  cat('done!\n')
+    #uses iA indices to store given column of mtx, which has our values for the given variable
+    cat('setting herbivory matrix...')
+    H[iA] <- mtx[,"w"]
+    obj$matrices$H <- H
+    cat('done!\n')
 
-  cat('setting LMA matrix...')
-  L[iA] <- mtx[,"l"]
-  obj$matrices$L <- L
-  cat('done!\n')
+    cat('setting cardenolide matrix...')
+    C[iA] <- mtx[,"c"]
+    obj$matrices$C <- C
+    cat('done!\n')
 
+    cat('setting LMA matrix...')
+    L[iA] <- mtx[,"l"]
+    obj$matrices$L <- L
+    cat('done!\n')
 
-  #still calculates dist.herb, probably not necessary anymore, but leaving in just in case
-  # if (any(is.na(dist.herb))) {
-  #   dist.herb <- obj$pars$munched.fit[[obj$site]]$predict(obj$vars$herb_avg$b,
-  #                                                         c(obj$pars$munched.fit[[obj$site]]$pmunch,
-  #                                                           obj$pars$munched.fit[[obj$site]]$fit$estimate),
-  #                                                         perturb,
-  #                                                         distpars = distpars)
-  # }
-  # obj$pars$dist.herb <- dist.herb
+    if (update) {
+      obj %<>% computeSexualKernel(update = FALSE) %>%
+        computeClonalKernel(update = FALSE) %>%
+        computeFullKernel()
+    }
 
-  if (update) {
-    obj %<>% computeSexualKernel(update = FALSE) %>%
-             computeClonalKernel(update = FALSE) %>%
-             computeFullKernel()
+    if (saveresults) {
+      save(obj$matrices$H, obj$matrices$C, obj$matrices$L, file = file.path('data/mwCache',"varDistMats.RData"))
+    }
+
+  } else {
+    load(file.path('data/mwCache',"varDistMats.RData"))
   }
 
   return(obj)
@@ -1226,7 +1250,7 @@ setVarDistMatrices.mwIPM <- function(obj, dist.herb = NA, update = TRUE, perturb
 
   if (update) {
     obj %<>% computeSexualKernel()
-    obj <- computeMPM(obj)
+    #obj <- computeMPM(obj)
   }
 
   return(obj)
@@ -1249,7 +1273,7 @@ computeSexualKernel.mwIPM <- function(obj, update = TRUE, perturb = rep(0,2)) {
   attach(obj$matrices, warn.conflicts = FALSE)
 
   cat(paste0("Compiling sexual kernal..."))
-  Ks <- (seedling.emergence[[obj$site]]+perturb[1])*(seeds.per.pod+perturb[2])*R%*%(P*S*obj$matrices$F)%*%(H*C*L)*herb_avg$dx*h_apical$dx*Cardenolides$dx*LMA$dx
+  Ks <- (seedling.emergence + perturb[1])*(seeds.per.pod+perturb[2])*R%*%(P*S*obj$matrices$F)%*%(H*C*L)*herb_avg$dx*h_apical$dx*Cardenolides$dx*LMA$dx
   # image.plot(h_apical, h_apical, t(Ks), col=topo.colors(100))
 
   detach(obj$vars)
@@ -1283,6 +1307,7 @@ computeClonalKernel.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   attach(obj$pars, warn.conflicts = FALSE)
   attach(obj$matrices, warn.conflicts = FALSE)
 
+  cat(paste0("Compiling clonal kernal..."))
   if (obj$mdlargs$input == 'meanonly') {          # HERB NEEDS TO BE REPLACED WITH CARDENOLIDES IF WE WANT THIS METHOD TO WORK
     mean.herb_avg <- sum(dist.herb*herb_avg$x)*herb_avg$dx
     mean.buds.per.stem <- budlings.per.stem.fit$predict(mean.herb_avg,
@@ -1292,18 +1317,21 @@ computeClonalKernel.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
     mean.buds.per.stem <- t(budlings.per.stem.fit$predict(Cardenolides$x,
                                                           stats::coef(budlings.per.stem.fit$fit),
                                                           perturb[1:2])) %*%
-      Cardenolides$dx
+                          t(t(card.fit$predict(Cardenolides$b,
+                                               stats::coef(card.fit$fit),
+                                               perturb[1:2])))*Cardenolides$dx
   }
 
-  Kc <- t(t(mean.buds.per.stem*budling.fit[[obj$site]]$predict(h_apical$b,
-                                                               budling.fit[[obj$site]]$fit$estimate,
-                                                               perturb[3:4])))%*%t(rep(1,obj$N))*h_apical$dx
+  Kc <- t(t(mean.buds.per.stem*budling.fit$predict(h_apical$b,
+                                                   budling.fit$fit$estimate,
+                                                   perturb[3:4]))) %*% t(rep(1,obj$N))*h_apical$dx
 
   detach(obj$vars)
   detach(obj$pars)
   detach(obj$matrices)
 
   obj$kernels$Kc <- Kc
+  cat(paste0("done!\n"))
 
   if (update) {
     obj %<>% computeFullKernel()
@@ -1318,7 +1346,10 @@ computeClonalKernel.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
 #'
 #' @return A mwIPM model object.
 computeFullKernel.mwIPM <- function(obj) {
+
+  cat(paste0("Merging kernals..."))
   obj$kernels$K <- obj$kernels$Ks + obj$kernels$Kc
+  cat(paste0("done!\n"))
   # image.plot(h_apical, h_apical, t(K), col=topo.colors(100))
   # contour(h_apical, h_apical, t(K), add = TRUE, drawlabels = TRUE)
 
@@ -1394,7 +1425,7 @@ computeMPM.mwIPM <- function(obj) {
       t(t(H[1+(0:(obj$N-1))*obj$N,1]))*herb_avg$dx
   }
 
-  Kss <- seedling.emergence[[obj$site]]*seeds.per.pod*(P*G*S*F)%*%H*herb_avg$dx*h_apical.next$dx*h_apical$dx
+  Kss <- seedling.emergence*seeds.per.pod*(P*G*S*F)%*%H*herb_avg$dx*h_apical.next$dx*h_apical$dx
   alpha <- sum(Kss%*%t(t(seedling.fit$predict(h_apical$b, seedling.fit$fit$estimate))))
   beta <- sum(Kss%*%t(t(budling.fit[[obj$site]]$predict(h_apical$b,
                                                         budling.fit[[obj$site]]$fit$estimate))))
@@ -1445,7 +1476,7 @@ analyzeStandard.mwIPM <- function(obj) {
   repro.val <- v.eigen/v.eigen[1]
   v.dot.w <- sum(stable.dist*repro.val)*obj$vars$h_apical$dx
   sens <- outer(repro.val,stable.dist)/v.dot.w
-  elas <- matrix(as.vector(sens)*as.vector(K)/lam,nrow=ipm$N)
+  elas <- matrix(as.vector(sens)*as.vector(K)/lam,nrow=obj$N)
   obj$analysis$standard <- list(lambda = lam,
                                 stable.dist = stable.dist,
                                 repro.val = repro.val,
@@ -1473,7 +1504,7 @@ analyzeStandard.mwIPM <- function(obj) {
 #' ipm %<>% analyzeParameters()
 #' str(ipm$analysis$parameters)
 analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, params = "all", distpars = FALSE) {
-  if (!file.exists(file.path(mwCache,"parameterAnalysis.RData")) | (compute)) {
+  if (!file.exists(file.path('data/mwCache',"parameterAnalysis.RData")) | (compute)) {
     # Initialize to empty data frame
     analysis <- tbl_df(data.frame(sensitivity = NULL,
                                   pars = NULL,
@@ -1490,7 +1521,7 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
                           name = c("(Intercept)",
                                    "h_apical",
                                    "herb_avg",
-                                   "h_apical:herb_avg")
+                                   "Cardenolides")
         )
         )
       )
@@ -1501,32 +1532,14 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
       cat("Analyzing survival fit...")
       survival_func <- function(x) {obj %>% setSurvivalMatrix(perturb = x) %>% analyzeGrowthRate()}
       analysis %<>% bind_rows(
-        tbl_df(data.frame(sensitivity = numDeriv::grad(survival_func, rep(0,4)),
+        tbl_df(data.frame(sensitivity = numDeriv::grad(survival_func, rep(0,5)),
                           pars = obj$pars$surv.fit$pars$unscaled[obj$site,],
                           type = as.character("Survival"),
                           name = c("(Intercept)",
                                    "h_apical",
                                    "herb_avg",
-                                   "h_apical:herb_avg")
-        )
-        )
-      )
-      cat("done!\n")
-    }
-
-    if (("all" %in% params) | ("Growth" %in% params)) {
-      cat("Analyzing growth fit...")
-      growth_func <- function(x) {obj %>% setGrowthMatrix(perturb = x) %>% analyzeGrowthRate()}
-      analysis %<>% bind_rows(
-        tbl_df(data.frame(sensitivity = numDeriv::grad(growth_func, rep(0,5)),
-                          pars = c(obj$pars$growth.fit$pars$unscaled[obj$site,],
-                                   obj$pars$growth.fit$pars$sd[obj$site]),
-                          type = as.character("Growth"),
-                          name = c("(Intercept)",
-                                   "h_apical",
-                                   "herb_avg",
-                                   "h_apical:herb_avg",
-                                   "sd")
+                                   "Cardenolides",
+                                   "LMA")
         )
         )
       )
@@ -1537,13 +1550,14 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
       cat("Analyzing pods fit...")
       pods_func <- function(x) {obj %>% setPodsMatrix(perturb = x) %>% analyzeGrowthRate()}
       analysis %<>% bind_rows(
-        tbl_df(data.frame(sensitivity = numDeriv::grad(pods_func, rep(0,4)),
+        tbl_df(data.frame(sensitivity = numDeriv::grad(pods_func, rep(0,5)),
                           pars = obj$pars$pods.fit$pars$unscaled[obj$site,],
                           type = as.character("Pods"),
                           name = c("(Intercept)",
                                    "h_apical",
                                    "herb_avg",
-                                   "h_apical:herb_avg")
+                                   "Cardenolides",
+                                   "LMA")
         )
         )
       )
@@ -1573,9 +1587,9 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
       sexual_func <- function(x) {obj %>% computeSexualKernel(perturb = x) %>% analyzeGrowthRate()}
       analysis %<>% bind_rows(
         tbl_df(data.frame(sensitivity = numDeriv::grad(sexual_func, rep(0,2)),
-                          pars = c(obj$pars$seedling.emergence[obj$site],
+                          pars = c(obj$pars$seedling.emergence,
                                    obj$pars$seeds.per.pod),
-                          type = as.character("Sexual"),
+                          type = as.character("Seedlings", "Pods"),
                           name = c("seedling.emergence",
                                    "seeds.per.pod")
         )
@@ -1591,7 +1605,7 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
         tbl_df(data.frame(sensitivity = numDeriv::grad(clonal_func, rep(0,4)),
                           pars = c(stats::coef(obj$pars$budlings.per.stem.fit$fit),
                                    obj$pars$budling.fit[[obj$site]]$fit$estimate),
-                          type = c("Clonal", "Clonal", "Budlings", "Budlings"),
+                          type = c(rep("Clonal",2), rep("Budlings",2)),
                           name = c("a",
                                    "b",
                                    "mean",
@@ -1602,25 +1616,31 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
       cat("done!\n")
     }
 
-    # if (("all" %in% params) | ("Herbivory" %in% params)) {
-    #   cat("Analyzing herbivory distribution...")
-    #   herbivory_func <- function(x) {obj %>% setHerbivoryMatrix(perturb = x, distpars = distpars) %>% analyzeGrowthRate()}
-    #   analysis %<>% bind_rows(
-    #     tbl_df(data.frame(sensitivity = numDeriv::grad(herbivory_func, rep(0,3)),
-    #                       pars = c(obj$pars$munched.fit[[obj$site]]$pmunch,
-    #                                ParsToMoms(x = obj$pars$munched.fit[[obj$site]]$fit$estimate,
-    #                                           type = ifelse(!distpars,
-    #                                                         obj$pars$munched.fit[[obj$site]]$fit$distname,
-    #                                                         "id"))),
-    #                       type = c("Herbivory"),
-    #                       name = c("pmunch",
-    #                                "mean",
-    #                                "sd")
-    #     )
-    #     )
-    #   )
-    #   cat("done!\n")
-    # }
+    if (("all" %in% params) | ("VarDist" %in% params)) { ## if there are problems in pertubring just some of the parameters, than check here and verify the whole pipeline of what should be updated and when
+      cat("Analyzing variable distributions...")
+      varDist_func <- function(x) {obj %>% setVarDistMatrices(perturb = x) %>% analyzeGrowthRate()}
+      analysis %<>% bind_rows(
+        tbl_df(data.frame(sensitivity = numDeriv::grad(varDist_func, rep(0,7)),
+                          pars = c(obj$pars$munched.fit$pmunch,
+                                   ParsToMoms(x = obj$pars$munched.fit$fit$estimate,
+                                              type = ifelse(!distpars,
+                                                            obj$pars$munched.fit$fit$distname,
+                                                            "id")),
+                                   obj$pars$card.fit$fit$estimate,
+                                   obj$pars$lma.fit$fit$estimate),
+                          type = c(rep("Herbivory",3), rep("Cardenolides",2), rep("LMA",2)),
+                          name = c("pmunch",
+                                   "mean",
+                                   "sd",
+                                   "mean",
+                                   "sd",
+                                   "mean",
+                                   "sd")
+        )
+        )
+      )
+      cat("done!\n")
+    }
 
     analysis %<>% filter(pars != 0) %>%
       mutate(lambda = obj %>% analyzeGrowthRate(),
@@ -1628,10 +1648,10 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
     analysis$type <- factor(analysis$type)
 
     if (saveresults) {
-      save(analysis, file = file.path(mwCache,"parameterAnalysis.RData"))
+      save(analysis, file = file.path('data/mwCache',"parameterAnalysis.RData"))
     }
   } else {
-    load(file.path(mwCache,"parameterAnalysis.RData"))
+    load(file.path('data/mwCache',"parameterAnalysis.RData"))
   }
 
   obj$analysis$parameters <- analysis
@@ -2018,7 +2038,7 @@ jacMomsToPars <- function(y, type = "lnorm") {
 #' @param type Distribution type (lnorm, gamma, or identity)
 #'
 #' @return Gradient vector.
-perturbTrans <- function(pars, perturb = rep(0,2), type = "lnorm") {
+perturbTrans <- function(pars, perturb = rep(0,2), type = "ident") {
   if (type == "lnorm") {
     MSD <- ParsToMoms(x = pars, type)
     tpars <- MomsToPars(y = MSD+perturb, type)

@@ -29,7 +29,6 @@ mwMod <- function(x) {
 #'
 #' @export
 predict.mwMod <- function(obj, newdata, type="Bertha", perturb=rep(0,5)) {
-  cat("Hello, World!")
   pars <- obj$pars$unscaled
   linpart <- (pars[type,"(Intercept)"]+perturb[1])
   for (i in 1:length(obj$vars)) {
