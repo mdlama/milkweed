@@ -16,7 +16,7 @@ library(doParallel) # Normally, I don't load suggested packages, but this one re
                     #   so, you know, it's easier this way.
 '%<>%' <- magrittr::'%<>%'
 TeX <- latex2exp::TeX
-#mwCache <- '../../data/mwCache'
+mwCache <- "~/Documents/traits/data/mwCache"
 ```
 
 # Analysis
