@@ -13,15 +13,10 @@ library(dplyr)
 library(ggplot2)
 
 '%<>%' <- magrittr::'%<>%'
-<<<<<<< HEAD
 TeX <- latex2exp::TeX
-mwCache <- "~/Documents/traits/data/mwCache"
-=======
-#TeX <- latex2exp::TeX
 
 #ipm = mwIPM(list(compute = T, saveresults = FALSE))
-mwCache <- '/Users/slstruckman_admin/traits/data/mwCache'
->>>>>>> d26214ec86b196adc54bc01eed71b129f4987dc5
+mwCache <- '../../data/mwCache'
 ```
 
 # Analysis
