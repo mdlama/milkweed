@@ -545,9 +545,6 @@ setSurvivalFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, upda
                                          LMA = scale(metadata_usc$LMA)),
                            perturb.mdl = surv.mdl))
 
-    #test code to see if manual perturbation of beta_c in survival vr function changes lambda how we think it will
-    #obj$pars$surv.fit$perturb.mdl$coefficients[4] = obj$pars$surv.fit$mdl$coefficients[4] + 16
-
     # Check parameters
     cat("Checking parameters:\n")
     checkPars(surv.fit)
@@ -560,6 +557,9 @@ setSurvivalFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, upda
   }
 
   obj$pars$surv.fit <- surv.fit
+  
+  #test code to see if manual perturbation of beta_c in survival vr function changes lambda how we think it will
+  #obj$pars$surv.fit$perturb.mdl$coefficients[4] = obj$pars$surv.fit$mdl$coefficients[4] + abs(10*obj$pars$surv.fit$mdl$coefficients[4])
 
   return(obj)
 }

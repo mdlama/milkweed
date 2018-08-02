@@ -11,38 +11,47 @@ output: html_document
 library(milkweed)
 library(dplyr)
 library(ggplot2)
-requirePackages(c("doParallel", "latex2exp"))
-library(doParallel) # Normally, I don't load suggested packages, but this one requires and loads parallel, foreach, and iterators,
-                    #   so, you know, it's easier this way.
+
 '%<>%' <- magrittr::'%<>%'
+<<<<<<< HEAD
 TeX <- latex2exp::TeX
 mwCache <- "~/Documents/traits/data/mwCache"
+=======
+#TeX <- latex2exp::TeX
+
+#ipm = mwIPM(list(compute = T, saveresults = FALSE))
+mwCache <- '/Users/slstruckman_admin/traits/data/mwCache'
+>>>>>>> d26214ec86b196adc54bc01eed71b129f4987dc5
 ```
 
 # Analysis
 
 ## Bootstrap
 
-The results object should have everything we need to generate the caterpillar plot and confidence intervals around elasticities, as well as a confidence interval around lambda.
+The function should save a piece of what we need to generate the caterpillar plot and confidence intervals around elasticities, as well as a confidence interval around lambda... every time it is run. Then they can all be put together into one data frame.
 ```{r}
-compute <- FALSE
-
-ipm = mwIPM(list(compute = TRUE, saveresults = FALSE))
-
-if (!file.exists(file.path(mwCache,"figure6.RData")) | (compute)) {
-  numcl <- detectCores()-1
-  registerDoParallel(cores = numcl)
-  results <- tbl_df(foreach(i=1:4, .combine=bind_rows) %dopar% { #3 was previously 20
-    library(milkweed)
-    library(dplyr)
-    '%<>%' <- magrittr::'%<>%'
-    ipm %<>% bootIPM() %>% analyzeParameters(distpars = FALSE) #changed from TRUE
-    thisone <- ipm$analysis$parameters
-    thisone
-  })
-  
-  save(results, file=file.path(mwCache,"figure6.RData"))
-} else {
-  load(file.path(mwCache,"figure6.RData"))
+bootstrap = function(ipm, runs = 1) {
+  results = data.frame()
+  for(i in 1:runs) {
+    tmp = ipm %>% bootIPM() %>% analyzeParameters(distpars = FALSE) #changed from TRUE
+    results <- bind_rows(results, tmp$analysis$parameters)
+  }
+  save(results, file=file.path(mwCache, paste0(format(Sys.Date()), "_figure6.RData")))
 }
 ```
+
+```{r, echo = FALSE}
+runs = 1
+
+pracma::tic()
+ipm %>% bootstrap(runs = runs)
+pracma::toc(echo=T)
+```
+
+```{r, echo = FALSE}
+ipm = mwIPM(list(compute = T, saveresults = FALSE)) %>% bootIPM()
+tmp = ipm %<>% analyzeParameters(distpars = FALSE) #changed from TRUE
+results <- tmp$analysis$parameters
+save(results, file=file.path(mwCache, paste0(format(Sys.Date()), "_figure6.RData")))
+```
+
