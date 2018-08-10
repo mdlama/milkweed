@@ -10,6 +10,7 @@ output:
 ```{r}
 library(dplyr)
 library(tidyr)
+library(AICcmodavg)
 ```
 
 # Data
@@ -842,7 +843,7 @@ exp.model.5 = lm(log(buds_per_stem) ~ 1, data = bud.data)
 aictab(list(exp.model.3a, exp.model.4a, exp.model.4b, exp.model.4c, exp.model.5), modnames = c('3a','4a','4b','4c', 'null'), second.order=T)
 ```
 
-Alright, so it looks like an exponential with Cardenolides by themselves is our best model with an AICc of 64.94. Deciding to disregard null, becasue it is just another way to write the constant model and should produce the same AICc, but for some numerical reason is not. That's interesting and seems to match relatively well with the other models! Weird, that herbivory does so poorly. Expoential also makes sense since it won't go negative.
+Alright, so it looks like an exponential with Cardenolides by themselves is our best model with an AICc of 64.94. Deciding to disregard null, becasue it is just another way to write the constant model and should produce the same AICc, but for some numerical reason is not. That's interesting and seems to match relatively well with the other models! Weird, that herbivory does so poorly. Exponential also makes sense since it won't go negative.
 ```{r}
 fit <- exp.model.4a 
 

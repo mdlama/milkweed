@@ -50,3 +50,27 @@ results <- tmp$analysis$parameters
 save(results, file=file.path(mwCache, paste0(format(Sys.Date()), "_figure6.RData")))
 ```
 
+#Lambda by itself
+```{r, echo=FALSE}
+ipm = mwIPM(list(compute = T, saveresults = FALSE))
+
+runs = 50
+lambdas = c()
+pracma::tic()
+for(i in 1:runs) {
+    tmp = ipm %>% bootIPM() %>% analyzeGrowthRate()
+    lambdas <- c(lambdas, tmp)
+}
+pracma::toc()
+
+save(lambdas, file=file.path("/Users/slstruckman_admin/traits/data/mwCache", 'lambdas_storage.RData'))
+```
+
+```{r}
+lamb = lambdas
+results = data.frame(lambda = lamb) %>% summarize(n = n(),
+                                                  mean_lamb = mean(lambda),
+                                                  se = sd(lambda)/sqrt(n),
+                                                  ci = qt(0.975, n-1)*se)
+```
+
