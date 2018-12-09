@@ -890,7 +890,7 @@ p <- p + theme_bw() +
 
 p
 
-ggsave('budsperstem.png', width = 6.5, height = 5, units = 'in', device = 'png')
+#ggsave('budsperstem.png', width = 6.5, height = 5, units = 'in', device = 'png')
 ```
 
 ##Outlier(s)
@@ -961,6 +961,163 @@ p <- p + theme_bw() +
 
 p
 
-ggsave('budsimple.png', width = 6.5, height = 5, units = 'in', device = 'png')
+#ggsave('budsimple.png', width = 6.5, height = 5, units = 'in', device = 'png')
+```
+
+# Autocorrelation
+Investigating whether points next to each other are correlated. Because we broke up the transects "arbitrarily" starting at the end fo the transect, we run the risk of plots not being independent like they would be if we did this at the transect level.
+```{r}
+dat42 = bud.data %>% filter(transect == 42)
+dat80 = bud.data %>% filter(transect == 80)
+dat81 = bud.data %>% filter(transect == 81)
+dat83 = bud.data %>% filter(transect == 83)
+
+#generate blank dataframes
+plot.pairs42 = data.frame(pair = rep(NA, nrow(dat42)-1),
+                          transect = rep(NA, nrow(dat42)-1),
+                          bps1 = rep(NA, nrow(dat42)-1),
+                          bps2 = rep(NA, nrow(dat42)-1),
+                          herb1 = rep(NA, nrow(dat42)-1),
+                          herb2 = rep(NA, nrow(dat42)-1),
+                          lma1 = rep(NA, nrow(dat42)-1),
+                          lma2 = rep(NA, nrow(dat42)-1),
+                          card1 = rep(NA, nrow(dat42)-1),
+                          card2 = rep(NA, nrow(dat42)-1))
+plot.pairs80 = data.frame(pair = rep(NA, nrow(dat80)-1),
+                          transect = rep(NA, nrow(dat80)-1),
+                          bps1 = rep(NA, nrow(dat80)-1),
+                          bps2 = rep(NA, nrow(dat80)-1),
+                          herb1 = rep(NA, nrow(dat80)-1),
+                          herb2 = rep(NA, nrow(dat80)-1),
+                          lma1 = rep(NA, nrow(dat80)-1),
+                          lma2 = rep(NA, nrow(dat80)-1),
+                          card1 = rep(NA, nrow(dat80)-1),
+                          card2 = rep(NA, nrow(dat80)-1))
+plot.pairs81 = data.frame(pair = rep(NA, nrow(dat81)-1),
+                          transect = rep(NA, nrow(dat81)-1),
+                          bps1 = rep(NA, nrow(dat81)-1),
+                          bps2 = rep(NA, nrow(dat81)-1),
+                          herb1 = rep(NA, nrow(dat81)-1),
+                          herb2 = rep(NA, nrow(dat81)-1),
+                          lma1 = rep(NA, nrow(dat81)-1),
+                          lma2 = rep(NA, nrow(dat81)-1),
+                          card1 = rep(NA, nrow(dat81)-1),
+                          card2 = rep(NA, nrow(dat81)-1))
+plot.pairs83 = data.frame(pair = rep(NA, nrow(dat83)-1),
+                          transect = rep(NA, nrow(dat83)-1),
+                          bps1 = rep(NA, nrow(dat83)-1),
+                          bps2 = rep(NA, nrow(dat83)-1),
+                          herb1 = rep(NA, nrow(dat83)-1),
+                          herb2 = rep(NA, nrow(dat83)-1),
+                          lma1 = rep(NA, nrow(dat83)-1),
+                          lma2 = rep(NA, nrow(dat83)-1),
+                          card1 = rep(NA, nrow(dat83)-1),
+                          card2 = rep(NA, nrow(dat83)-1))
+
+#creates sequencial pairs, and takes the values for both plots
+for (i in 1:(nrow(dat42)-1)) {
+  plot.pairs42$pair[i] = i
+  plot.pairs42$transect[i] = 42
+  plot.pairs42$bps1[i] = dat42$buds_per_stem[i]
+  plot.pairs42$bps2[i] = dat42$buds_per_stem[i+1]
+  plot.pairs42$herb1[i] = dat42$herb_mean[i]
+  plot.pairs42$herb2[i] = dat42$herb_mean[i+1]
+  plot.pairs42$lma1[i] = dat42$LMA_mean[i]
+  plot.pairs42$lma2[i] = dat42$LMA_mean[i+1]
+  plot.pairs42$card1[i] = dat42$Card_mean[i]
+  plot.pairs42$card2[i] = dat42$Card_mean[i+1]
+}
+for (i in 1:(nrow(dat80)-1)) {
+  plot.pairs80$pair[i] = i
+  plot.pairs80$transect[i] = 80
+  plot.pairs80$bps1[i] = dat80$buds_per_stem[i]
+  plot.pairs80$bps2[i] = dat80$buds_per_stem[i+1]
+  plot.pairs80$herb1[i] = dat80$herb_mean[i]
+  plot.pairs80$herb2[i] = dat80$herb_mean[i+1]
+  plot.pairs80$lma1[i] = dat80$LMA_mean[i]
+  plot.pairs80$lma2[i] = dat80$LMA_mean[i+1]
+  plot.pairs80$card1[i] = dat80$Card_mean[i]
+  plot.pairs80$card2[i] = dat80$Card_mean[i+1]
+}
+for (i in 1:(nrow(dat81)-1)) {
+  plot.pairs81$pair[i] = i
+  plot.pairs81$transect[i] = 81
+  plot.pairs81$bps1[i] = dat81$buds_per_stem[i]
+  plot.pairs81$bps2[i] = dat81$buds_per_stem[i+1]
+  plot.pairs81$herb1[i] = dat81$herb_mean[i]
+  plot.pairs81$herb2[i] = dat81$herb_mean[i+1]
+  plot.pairs81$lma1[i] = dat81$LMA_mean[i]
+  plot.pairs81$lma2[i] = dat81$LMA_mean[i+1]
+  plot.pairs81$card1[i] = dat81$Card_mean[i]
+  plot.pairs81$card2[i] = dat81$Card_mean[i+1]
+}
+for (i in 1:(nrow(dat83)-1)) {
+  plot.pairs83$pair[i] = i
+  plot.pairs83$transect[i] = 83
+  plot.pairs83$bps1[i] = dat83$buds_per_stem[i]
+  plot.pairs83$bps2[i] = dat83$buds_per_stem[i+1]
+  plot.pairs83$herb1[i] = dat83$herb_mean[i]
+  plot.pairs83$herb2[i] = dat83$herb_mean[i+1]
+  plot.pairs83$lma1[i] = dat83$LMA_mean[i]
+  plot.pairs83$lma2[i] = dat83$LMA_mean[i+1]
+  plot.pairs83$card1[i] = dat83$Card_mean[i]
+  plot.pairs83$card2[i] = dat83$Card_mean[i+1]
+}
+
+#put them all together
+plot.pairs = bind_rows(plot.pairs42, plot.pairs80, plot.pairs81, plot.pairs83)
+```
+
+```{r}
+plot(plot.pairs$bps2 ~ plot.pairs$bps1)
+plot(plot.pairs$herb2 ~ plot.pairs$herb1)
+plot(plot.pairs$card2 ~ plot.pairs$card1)
+plot(plot.pairs$lma2 ~ plot.pairs$lma1)
+```
+
+```{r}
+summary(lm(bps2 ~ bps1, data = plot.pairs))
+summary(lm(herb2 ~ herb1, data = plot.pairs))
+summary(lm(card2 ~ card1, data = plot.pairs))
+summary(lm(lma2 ~ lma1, data = plot.pairs))
+```
+So it seems that clonal reproduction (buds/stem) is not spatially autocorrelated, but herbivory, cardenolides, and LMA might be.
+
+Breaking it up by transect, just to see if it's worse in some places.
+```{r}
+summary(lm(bps2 ~ bps1, data = plot.pairs42))
+summary(lm(herb2 ~ herb1, data = plot.pairs42))
+summary(lm(card2 ~ card1, data = plot.pairs42))
+summary(lm(lma2 ~ lma1, data = plot.pairs42))
+```
+Just herb significant.
+```{r}
+summary(lm(bps2 ~ bps1, data = plot.pairs80))
+#summary(lm(herb2 ~ herb1, data = plot.pairs80))
+summary(lm(card2 ~ card1, data = plot.pairs80))
+summary(lm(lma2 ~ lma1, data = plot.pairs80))
+```
+Nothing.
+```{r}
+summary(lm(bps2 ~ bps1, data = plot.pairs81))
+summary(lm(herb2 ~ herb1, data = plot.pairs81))
+summary(lm(card2 ~ card1, data = plot.pairs81))
+summary(lm(lma2 ~ lma1, data = plot.pairs81))
+```
+Nothing.
+```{r}
+summary(lm(bps2 ~ bps1, data = plot.pairs83))
+summary(lm(herb2 ~ herb1, data = plot.pairs83))
+summary(lm(card2 ~ card1, data = plot.pairs83))
+summary(lm(lma2 ~ lma1, data = plot.pairs83))
+```
+Nothing (maybe LMA)
+
+Weird, let's look at it again.
+```{r}
+plot(bps2 ~ bps1, data = plot.pairs, col = transect)
+plot(herb2 ~ herb1, data = plot.pairs, col = transect)
+plot(card2 ~ card1, data = plot.pairs, col = transect)
+plot(lma2 ~ lma1, data = plot.pairs, col = transect)
 ```
 
