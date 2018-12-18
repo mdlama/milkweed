@@ -1121,3 +1121,30 @@ plot(card2 ~ card1, data = plot.pairs, col = transect)
 plot(lma2 ~ lma1, data = plot.pairs, col = transect)
 ```
 
+```{r}
+bps42 = lm(bps2 ~ bps1, data = plot.pairs42)
+plot(bps42$residuals)
+```
+
+```{r}
+bps80 = lm(bps2 ~ bps1, data = plot.pairs80)
+plot(bps80$residuals)
+```
+
+```{r}
+bps81 = lm(bps2 ~ bps1, data = plot.pairs81)
+plot(bps81$residuals)
+```
+
+```{r}
+bps83 = lm(bps2 ~ bps1, data = plot.pairs83)
+plot(bps83$residuals)
+
+bps83b = lm(bps2 ~ bps1, data = plot.pairs83[-c(1,15),]) #tried removing some high values to see if the pattern still looked like it or if it was a plto scaling issue
+plot(bps83b$residuals)
+```
+
+```{r}
+plot(exp.model.4a$residuals, type = 'b') #overal model residuals show little pattern
+```
+
