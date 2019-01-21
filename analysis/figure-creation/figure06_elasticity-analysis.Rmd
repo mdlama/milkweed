@@ -25,10 +25,10 @@ mwCache <- getOption("milkweed.cache")
 ## Bootstrap elasticities
 ```{r}
 compute <- FALSE
+local <- FALSE
 
-ipm <- mwIPM(list(compute = TRUE, saveresults = FALSE))
-
-if (!file.exists(file.path(mwCache,"figure6.RData")) | (compute)) {
+if (compute) {
+  ipm <- mwIPM(list(compute = TRUE, saveresults = FALSE))
   ipm %<>% bootIPM() %>% analyzeParameters(distpars = FALSE)
   results <- ipm$analysis$parameters
 
@@ -39,13 +39,16 @@ if (!file.exists(file.path(mwCache,"figure6.RData")) | (compute)) {
   }
   
   save(results, file=file.path(mwCache,"figure6.RData"))
-} else {
-  load(file.path(mwCache,"figure6.RData"))
-}
+} else 
+  if (local) {
+    load(file.path(mwCache,"figure6.RData"))
+  } else {
+    results <- fig06.data
+  }
 ```
 
 ## Spread elasticity over kernel for herbivory parameters
-```{r}
+```{r, eval=FALSE, echo=FALSE}
 ipm %<>% analyzeStandard() %>% analyzeParameters(distpars = TRUE)
 res <- ipm$analysis$parameters %>% 
     filter(type == "Herbivory") %>% 
@@ -81,6 +84,7 @@ abs(sum(sum(E3)) - res$elasticity[3])
 ```{r}
 plotdata <- results %>%
   tidyr::unite(label, type, name, sep="-", remove=FALSE) %>% 
+  mutate(elasticity = abs(pars)*sensitivity/lambda) %>% 
   group_by(label) %>% 
   summarize(meanElasticity = mean(elasticity),
             n = n(),
@@ -243,6 +247,7 @@ elastiplot <- elastiplot +
 # Labels and such
 elastiplot <- elastiplot + 
   scale_y_discrete(labels = rev(fancypantslabels)) +
+  scale_x_continuous(limits = c(-0.5, 0.5)) + 
   xlab("Parameter elasticity") +
   ylab("Parameters") + 
   theme_bw() +
@@ -253,11 +258,12 @@ elastiplot <- elastiplot +
                                          size=0.1,
                                          linetype="solid"),
         legend.key.size = unit(0.18, "in"),
-        legend.position = c(0.89, 0.125),
+        legend.position = c(0.89, 0.145),
         plot.title = element_text(hjust = 0,
                                   margin = margin(b = 15, unit = "pt")))
 
 elastiplot
+ggsave("Elasticities_new.png", device="png", elastiplot)
 ```
 
 
@@ -265,7 +271,7 @@ elastiplot
 
 ### Prep data for heatmap of expanded elasticities
 
-```{r, warning=FALSE}
+```{r, warning=FALSE, eval=FALSE, echo=FALSE}
 M <- mesh(ipm$vars$h_apical$x, ipm$vars$h_apical$x)
 
 plotdata <- tbl_df(data.frame(h_apical_t0 = as.vector(M$x),
@@ -280,7 +286,7 @@ plotdata %<>% bind_rows(tbl_df(data.frame(h_apical_t0 = as.vector(M$x),
 
 ### Render expanded elasticity plots for herbivory parameters
 
-```{r}
+```{r, eval=FALSE, echo=FALSE}
 maxval <- max(abs(c(as.vector(E1), as.vector(E3))))
 colorpal <- brewer.pal(3, "RdBu")
 
@@ -318,7 +324,7 @@ pmunch_elastiplot
 
 ## Put em together, it just makes sense!
 
-```{r, fig.width=8, fig.height=4}
+```{r, fig.width=8, fig.height=4, eval=FALSE, echo=FALSE}
 g1 <- ggplotGrob(elastiplot)
 g1 <- gtable_add_rows(g1, unit(0, "mm"))
 g1 <- gtable_add_rows(g1, unit(0, "mm"))

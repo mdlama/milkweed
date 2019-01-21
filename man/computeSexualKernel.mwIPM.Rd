@@ -4,7 +4,8 @@
 \alias{computeSexualKernel.mwIPM}
 \title{Compute sexual reproduction kernel.}
 \usage{
-\method{computeSexualKernel}{mwIPM}(obj, update = TRUE, perturb = rep(0, 2))
+\method{computeSexualKernel}{mwIPM}(obj, update = TRUE,
+  perturb = rep(0, 2))
 }
 \arguments{
 \item{obj}{A mwIPM model object.}
