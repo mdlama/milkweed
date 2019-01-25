@@ -1,0 +1,504 @@
+---
+title: "Figure 5: Elasticity Analysis"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: true
+---
+
+# Initialization
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(milkweed)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+requirePackages(c("doParallel", "latex2exp"))
+library(doParallel) # Normally, I don't load suggested packages, but this one requires and loads parallel, foreach, and iterators,
+                    #   so, you know, it's easier this way.
+'%<>%' <- magrittr::'%<>%'
+TeX <- latex2exp::TeX
+mwCache <- '../../data/mwCache'
+```
+
+# Analysis
+
+## Bootstrap elasticities
+```{r}
+compute <- FALSE
+local <- FALSE
+
+if (compute) {
+  ipm <- mwIPM(list(compute = TRUE, saveresults = FALSE))
+  ipm %<>% bootIPM() %>% analyzeParameters(distpars = FALSE)
+  results <- ipm$analysis$parameters
+
+  for (i in 1:1) {
+    ipm %<>% bootIPM() %>% analyzeParameters(distpars = FALSE)
+    results <- bind_rows(results, 
+                         ipm$analysis$parameters)
+  }
+  
+  save(results, file=file.path(mwCache,"figure06.rda"))
+} else 
+  if (local) {
+    load(file.path(mwCache,"figure06.rda"))
+  } else {
+    results <- figure06.data
+  }
+```
+
+
+# Plotting
+
+## Caterpillar plot of elasticities
+### Prep the plot data
+```{r}
+plotdata <- results
+plotdata$name[which(plotdata$name == 'a')] = '(Intercept)'
+plotdata$name[which(plotdata$name == 'b')] = 'Cardenolides'
+plotdata$type = as.character(plotdata$type)
+plotdata$type[which(plotdata$type == 'Budlings')] = 'Sprouts'
+plotdata$type = factor(plotdata$type)
+
+plotdata %<>% tidyr::unite(label, type, name, sep="-", remove=FALSE) %>%
+              mutate(elasticity = abs(pars)*sensitivity/lambda) %>% #correction for using the absolute value of parameter, so that sensitivity doesn't make things hard to interpret.
+              group_by(label) %>% 
+              summarize(meanElasticity = mean(elasticity),
+                        n = n(),
+                        se = sd(elasticity)/sqrt(n),
+                        ci = qt(0.975, n-1)*se,
+                        type = last(type),
+                        name = last(name))
+
+# Group parameters for plotting
+plotdata %<>% mutate(newtype = factor(ifelse((name == 'Cardenolides') | (type == 'Cardenolides'), 'Cardenolides', ifelse((name == 'LMA') | (type == 'LMA'), 'LMA', ifelse((name == 'herb_avg') | (type == 'Herbivory'), 'Herbivory', ifelse((name == 'h_apical') | (type %in% c('Seedlings', 'Sprouts')), 'Size', 'Constants')))))) 
+plotdata$newtype[which(plotdata$name %in% c('seedling.emergence', 'seeds.per.pod'))] = 'Constants'
+
+# Specify order of parameters in plot
+newlabelorder <- c("Cardenolides-mean", 
+                   "Cardenolides-sd",
+                   "LMA-mean", 
+                   "LMA-sd",
+                   "Herbivory-pmunch", 
+                   "Herbivory-mean", 
+                   "Herbivory-sd",
+                   "Sprouts-mean", 
+                   "Sprouts-sd",
+                   "Seedlings-mean", 
+                   "Seedlings-sd", 
+                   "Flowering-(Intercept)", 
+                   "Flowering-h_apical", 
+                   "Flowering-herb_avg", 
+                   "Flowering-Cardenolides", 
+                   "Survival-(Intercept)",
+                   "Survival-h_apical",
+                   "Survival-herb_avg",
+                   "Survival-Cardenolides",
+                   "Survival-LMA",
+                   "Pods-(Intercept)", 
+                   "Pods-h_apical", 
+                   "Pods-herb_avg",
+                   "Pods-Cardenolides",
+                   "Pods-LMA",
+                   "Seedlings-seeds.per.pod",
+                   "Seedlings-seedling.emergence",
+                   "Clonal-(Intercept)", 
+                   "Clonal-Cardenolides")
+
+# Corresponding mathematical symbols to above parameters
+# These really ought to be done through plotmath notation:
+#   https://stat.ethz.ch/R-manual/R-devel/library/grDevices/html/plotmath.html
+fancypantslabels <- rev(newlabelorder)
+
+fancypantslabels[1] <- TeX('$\\mu$')
+fancypantslabels[2] <- TeX('$\\sigma$')
+fancypantslabels[3] <- TeX('$\\mu$')
+fancypantslabels[4] <- TeX('$\\sigma$')
+fancypantslabels[5] <- TeX('$p_{\\omega}$')
+fancypantslabels[6] <- TeX('$\\mu$')
+fancypantslabels[7] <- TeX('$\\sigma$')
+fancypantslabels[8] <- TeX('$\\mu$')
+fancypantslabels[9] <- TeX('$\\sigma$')
+fancypantslabels[10] <- TeX('$\\mu$')
+fancypantslabels[11] <- TeX('$\\sigma$')
+
+fancypantslabels[12] <- TeX('$\\alpha$')
+fancypantslabels[13] <- TeX('$\\beta_{z_{h}}$')
+fancypantslabels[14] <- TeX('$\\beta_{z_{\\omega}}$')
+fancypantslabels[15] <- TeX('$\\beta_{z_{c}}$')
+fancypantslabels[16] <- TeX('$\\alpha$')
+fancypantslabels[17] <- TeX('$\\beta_{z_{h}}$')
+fancypantslabels[18] <- TeX('$\\beta_{z_{\\omega}}$')
+fancypantslabels[19] <- TeX('$\\beta_{z_{c}}$')
+fancypantslabels[20] <- TeX('$\\beta_{z_{\\l}}$')
+fancypantslabels[21] <- TeX('$\\alpha$')
+fancypantslabels[22] <- TeX('$\\beta_{z_{h}}$')
+fancypantslabels[23] <- TeX('$\\beta_{z_{\\omega}}$')
+fancypantslabels[24] <- TeX('$\\beta_{z_{c}}$')
+fancypantslabels[25] <- TeX('$\\beta_{z_{l}}$')
+fancypantslabels[26] <- TeX('$\\alpha$')
+fancypantslabels[27] <- TeX('$\\alpha$')
+fancypantslabels[28] <- TeX('$\\alpha$')
+fancypantslabels[29] <- TeX('$\\beta_{z_{c}}$')
+
+# Legend ordering
+newtypeorder <- c("Cardenolides", "LMA", "Herbivory", "Size", "Constants")
+
+# Colors
+group.colors <- c("#E76BF3", "#00BF7D", "#F8766D", "#00B0F6", 'grey37')
+```
+
+### Render elasticity caterpillar plot
+```{r}
+elastiplot <- plotdata %>% 
+  mutate(label = factor(label, levels = rev(newlabelorder))) %>%
+  mutate(newtype = factor(newtype, levels = newtypeorder)) %>%
+  
+  ggplot(aes(x = meanElasticity,
+             y = label,
+             color = newtype, 
+             fill = newtype)) +
+  geom_vline(xintercept = 0, 
+             linetype = 1,
+             size = 0.2) +
+  scale_color_manual(values = group.colors) +
+  geom_point() + 
+  geom_errorbarh(aes(xmin = meanElasticity - ci,
+                     xmax = meanElasticity + ci),
+                height = 0.3)
+
+# Highlight rects for functional forms
+ym <- 0.25
+al <- 0.1
+r_bdlgs_per_stem <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 1-ym, ymax = 2+ym, fill = "black", alpha = al)
+#constant parameters goes here, but no rectangle necessary
+r_pods <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 5-ym, ymax = 9+ym, fill = "black", alpha = al)
+r_surv <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 10-ym, ymax = 14+ym, fill = "black", alpha = al)
+r_flowering <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 15-ym, ymax = 18+ym, fill = "black", alpha = al)
+r_seedlings <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 19-ym, ymax = 20+ym, fill = "black", alpha = al)
+r_budlings <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 21-ym, ymax = 22+ym, fill = "black", alpha = al)
+r_herbivory <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 23-ym, ymax = 25+ym, fill = "black", alpha = al)
+r_lma <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 26-ym, ymax = 27+ym, fill = "black", alpha = al)
+r_card <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 28-ym, ymax = 29+ym, fill = "black", alpha = al)
+
+# Functional form labels
+xc <- -0.31
+sz <- 2.5
+t_bdlgs_per_stem <- annotate("text", x = xc, y = 1.5, label = "Clonal Reproduction", size = sz)
+t_seeds_per_pod <- annotate("text", x = xc, y = 3, label = "Seedling Recruitment", size = sz)
+t_seed_succ <- annotate("text", x = xc, y = 4, label = "Seeds per Pod", size = sz)
+t_pods <- annotate("text", x = xc, y = 7, label = "Pods", size = sz)
+t_surv <- annotate("text", x = xc, y = 12, label = "Survival", size = sz)
+t_flowering <- annotate("text", x = xc, y = 16.5, label = "Flowering", size = sz)
+t_seedlings <- annotate("text", x = xc, y = 19.5, label = "Seedling Recruit Height", size = sz)
+t_budlings <- annotate("text", x = xc, y = 21.5, label = "Sprout Recruit Height", size = sz)
+t_herbivory <- annotate("text", x = xc, y = 24, label = "Herbivory", size = sz)
+t_lma <- annotate("text", x = xc, y = 26.5, label = "LMA", size = sz)
+t_card <- annotate("text", x = xc, y = 28.5, label = "Cardelonides", size = sz)
+
+# Throw those puppies in...
+elastiplot <- elastiplot +
+  t_seed_succ +
+  t_seeds_per_pod +
+  t_surv +
+  r_surv +
+  r_lma +
+  t_lma +
+  r_card +
+  t_card +
+  r_seedlings +
+  t_seedlings +
+  r_pods +
+  t_pods +
+  r_flowering +
+  t_flowering +
+  r_herbivory +
+  t_herbivory +
+  r_budlings +
+  t_budlings +
+  r_bdlgs_per_stem +
+  t_bdlgs_per_stem
+
+# Labels and such
+elastiplot <- elastiplot + 
+  scale_y_discrete(labels = rev(fancypantslabels)) +
+  xlab("Parameter elasticity") +
+  ylab("       Vital Rates                         Distributions") +
+  geom_hline(aes(color = 'black'), yintercept = 18.5) +
+  theme_bw() +
+  labs(color = "Parameter\nType",
+       fill = "Parameter\nType") + 
+  theme(axis.text.y=element_text(hjust = 0, margin = unit(c(0.3,0.3,0.3,0.3), 'cm')),
+        axis.text.x=element_text(margin = unit(c(0.3,0.3,0.3,0.3), 'cm')),
+        axis.ticks.length=unit(-0.15, "cm"),
+        legend.background = element_rect(fill="lightgrey",
+                                         size=0.1,
+                                         linetype="solid"),
+        legend.key.size = unit(0.18, "in"),
+        legend.position = c(0.89, 0.245))
+
+elastiplot
+#saved as 4 x 5.9 inches
+```
+
+##Paneled Version
+###Prep the distribution plot data
+```{r}
+dist.plot.data = plotdata %>% filter(type %in% c('Herbivory', 'Cardenolides', 'LMA', 'Seedlings', 'Sprouts')) %>% filter(! (type == 'Seedlings' & newtype == 'Constants'))
+
+# Specify order of parameters in plot
+newlabelorder <- c("Cardenolides-mean", 
+                   "Cardenolides-sd",
+                   "LMA-mean", 
+                   "LMA-sd",
+                   "Herbivory-pmunch", 
+                   "Herbivory-mean", 
+                   "Herbivory-sd",
+                   "Sprouts-mean", 
+                   "Sprouts-sd",
+                   "Seedlings-mean", 
+                   "Seedlings-sd")
+
+# Corresponding mathematical symbols to above parameters
+fancypantslabels <- rev(newlabelorder)
+
+fancypantslabels[1] <- TeX('$\\mu$')
+fancypantslabels[2] <- TeX('$\\sigma$')
+fancypantslabels[3] <- TeX('$\\mu$')
+fancypantslabels[4] <- TeX('$\\sigma$')
+fancypantslabels[5] <- TeX('$p_{\\omega}$')
+fancypantslabels[6] <- TeX('$\\mu$')
+fancypantslabels[7] <- TeX('$\\sigma$')
+fancypantslabels[8] <- TeX('$\\mu$')
+fancypantslabels[9] <- TeX('$\\sigma$')
+fancypantslabels[10] <- TeX('$\\mu$')
+fancypantslabels[11] <- TeX('$\\sigma$')
+
+# Legend ordering
+newtypeorder <- c("Cardenolides", "LMA", "Herbivory", "Size", "Constants")
+
+# Colors
+group.colors <- c("#E76BF3", "#00BF7D", "#F8766D", "#00B0F6", "grey45")
+
+# Individual panel Point types
+#dist.plot.data = dist.plot.data %>% mutate(pointtype = ifelse(name == 'mean', 'mu', ifelse(name == 'sd', 'sigma', 'p')))
+```
+
+###Render distribution plot
+```{r}
+dist.plot <- dist.plot.data %>% 
+  mutate(label = factor(label, levels = rev(newlabelorder))) %>%
+  mutate(newtype = factor(newtype, levels = newtypeorder)) %>%
+  
+  ggplot(aes(x = meanElasticity,
+             y = label,
+             color = newtype, 
+             fill = newtype)) +
+  geom_vline(xintercept = 0, 
+             linetype = 1,
+             size = 0.2) +
+  scale_color_manual(values = group.colors) +
+  geom_point() + #insert aes(shape = pointtype) to make different shapes
+  geom_errorbarh(aes(xmin = meanElasticity - ci,
+                     xmax = meanElasticity + ci),
+                height = 0.3)
+
+# Highlight rects for functional forms
+ym <- 0.25
+al <- 0.1
+r_seedlings <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 1-ym, ymax = 2+ym, fill = "black", alpha = al)
+r_budlings <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 3-ym, ymax = 4+ym, fill = "black", alpha = al)
+r_herbivory <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 5-ym, ymax = 7+ym, fill = "black", alpha = al)
+r_lma <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 8-ym, ymax = 9+ym, fill = "black", alpha = al)
+r_card <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 10-ym, ymax = 11+ym, fill = "black", alpha = al)
+
+# Functional form labels
+xc <- -0.3
+sz <- 2.5
+t_seedlings <- annotate("text", x = xc, y = 1.5, label = "Seedling Recruit Height", size = sz)
+t_budlings <- annotate("text", x = xc, y = 3.5, label = "Sprout Recruit Height", size = sz)
+t_herbivory <- annotate("text", x = xc, y = 6, label = "Herbivory", size = sz)
+t_lma <- annotate("text", x = xc, y = 8.5, label = "LMA", size = sz)
+t_card <- annotate("text", x = xc, y = 10.5, label = "Cardelonides", size = sz)
+
+# Throw those puppies in...
+dist.plot <- dist.plot +
+  r_seedlings +
+  t_seedlings +
+  r_budlings +
+  t_budlings +
+  r_herbivory +
+  t_herbivory +
+  r_lma +
+  t_lma +
+  r_card +
+  t_card
+
+# Labels and such
+dist.plot <- dist.plot + 
+  scale_y_discrete(labels = rev(fancypantslabels)) +
+  scale_x_continuous(limits = c(-0.525, 0.525)) +
+  xlab("Elasticity") +
+  ylab("Parameter") +
+  theme_bw() +
+  ggtitle('a) Distribution Parameters', ) +
+  labs(color = "Parameter\nType",
+       fill = "Parameter\nType") + 
+  theme(axis.text.y=element_text(hjust = 0, margin = unit(c(0.3,0.3,0.3,0.3), 'cm')),
+        axis.text.x=element_text(margin = unit(c(0.3,0.3,0.3,0.3), 'cm')),
+        axis.ticks.length=unit(-0.15, "cm"),
+        legend.background = element_rect(fill="lightgrey",
+                                         size=0.1,
+                                         linetype="solid"),
+        legend.key.size = unit(0.18, "in"),
+        legend.position = c(0.89, 0.2)) +
+  theme(legend.position = 'none')
+
+dist.plot
+```
+
+###Prep vital rate plot data
+```{r}
+vr.plot.data = plotdata %>% filter(! type %in% c('Herbivory', 'Cardenolides', 'LMA', 'Sprouts')) %>%
+                            filter(! (type == 'Seedlings' & newtype == 'Size'))
+
+# Specify order of parameters in plot
+newlabelorder <- c("Flowering-(Intercept)", 
+                   "Flowering-h_apical", 
+                   "Flowering-herb_avg", 
+                   "Flowering-Cardenolides", 
+                   "Survival-(Intercept)",
+                   "Survival-h_apical",
+                   "Survival-herb_avg",
+                   "Survival-Cardenolides",
+                   "Survival-LMA",
+                   "Pods-(Intercept)", 
+                   "Pods-h_apical", 
+                   "Pods-herb_avg",
+                   "Pods-Cardenolides",
+                   "Pods-LMA",
+                   "Seedlings-seeds.per.pod",
+                   "Seedlings-seedling.emergence",
+                   "Clonal-(Intercept)", 
+                   "Clonal-Cardenolides")
+
+# Corresponding mathematical symbols to above parameters
+fancypantslabels <- rev(newlabelorder)
+
+fancypantslabels[1] <- TeX('$\\alpha$')
+fancypantslabels[2] <- TeX('$\\beta_{z_{h}}$')
+fancypantslabels[3] <- TeX('$\\beta_{z_{\\omega}}$')
+fancypantslabels[4] <- TeX('$\\beta_{z_{c}}$')
+fancypantslabels[5] <- TeX('$\\alpha$')
+fancypantslabels[6] <- TeX('$\\beta_{z_{h}}$')
+fancypantslabels[7] <- TeX('$\\beta_{z_{\\omega}}$')
+fancypantslabels[8] <- TeX('$\\beta_{z_{c}}$')
+fancypantslabels[9] <- TeX('$\\beta_{z_{\\l}}$')
+fancypantslabels[10] <- TeX('$\\alpha$')
+fancypantslabels[11] <- TeX('$\\beta_{z_{h}}$')
+fancypantslabels[12] <- TeX('$\\beta_{z_{\\omega}}$')
+fancypantslabels[13] <- TeX('$\\beta_{z_{c}}$')
+fancypantslabels[14] <- TeX('$\\beta_{z_{l}}$')
+fancypantslabels[15] <- TeX('$\\alpha$')
+fancypantslabels[16] <- TeX('$\\alpha$')
+fancypantslabels[17] <- TeX('$\\alpha$')
+fancypantslabels[18] <- TeX('$\\beta_{z_{c}}$')
+
+# Legend ordering
+newtypeorder <- c("Cardenolides", "LMA", "Herbivory", "Size", "Constants")
+
+# Colors
+group.colors <- c("#E76BF3", "#00BF7D", "#F8766D", "#00B0F6", 'grey45')
+
+# Individual panel Point types
+#vr.plot.data = vr.plot.data %>% mutate(pointtype = ifelse(newtype == 'Constants', 'alpha', 'beta'))
+```
+
+###Render vital rate plot
+```{r}
+vr.plot <- vr.plot.data %>% 
+  mutate(label = factor(label, levels = rev(newlabelorder))) %>%
+  mutate(newtype = factor(newtype, levels = newtypeorder)) %>%
+  
+  ggplot(aes(x = meanElasticity,
+             y = label,
+             color = newtype, 
+             fill = newtype)) +
+  geom_vline(xintercept = 0, 
+             linetype = 1,
+             size = 0.2) +
+  scale_color_manual(values = group.colors) +
+  geom_point() + # insert aes(shape = pointtype) to make different shapes
+  geom_errorbarh(aes(xmin = meanElasticity - ci,
+                     xmax = meanElasticity + ci),
+                height = 0.3)
+
+# Highlight rects for functional forms
+ym <- 0.25
+al <- 0.1
+r_bdlgs_per_stem <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 1-ym, ymax = 2+ym, fill = "black", alpha = al)
+#constant parameters goes here, but no rectangle necessary
+r_seed_succ <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 3-ym, ymax = 3+ym, fill = "black", alpha = al)
+r_seeds_per_pod <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 4-ym, ymax = 4+ym, fill = "black", alpha = al)
+r_pods <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 5-ym, ymax = 9+ym, fill = "black", alpha = al)
+r_surv <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 10-ym, ymax = 14+ym, fill = "black", alpha = al)
+r_flowering <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 15-ym, ymax = 18+ym, fill = "black", alpha = al)
+
+# Functional form labels
+xc <- -0.3
+sz <- 2.5
+t_bdlgs_per_stem <- annotate("text", x = xc, y = 1.5, label = "Clonal Reproduction", size = sz)
+t_seeds_per_pod <- annotate("text", x = xc, y = 3, label = "Seedling Recruitment", size = sz)
+t_seed_succ <- annotate("text", x = xc, y = 4, label = "Seeds per Pod", size = sz)
+t_pods <- annotate("text", x = xc, y = 7, label = "Pods", size = sz)
+t_surv <- annotate("text", x = xc, y = 12, label = "Survival", size = sz)
+t_flowering <- annotate("text", x = xc, y = 16.5, label = "Flowering", size = sz)
+
+# Throw those puppies in...
+vr.plot <- vr.plot +
+  r_pods +
+  t_pods +
+  t_surv +
+  r_surv +
+  r_flowering +
+  t_flowering +
+  t_seed_succ +
+  t_seeds_per_pod +
+  r_seed_succ +
+  r_seeds_per_pod +
+  r_bdlgs_per_stem +
+  t_bdlgs_per_stem
+
+# Labels and such
+vr.plot <- vr.plot + 
+  scale_y_discrete(labels = rev(fancypantslabels)) +
+  scale_x_continuous(limits = c(-0.525, 0.525)) +
+  xlab("Elasticity") +
+  ylab("Parameter") +
+  theme_bw() +
+  ggtitle('b) Vital Rate Parameters') +
+  labs(color = "Parameter\nType",
+       fill = "Parameter\nType") + 
+  theme(axis.text.y=element_text(hjust = 0, margin = unit(c(0.3,0.3,0.3,0.3), 'cm')),
+        axis.text.x=element_text(margin = unit(c(0.3,0.3,0.3,0.3), 'cm')),
+        axis.ticks.length=unit(-0.15, "cm"),
+        legend.background = element_rect(fill="lightgrey",
+                                         size=0.1,
+                                         linetype="solid"),
+        legend.key.size = unit(0.18, "in"),
+        legend.position = c(0.89, 0.245))
+
+vr.plot
+```
+
+### Put panels together
+Put 'em all together with gridExtra!
+```{r}
+#issues with outputting the right dimensions and legend scaling... did this in inkscape instead
+
+grid.arrange(dist.plot, vr.plot, nrow=2) #visualize
+
+g = arrangeGrob(dist.plot, vr.plot, nrow=2) #generates g
+```
+

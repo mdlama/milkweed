@@ -1,0 +1,41 @@
+---
+title: "Bootstrap"
+author: "Soren Struckman"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+# Initialization
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(milkweed)
+library(dplyr)
+
+'%<>%' <- magrittr::'%<>%'
+mwCache <- '../../data/mwCache'
+```
+
+# Analysis
+## Bootstrap Lambda
+```{r, echo=FALSE}
+ipm = mwIPM(list(compute = T, saveresults = FALSE))
+
+runs = 50
+lambdas = c()
+for(i in 1:runs) {
+    tmp = ipm %>% bootIPM() %>% analyzeGrowthRate()
+    lambdas <- c(lambdas, tmp)
+}
+
+save(lambdas, file=file.path("/Users/slstruckman_admin/traits/data/mwCache", 'lambdas_storage.RData'))
+```
+
+##Mean and CI
+```{r}
+lamb = lambdas
+results = data.frame(lambda = lamb) %>% summarize(n = n(),
+                                                  mean_lamb = mean(lambda),
+                                                  se = sd(lambda)/sqrt(n),
+                                                  ci = qt(0.975, n-1)*se)
+```
+

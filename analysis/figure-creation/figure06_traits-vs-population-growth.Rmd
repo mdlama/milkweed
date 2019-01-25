@@ -1,0 +1,10 @@
+---
+title: "Figure 6: Traits vs Population Growth"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: true
+---
+
+# Initialization
+

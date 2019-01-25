@@ -1,0 +1,154 @@
+---
+title: "Figure 3: Scaled Beta Coefficient Comparison"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: true
+---
+
+#Initialization
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(milkweed)
+library(dplyr)
+library(ggplot2)
+library(magrittr)
+library(gridExtra)
+```
+
+#Data & Regressions
+
+```{r}
+metadata <- full.data
+metadata$year <- factor(metadata$year)
+metadata$transect <- factor(metadata$transect)
+
+metadata = cbind(data.frame(X = rep(NA, nrow(metadata))), metadata) #switch on if indeces are not matching when creating scaled dataframes later on, arises from the occasional addition or removal of the X dummy variable column.
+```
+
+##Flowering
+```{r}
+#raw data
+flower.data = metadata %>% filter(!is.na(fec.flower),
+                                  !is.na(h_apical),
+                                  !is.na(herb_avg),
+                                  !is.na(Cardenolides))
+#scaled data
+flower.ds = cbind(flower.data[,1:5], scale(flower.data[,6:8]), flower.data[,9:12], flower.data[,13:15], scale(flower.data[,16:26]))
+
+#vital rate regression with scaled data
+scale.f = glm(fec.flower ~ h_apical + herb_avg + Cardenolides, data = flower.ds, family = binomial(link = 'logit'))
+```
+
+##Survival
+```{r}
+#raw data
+surv.data = metadata %>% filter(!is.na(surv),
+                                  !is.na(h_apical),
+                                  !is.na(herb_avg),
+                                  !is.na(Cardenolides),
+                                  !is.na(LMA),
+                                  fec.flower == 1)
+#scaled data
+surv.ds = cbind(surv.data[,1:5], scale(surv.data[,6:8]), surv.data[,9:12], surv.data[,13:15], scale(surv.data[,16:26]))
+
+#vital rate regression with scaled data
+scale.s = glm(surv ~ h_apical + herb_avg + Cardenolides + LMA, data = surv.ds, family = binomial(link = 'logit'))
+```
+
+##Pods
+```{r}
+pods.data = metadata %>% filter(!is.na(N_pods),
+                                  !is.na(h_apical),
+                                  !is.na(herb_avg),
+                                  !is.na(Cardenolides),
+                                  !is.na(LMA))
+#scaled data
+pods.ds = cbind(pods.data[,1:5], scale(pods.data[,6:8]), pods.data[,9:12], pods.data[,13:15], scale(pods.data[,16:26]))
+
+#vital rate regression with scaled data
+scale.p = glm(N_pods ~ h_apical + herb_avg + Cardenolides + LMA, data = pods.ds, family = poisson(link='log'))
+```
+
+##Clonal
+```{r}
+#raw data
+clonal.data = bud.data %>% filter(!is.na(buds_per_stem),
+                                       !is.na(herb_mean),
+                                       !is.na(Card_mean))
+#scaled data
+clonal.ds = data.frame(buds_per_stem = scale(clonal.data$buds_per_stem), Card_mean = scale(clonal.data$Card_mean))
+
+#vital rate regression with scaled data
+scale.c = lm(log(buds_per_stem) ~ Card_mean, data=clonal.ds) #throws a NaN warning, but seems harmless
+```
+
+#Comparing Scaled Coefficients
+
+##Assembling data
+```{r}
+ssbetas = data.frame(c(scale.f$coefficients[2:4], 0), scale.p$coefficients[2:5], scale.s$coefficients[2:5])
+sbetas = as.data.frame(cbind(t(t(c('Flowering', 'Pods', 'Survival'))), t(ssbetas)))
+colnames(sbetas)[1] = 'Vital Rate'
+colnames(sbetas)[5] = 'LMA'
+rownames(sbetas) = 1:3
+sbetas$h_apical = as.numeric(as.character((sbetas$h_apical)))
+sbetas$herb_avg = as.numeric(as.character((sbetas$herb_avg)))
+sbetas$Cardenolides = as.numeric(as.character((sbetas$Cardenolides)))
+sbetas$LMA = as.numeric(as.character((sbetas$LMA)))
+sbetas$`Vital Rate` = as.character((sbetas$`Vital Rate`))
+sbetas[4,] = c('Clonal Reproduction', 0, 0, scale.c$coefficients[2], 0)  ## hardcoded to only show cardenolides, since that is the only cofficient in our model (sans intercept)
+
+sbetas = sbetas[,2:5]
+sbetas = t(sbetas)
+sbetas = c(sbetas)
+sbetas = cbind(data.frame(scaled_beta = as.numeric(as.character(sbetas))), data.frame(Vital = c(rep('Flowering', 4), rep('Pods', 4), rep('Survival', 4), rep('Clonal Reproduction', 4))))
+sbetas$Vital = factor(sbetas$Vital, levels(sbetas$Vital)[c(2,4,3,1)])
+sbetas$var = rep(c('Height', 'Herbivory', 'Cardenolides', 'LMA'),4)
+sbetas = mutate(sbetas, sign = ifelse(scaled_beta >= 0, 'Positive', 'Negative'))
+
+sbetas$se = c(summary(scale.f)$coefficients[2:4, 2], NA, summary(scale.p)$coefficients[2:5, 2], summary(scale.s)$coefficients[2:5, 2], NA, NA, summary(scale.c)$coefficients[2,2], NA)
+```
+
+##Plotting
+```{r}
+#adding panel letters
+dat_text <- data.frame(label = c("a) Flowering", "b) Survival", "c) Pod Production", "d) Clonal Reproduction"),
+                       Vital = c('Flowering', 'Survival', 'Pods', 'Clonal Reproduction'))
+
+#switches order of panels
+sbetas$Vital = factor(sbetas$Vital, levels = c('Flowering', 'Pods', 'Survival', 'Clonal Reproduction'), ordered = T) 
+dat_text <- data.frame(label = c("a) Flowering", "b) Pod Production", "c) Survival", "d) Clonal Reproduction"),
+                       Vital = c('Flowering', 'Pods', 'Survival', 'Clonal Reproduction'))
+
+bars = ggplot(sbetas, aes(y=scaled_beta, x=var)) + 
+  geom_bar(stat="identity", fill='grey50') +
+  #facet_wrap(~Vital) + 
+  facet_grid(rows=vars(Vital), margins = FALSE) +
+  labs(x='Variable', y='Scaled Beta Coefficient') +
+  geom_text(size = 2.9,
+            fontface='bold',
+            data = dat_text,
+            mapping = aes(x = 0.5, y = 2.9, label = label),
+            vjust=0.5,
+            hjust=0) +
+  geom_hline(yintercept = 0, col = "grey") + 
+  geom_errorbar(aes(ymin = scaled_beta - se, ymax = scaled_beta + se), width = 0.2) +
+  theme_bw() + 
+  theme(axis.text.y=element_text(size=12, margin = unit(c(0.5,0.5,0.5,0.5), 'cm')),
+        axis.text.x=element_text(size=11, angle=30, hjust=1, vjust=1,
+                                 margin = unit(c(0.25,0.25,0.25,0.25), 'cm')),
+        axis.title.y=element_text(size=16,face="bold"),
+        axis.title.x=element_text(size=16,face="bold",vjust=1),
+        axis.ticks.length=unit(-0.2, "cm"),
+        strip.background = element_blank(),
+        strip.text = element_blank())
+
+bars
+#throws missing value warning in geom_errorbar since the spaces with no column have no errorbar
+```
+
+##Saving
+```{r}
+#ggsave() #figure out good sizing and save as pdf
+```
+

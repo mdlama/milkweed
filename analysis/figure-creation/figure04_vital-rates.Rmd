@@ -1,0 +1,383 @@
+---
+title: "Figure 4: Vital Rate Visualization"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: true
+---
+
+#Initialization
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(milkweed)
+library(dplyr)
+library(ggplot2)
+library(magrittr)
+library(gridExtra)
+```
+
+#Vital Rate Visualizations
+```{r}
+metadata <- full.data
+metadata$year <- factor(metadata$year)
+metadata$transect <- factor(metadata$transect)
+
+#metadata = cbind(data.frame(X = rep(NA, nrow(metadata))), metadata) #switch on if indeces are not matching when creating scaled dataframes later on, arises from the occasional addition or removal of the X dummy variable column.
+```
+
+##Flowering
+###Generating Predicted Data
+```{r}
+flower.data = metadata %>% filter(!is.na(fec.flower),
+                                  !is.na(h_apical),
+                                  !is.na(herb_avg),
+                                  !is.na(Cardenolides))
+
+flower.mod = glm(fec.flower ~ h_apical + herb_avg + Cardenolides, data = flower.data, family = binomial(link = 'logit'))
+
+x = seq(0, 180, 1) #established by taking the range of the desired x variable and making it an even number to fit
+
+#predicting values given the model, using artificial 'categories' for visualization purposes
+
+min_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = min(metadata$herb_avg, na.rm = T), Cardenolides = min(metadata$Cardenolides, na.rm = T))
+fec.flower = predict(flower.mod, newdata = min_min_plot, type='response')
+min_min_plot %<>% cbind(fec.flower, data.frame(h_cat = rep('Low Herbivory', length(x)), c_cat = rep('Low Cardenolides', length(x))))
+min_mean_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = min(metadata$herb_avg, na.rm = T), Cardenolides = mean(metadata$Cardenolides, na.rm = T))
+fec.flower = predict(flower.mod, newdata = min_mean_plot, type='response')
+min_mean_plot %<>% cbind(fec.flower, data.frame(h_cat = rep('Low Herbivory', length(x)), c_cat = rep('Mean Cardenolides', length(x))))
+min_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = min(metadata$herb_avg, na.rm = T), Cardenolides = max(metadata$Cardenolides, na.rm = T))
+fec.flower = predict(flower.mod, newdata = min_max_plot, type='response')
+min_max_plot %<>% cbind(fec.flower, data.frame(h_cat = rep('Low Herbivory', length(x)), c_cat = rep('High Cardenolides', length(x))))
+
+mean_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = mean(metadata$herb_avg, na.rm = T), Cardenolides = min(metadata$Cardenolides, na.rm = T))
+fec.flower = predict(flower.mod, newdata = mean_min_plot, type='response')
+mean_min_plot %<>% cbind(fec.flower, data.frame(h_cat = rep('Mean Herbivory', length(x)), c_cat = rep('Low Cardenolides', length(x))))
+mean_mean_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = mean(metadata$herb_avg, na.rm = T), Cardenolides = mean(metadata$Cardenolides, na.rm = T))
+fec.flower = predict(flower.mod, newdata = mean_mean_plot, type='response')
+mean_mean_plot %<>% cbind(fec.flower, data.frame(h_cat = rep('Mean Herbivory', length(x)), c_cat = rep('Mean Cardenolides', length(x))))
+mean_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = mean(metadata$herb_avg, na.rm = T), Cardenolides = max(metadata$Cardenolides, na.rm = T))
+fec.flower = predict(flower.mod, newdata = mean_max_plot, type='response')
+mean_max_plot %<>% cbind(fec.flower, data.frame(h_cat = rep('Mean Herbivory', length(x)), c_cat = rep('High Cardenolides', length(x))))
+
+max_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = max(metadata$herb_avg, na.rm = T), Cardenolides = min(metadata$Cardenolides, na.rm = T))
+fec.flower = predict(flower.mod, newdata = max_min_plot, type='response')
+max_min_plot %<>% cbind(fec.flower, data.frame(h_cat = rep('High Herbivory', length(x)), c_cat = rep('Low Cardenolides', length(x))))
+max_mean_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = max(metadata$herb_avg, na.rm = T), Cardenolides = mean(metadata$Cardenolides, na.rm = T))
+fec.flower = predict(flower.mod, newdata = max_mean_plot, type='response')
+max_mean_plot %<>% cbind(fec.flower, data.frame(h_cat = rep('High Herbivory', length(x)), c_cat = rep('Mean Cardenolides', length(x))))
+max_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = max(metadata$herb_avg, na.rm = T), Cardenolides = max(metadata$Cardenolides, na.rm = T))
+fec.flower = predict(flower.mod, newdata = max_max_plot, type='response')
+max_max_plot %<>% cbind(fec.flower, data.frame(h_cat = rep('High Herbivory', length(x)), c_cat = rep('High Cardenolides', length(x))))
+
+#consolidating
+plot.data = rbind(min_min_plot, min_mean_plot, min_max_plot, 
+                  mean_min_plot, mean_mean_plot, mean_max_plot,
+                  max_min_plot, max_mean_plot, max_max_plot) %>% 
+            mutate(h_cat = as.factor(h_cat),
+                   c_cat = as.factor(c_cat))
+```
+
+###Plotting
+```{r}
+flower.mod.plot = ggplot(plot.data, aes(x = h_apical, y = fec.flower)) +
+  facet_grid(. ~ h_cat, switch = 'both') +
+  coord_cartesian(xlim = c(0, 150)) +
+  geom_point(data = flower.data, alpha= 0.25) +
+  geom_jitter(data = flower.data, alpha= 0.25, height = 0.1) +
+  geom_line(data = filter(plot.data, c_cat=='Low Cardenolides'), aes(x = h_apical, y = fec.flower, col='#D55E00'), size=1) + 
+  geom_line(data = filter(plot.data, c_cat=='Mean Cardenolides'), aes(x = h_apical, y = fec.flower, col='#7570b3'), size=1) +
+  geom_line(data = filter(plot.data, c_cat=='High Cardenolides'), aes(x = h_apical, y = fec.flower, col='#009E73'), size=1) +
+  scale_color_discrete(name = "Cardenolides", labels = c("High", "Mean", "Low")) +
+  labs(x='Height (cm)', y='Probability of \nFlowering') +
+  theme_bw() +
+  theme(#strip.background = element_blank(),
+        axis.text=element_text(size=12),
+        axis.title=element_text(size=20,face="bold"),
+        legend.background = element_rect(fill="lightgrey",
+                                                size=0.1,
+                                                linetype="solid"),
+               legend.key.size =  unit(0.2, "in"))
+
+flower.mod.plot
+```
+
+```{r}
+#ggsave('flowerplot.png', width = 6.5, height = 3, units = 'in', device = 'png')
+```
+
+##Survival
+###Generating Predicted Data
+```{r}
+surv.data = metadata %>% filter(!is.na(surv),
+                                  !is.na(h_apical),
+                                  !is.na(herb_avg),
+                                  !is.na(Cardenolides),
+                                  !is.na(LMA),
+                                  fec.flower == 1)
+
+surv.mod = glm(surv ~ h_apical + herb_avg + Cardenolides + LMA, data = surv.data, family = binomial(link = 'logit'))
+
+x = seq(0, 180, 1) #established by taking the range of the desired x variable and making it an even number to fit
+
+#predicting values given the model, using artificial 'categories' for visualization purposes
+
+min_min_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = min(metadata$herb_avg, na.rm = T), Cardenolides = min(metadata$Cardenolides, na.rm = T), LMA = min(metadata$LMA, na.rm = T))
+surv = predict(surv.mod, newdata = min_min_min_plot, type='response')
+min_min_min_plot %<>% cbind(surv, data.frame(h_cat = rep('Low Herbivory', length(x)), c_cat = rep('Low Cardenolides', length(x)), l_cat = rep('Low LMA', length(x))))
+min_min_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = min(metadata$herb_avg, na.rm = T), Cardenolides = min(metadata$Cardenolides, na.rm = T), LMA = max(metadata$LMA, na.rm = T))
+surv = predict(surv.mod, newdata = min_min_max_plot, type='response')
+min_min_max_plot %<>% cbind(surv, data.frame(h_cat = rep('Low Herbivory', length(x)), c_cat = rep('Low Cardenolides', length(x)), l_cat = rep('High LMA', length(x))))
+min_mean_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = min(metadata$herb_avg, na.rm = T), Cardenolides = mean(metadata$Cardenolides, na.rm = T), LMA = min(metadata$LMA, na.rm = T))
+surv = predict(surv.mod, newdata = min_mean_min_plot, type='response')
+min_mean_min_plot %<>% cbind(surv, data.frame(h_cat = rep('Low Herbivory', length(x)), c_cat = rep('Mean Cardenolides', length(x)), l_cat = rep('Low LMA', length(x))))
+min_mean_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = min(metadata$herb_avg, na.rm = T), Cardenolides = mean(metadata$Cardenolides, na.rm = T), LMA = max(metadata$LMA, na.rm = T))
+surv = predict(surv.mod, newdata = min_mean_max_plot, type='response')
+min_mean_max_plot %<>% cbind(surv, data.frame(h_cat = rep('Low Herbivory', length(x)), c_cat = rep('Mean Cardenolides', length(x)), l_cat = rep('High LMA', length(x))))
+min_max_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = min(metadata$herb_avg, na.rm = T), Cardenolides = max(metadata$Cardenolides, na.rm = T), LMA = min(metadata$LMA, na.rm = T))
+surv = predict(surv.mod, newdata = min_max_min_plot, type='response')
+min_max_min_plot %<>% cbind(surv, data.frame(h_cat = rep('Low Herbivory', length(x)), c_cat = rep('High Cardenolides', length(x)), l_cat = rep('Low LMA', length(x))))
+min_max_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = min(metadata$herb_avg, na.rm = T), Cardenolides = max(metadata$Cardenolides, na.rm = T), LMA = max(metadata$LMA, na.rm = T))
+surv = predict(surv.mod, newdata = min_max_max_plot, type='response')
+min_max_max_plot %<>% cbind(surv, data.frame(h_cat = rep('Low Herbivory', length(x)), c_cat = rep('High Cardenolides', length(x)), l_cat = rep('High LMA', length(x))))
+
+mean_min_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = mean(metadata$herb_avg, na.rm = T), Cardenolides = min(metadata$Cardenolides, na.rm = T), LMA = min(metadata$LMA, na.rm = T))
+surv = predict(surv.mod, newdata = mean_min_min_plot, type='response')
+mean_min_min_plot %<>% cbind(surv, data.frame(h_cat = rep('Mean Herbivory', length(x)), c_cat = rep('Low Cardenolides', length(x)), l_cat = rep('Low LMA', length(x))))
+mean_min_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = mean(metadata$herb_avg, na.rm = T), Cardenolides = min(metadata$Cardenolides, na.rm = T), LMA = max(metadata$LMA, na.rm = T))
+surv = predict(surv.mod, newdata = mean_min_max_plot, type='response')
+mean_min_max_plot %<>% cbind(surv, data.frame(h_cat = rep('Mean Herbivory', length(x)), c_cat = rep('Low Cardenolides', length(x)), l_cat = rep('High LMA', length(x))))
+mean_mean_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = mean(metadata$herb_avg, na.rm = T), Cardenolides = mean(metadata$Cardenolides, na.rm = T), LMA = min(metadata$LMA, na.rm = T))
+surv = predict(surv.mod, newdata = mean_mean_min_plot, type='response')
+mean_mean_min_plot %<>% cbind(surv, data.frame(h_cat = rep('Mean Herbivory', length(x)), c_cat = rep('Mean Cardenolides', length(x)), l_cat = rep('Low LMA', length(x))))
+mean_mean_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = mean(metadata$herb_avg, na.rm = T), Cardenolides = mean(metadata$Cardenolides, na.rm = T), LMA = max(metadata$LMA, na.rm = T))
+surv = predict(surv.mod, newdata = mean_mean_max_plot, type='response')
+mean_mean_max_plot %<>% cbind(surv, data.frame(h_cat = rep('Mean Herbivory', length(x)), c_cat = rep('Mean Cardenolides', length(x)), l_cat = rep('High LMA', length(x))))
+mean_max_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = mean(metadata$herb_avg, na.rm = T), Cardenolides = max(metadata$Cardenolides, na.rm = T), LMA = min(metadata$LMA, na.rm = T))
+surv = predict(surv.mod, newdata = mean_max_min_plot, type='response')
+mean_max_min_plot %<>% cbind(surv, data.frame(h_cat = rep('Mean Herbivory', length(x)), c_cat = rep('High Cardenolides', length(x)), l_cat = rep('Low LMA', length(x))))
+mean_max_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = mean(metadata$herb_avg, na.rm = T), Cardenolides = max(metadata$Cardenolides, na.rm = T), LMA = max(metadata$LMA, na.rm = T))
+surv = predict(surv.mod, newdata = mean_max_max_plot, type='response')
+mean_max_max_plot %<>% cbind(surv, data.frame(h_cat = rep('Mean Herbivory', length(x)), c_cat = rep('High Cardenolides', length(x)), l_cat = rep('High LMA', length(x))))
+
+max_min_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = max(metadata$herb_avg, na.rm = T), Cardenolides = min(metadata$Cardenolides, na.rm = T), LMA = min(metadata$LMA, na.rm = T))
+surv = predict(surv.mod, newdata = max_min_min_plot, type='response')
+max_min_min_plot %<>% cbind(surv, data.frame(h_cat = rep('High Herbivory', length(x)), c_cat = rep('Low Cardenolides', length(x)), l_cat = rep('Low LMA', length(x))))
+max_min_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = max(metadata$herb_avg, na.rm = T), Cardenolides = min(metadata$Cardenolides, na.rm = T), LMA = max(metadata$LMA, na.rm = T))
+surv = predict(surv.mod, newdata = max_min_max_plot, type='response')
+max_min_max_plot %<>% cbind(surv, data.frame(h_cat = rep('High Herbivory', length(x)), c_cat = rep('Low Cardenolides', length(x)), l_cat = rep('High LMA', length(x))))
+max_mean_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = max(metadata$herb_avg, na.rm = T), Cardenolides = mean(metadata$Cardenolides, na.rm = T), LMA = min(metadata$LMA, na.rm = T))
+surv = predict(surv.mod, newdata = max_mean_min_plot, type='response')
+max_mean_min_plot %<>% cbind(surv, data.frame(h_cat = rep('High Herbivory', length(x)), c_cat = rep('Mean Cardenolides', length(x)), l_cat = rep('Low LMA', length(x))))
+max_mean_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = max(metadata$herb_avg, na.rm = T), Cardenolides = mean(metadata$Cardenolides, na.rm = T), LMA = max(metadata$LMA, na.rm = T))
+surv = predict(surv.mod, newdata = max_mean_max_plot, type='response')
+max_mean_max_plot %<>% cbind(surv, data.frame(h_cat = rep('High Herbivory', length(x)), c_cat = rep('Mean Cardenolides', length(x)), l_cat = rep('High LMA', length(x))))
+max_max_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = max(metadata$herb_avg, na.rm = T), Cardenolides = max(metadata$Cardenolides, na.rm = T), LMA = min(metadata$LMA, na.rm = T))
+surv = predict(surv.mod, newdata = max_max_min_plot, type='response')
+max_max_min_plot %<>% cbind(surv, data.frame(h_cat = rep('High Herbivory', length(x)), c_cat = rep('High Cardenolides', length(x)), l_cat = rep('Low LMA', length(x))))
+max_max_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = max(metadata$herb_avg, na.rm = T), Cardenolides = max(metadata$Cardenolides, na.rm = T), LMA = max(metadata$LMA, na.rm = T))
+surv = predict(surv.mod, newdata = max_max_max_plot, type='response')
+max_max_max_plot %<>% cbind(surv, data.frame(h_cat = rep('High Herbivory', length(x)), c_cat = rep('High Cardenolides', length(x)), l_cat = rep('High LMA', length(x))))
+
+#consolidating
+plot.data = rbind(min_min_min_plot, min_min_max_plot, min_mean_min_plot, min_mean_max_plot, min_max_min_plot, min_max_max_plot,
+                  mean_min_min_plot, mean_min_max_plot, mean_mean_min_plot, mean_mean_max_plot, mean_max_min_plot, mean_max_max_plot,
+                  max_min_min_plot, max_min_max_plot, max_mean_min_plot, max_mean_max_plot, max_max_min_plot, max_max_max_plot) %>% 
+            mutate(h_cat = as.factor(h_cat),
+                   c_cat = as.factor(c_cat),
+                   l_cat = factor(l_cat, levels = c('High LMA', 'Low LMA')))
+```
+
+###Plotting
+```{r}
+surv.mod.plot = ggplot(plot.data, aes(x = h_apical, y = surv)) +
+  facet_grid(l_cat ~ h_cat, switch = 'both') +
+  coord_cartesian(xlim = c(0,150)) +
+  geom_point(data = surv.data, alpha= 0.25) +
+  geom_jitter(data = surv.data, alpha= 0.25, height = 0.1) +
+  geom_line(data = filter(plot.data, c_cat=='Low Cardenolides'), aes(x = h_apical, y = surv, col='#D55E00'), size=1) + 
+  geom_line(data = filter(plot.data, c_cat=='Mean Cardenolides'), aes(x = h_apical, y = surv, col='#7570b3'), size=1) +
+  geom_line(data = filter(plot.data, c_cat=='High Cardenolides'), aes(x = h_apical, y = surv, col='#009E73'), size=1) +
+  scale_color_discrete(name = "Cardenolides", labels = c("High", "Mean", "Low")) +
+  labs(x='Height (cm)', y='Probability of Survival') +
+  theme_bw() + 
+  theme(#strip.background = element_blank(),
+        axis.text=element_text(size=12),
+        axis.title=element_text(size=20,face="bold"),
+        legend.background = element_rect(fill="lightgrey",
+                                                size=0.1,
+                                                linetype="solid"),
+               legend.key.size =  unit(0.2, "in"))
+
+surv.mod.plot
+```
+
+```{r}
+#ggsave('survplot.png', width = 6.5, height = 5, units = 'in', device = 'png')
+```
+
+##Pods
+###Generating Predicted Data
+```{r}
+pods.data = metadata %>% filter(!is.na(N_pods),
+                                  !is.na(h_apical),
+                                  !is.na(herb_avg),
+                                  !is.na(Cardenolides),
+                                  !is.na(LMA))
+
+pods.mod = glm(N_pods ~ h_apical + herb_avg + Cardenolides + LMA, data = pods.data, family = poisson(link='log'))
+
+x = seq(0, 180, 1) #established by taking the range of the desired x variable and making it an even number to fit
+
+#predicting values given the model, using artificial 'categories' for visualization purposes
+
+min_min_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = min(metadata$herb_avg, na.rm = T), Cardenolides = min(metadata$Cardenolides, na.rm = T), LMA = min(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = min_min_min_plot, type='response')
+min_min_min_plot %<>% cbind(N_pods, data.frame(h_cat = rep('Low Herbivory', length(x)), c_cat = rep('Low Cardenolides', length(x)), l_cat = rep('Low LMA', length(x))))
+min_min_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = min(metadata$herb_avg, na.rm = T), Cardenolides = min(metadata$Cardenolides, na.rm = T), LMA = max(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = min_min_max_plot, type='response')
+min_min_max_plot %<>% cbind(N_pods, data.frame(h_cat = rep('Low Herbivory', length(x)), c_cat = rep('Low Cardenolides', length(x)), l_cat = rep('High LMA', length(x))))
+min_mean_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = min(metadata$herb_avg, na.rm = T), Cardenolides = mean(metadata$Cardenolides, na.rm = T), LMA = min(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = min_mean_min_plot, type='response')
+min_mean_min_plot %<>% cbind(N_pods, data.frame(h_cat = rep('Low Herbivory', length(x)), c_cat = rep('Mean Cardenolides', length(x)), l_cat = rep('Low LMA', length(x))))
+min_mean_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = min(metadata$herb_avg, na.rm = T), Cardenolides = mean(metadata$Cardenolides, na.rm = T), LMA = max(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = min_mean_max_plot, type='response')
+min_mean_max_plot %<>% cbind(N_pods, data.frame(h_cat = rep('Low Herbivory', length(x)), c_cat = rep('Mean Cardenolides', length(x)), l_cat = rep('High LMA', length(x))))
+min_max_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = min(metadata$herb_avg, na.rm = T), Cardenolides = max(metadata$Cardenolides, na.rm = T), LMA = min(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = min_max_min_plot, type='response')
+min_max_min_plot %<>% cbind(N_pods, data.frame(h_cat = rep('Low Herbivory', length(x)), c_cat = rep('High Cardenolides', length(x)), l_cat = rep('Low LMA', length(x))))
+min_max_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = min(metadata$herb_avg, na.rm = T), Cardenolides = max(metadata$Cardenolides, na.rm = T), LMA = max(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = min_max_max_plot, type='response')
+min_max_max_plot %<>% cbind(N_pods, data.frame(h_cat = rep('Low Herbivory', length(x)), c_cat = rep('High Cardenolides', length(x)), l_cat = rep('High LMA', length(x))))
+
+mean_min_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = mean(metadata$herb_avg, na.rm = T), Cardenolides = min(metadata$Cardenolides, na.rm = T), LMA = min(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = mean_min_min_plot, type='response')
+mean_min_min_plot %<>% cbind(N_pods, data.frame(h_cat = rep('Mean Herbivory', length(x)), c_cat = rep('Low Cardenolides', length(x)), l_cat = rep('Low LMA', length(x))))
+mean_min_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = mean(metadata$herb_avg, na.rm = T), Cardenolides = min(metadata$Cardenolides, na.rm = T), LMA = max(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = mean_min_max_plot, type='response')
+mean_min_max_plot %<>% cbind(N_pods, data.frame(h_cat = rep('Mean Herbivory', length(x)), c_cat = rep('Low Cardenolides', length(x)), l_cat = rep('High LMA', length(x))))
+mean_mean_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = mean(metadata$herb_avg, na.rm = T), Cardenolides = mean(metadata$Cardenolides, na.rm = T), LMA = min(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = mean_mean_min_plot, type='response')
+mean_mean_min_plot %<>% cbind(N_pods, data.frame(h_cat = rep('Mean Herbivory', length(x)), c_cat = rep('Mean Cardenolides', length(x)), l_cat = rep('Low LMA', length(x))))
+mean_mean_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = mean(metadata$herb_avg, na.rm = T), Cardenolides = mean(metadata$Cardenolides, na.rm = T), LMA = max(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = mean_mean_max_plot, type='response')
+mean_mean_max_plot %<>% cbind(N_pods, data.frame(h_cat = rep('Mean Herbivory', length(x)), c_cat = rep('Mean Cardenolides', length(x)), l_cat = rep('High LMA', length(x))))
+mean_max_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = mean(metadata$herb_avg, na.rm = T), Cardenolides = max(metadata$Cardenolides, na.rm = T), LMA = min(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = mean_max_min_plot, type='response')
+mean_max_min_plot %<>% cbind(N_pods, data.frame(h_cat = rep('Mean Herbivory', length(x)), c_cat = rep('High Cardenolides', length(x)), l_cat = rep('Low LMA', length(x))))
+mean_max_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = mean(metadata$herb_avg, na.rm = T), Cardenolides = max(metadata$Cardenolides, na.rm = T), LMA = max(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = mean_max_max_plot, type='response')
+mean_max_max_plot %<>% cbind(N_pods, data.frame(h_cat = rep('Mean Herbivory', length(x)), c_cat = rep('High Cardenolides', length(x)), l_cat = rep('High LMA', length(x))))
+
+max_min_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = max(metadata$herb_avg, na.rm = T), Cardenolides = min(metadata$Cardenolides, na.rm = T), LMA = min(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = max_min_min_plot, type='response')
+max_min_min_plot %<>% cbind(N_pods, data.frame(h_cat = rep('High Herbivory', length(x)), c_cat = rep('Low Cardenolides', length(x)), l_cat = rep('Low LMA', length(x))))
+max_min_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = max(metadata$herb_avg, na.rm = T), Cardenolides = min(metadata$Cardenolides, na.rm = T), LMA = max(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = max_min_max_plot, type='response')
+max_min_max_plot %<>% cbind(N_pods, data.frame(h_cat = rep('High Herbivory', length(x)), c_cat = rep('Low Cardenolides', length(x)), l_cat = rep('High LMA', length(x))))
+max_mean_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = max(metadata$herb_avg, na.rm = T), Cardenolides = mean(metadata$Cardenolides, na.rm = T), LMA = min(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = max_mean_min_plot, type='response')
+max_mean_min_plot %<>% cbind(N_pods, data.frame(h_cat = rep('High Herbivory', length(x)), c_cat = rep('Mean Cardenolides', length(x)), l_cat = rep('Low LMA', length(x))))
+max_mean_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = max(metadata$herb_avg, na.rm = T), Cardenolides = mean(metadata$Cardenolides, na.rm = T), LMA = max(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = max_mean_max_plot, type='response')
+max_mean_max_plot %<>% cbind(N_pods, data.frame(h_cat = rep('High Herbivory', length(x)), c_cat = rep('Mean Cardenolides', length(x)), l_cat = rep('High LMA', length(x))))
+max_max_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = max(metadata$herb_avg, na.rm = T), Cardenolides = max(metadata$Cardenolides, na.rm = T), LMA = min(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = max_max_min_plot, type='response')
+max_max_min_plot %<>% cbind(N_pods, data.frame(h_cat = rep('High Herbivory', length(x)), c_cat = rep('High Cardenolides', length(x)), l_cat = rep('Low LMA', length(x))))
+max_max_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = max(metadata$herb_avg, na.rm = T), Cardenolides = max(metadata$Cardenolides, na.rm = T), LMA = max(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = max_max_max_plot, type='response')
+max_max_max_plot %<>% cbind(N_pods, data.frame(h_cat = rep('High Herbivory', length(x)), c_cat = rep('High Cardenolides', length(x)), l_cat = rep('High LMA', length(x))))
+
+#consolidating
+plot.data = rbind(min_min_min_plot, min_min_max_plot, min_mean_min_plot, min_mean_max_plot, min_max_min_plot, min_max_max_plot,
+                  mean_min_min_plot, mean_min_max_plot, mean_mean_min_plot, mean_mean_max_plot, mean_max_min_plot, mean_max_max_plot,
+                  max_min_min_plot, max_min_max_plot, max_mean_min_plot, max_mean_max_plot, max_max_min_plot, max_max_max_plot) %>% 
+            mutate(h_cat = as.factor(h_cat),
+                   c_cat = as.factor(c_cat),
+                   l_cat = factor(l_cat, levels = c('High LMA', 'Low LMA')))
+```
+
+###Plotting
+```{r}
+pods.mod.plot = ggplot(plot.data, aes(x = h_apical, y = N_pods)) +
+  facet_grid(l_cat ~ h_cat, switch = 'both') +
+  coord_cartesian(xlim = c(0,150), ylim = c(0, 7)) +
+  geom_point(data = pods.data, alpha= 0.25) +
+  geom_line(data = filter(plot.data, c_cat=='Low Cardenolides'), aes(x = h_apical, y = N_pods, col='#D55E00'), size=1) + 
+  geom_line(data = filter(plot.data, c_cat=='Mean Cardenolides'), aes(x = h_apical, y = N_pods, col='#7570b3'), size=1) +
+  geom_line(data = filter(plot.data, c_cat=='High Cardenolides'), aes(x = h_apical, y = N_pods, col='#009E73'), size=1) +
+  scale_color_discrete(name = "Cardenolides", labels = c("High", "Mean", "Low")) +
+  labs(x='Height (cm)', y='# Seed Pods Produced') +
+  theme_bw() + 
+  theme(#strip.background = element_blank(),
+        axis.text=element_text(size=12),
+        axis.title=element_text(size=20,face="bold"),
+        legend.background = element_rect(fill="lightgrey",
+                                                size=0.1,
+                                                linetype="solid"),
+               legend.key.size =  unit(0.2, "in"))
+
+pods.mod.plot
+```
+
+```{r}
+#ggsave('podsplot.png', width = 6.5, height = 5, units = 'in', device = 'png')
+```
+
+##Clonal
+###Generating Predicted Data
+```{r}
+buds = filter(bud.data, !is.na(buds_per_stem), !is.na(herb_mean), !is.na(Card_mean), !is.na(LMA_mean))
+
+fit <- lm(log(buds_per_stem) ~ Card_mean, data=buds) 
+
+plotdata <- data.frame(Cardenolides = fit$model$Card_mean, 
+                       buds_per_stem = exp(fit$model$`log(buds_per_stem)`),
+                       transect = as.factor(buds$transect))
+
+p <- plotdata %>% ggplot(aes(x = Cardenolides, 
+                             y = buds_per_stem)) + 
+                  geom_point(alpha = 0.75)
+
+xpts <- seq(from=0, to=3, length.out = 1000)
+ypts <- predict(fit, 
+                new = data.frame(Card_mean = xpts), 
+                level=0.95,
+                interval="confidence",
+                se.fit=TRUE)
+plotdata <- data.frame(Cardenolides = xpts, 
+                       buds_per_stem = exp(ypts$fit[,"fit"]),
+                       lwr = exp(ypts$fit[,"lwr"]),
+                       upr = exp(ypts$fit[,"upr"]),
+                       transect = NA)
+```
+
+###Plotting
+```{r}
+p <- p + geom_line(data = plotdata, 
+                   color = "blue", 
+                   linetype = "solid") +
+         geom_ribbon(data = plotdata, 
+                     aes(ymin=lwr, 
+                         ymax=upr), 
+                     alpha = 0.2)
+         
+p <- p + theme_bw() +
+         xlab("Cardenolides") +
+         ylab("Per capita clonal reproduction\n (sprouts/stem)") +
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=20,face="bold"))
+
+p
+```
+
+```{r}
+#ggsave('budsimple.png', width = 6.5, height = 5, units = 'in', device = 'png')
+```
+
+
+
+
+#Composite Plot for Figure 4
+```{r}
+
+```
+
