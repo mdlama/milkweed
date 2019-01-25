@@ -39,10 +39,10 @@ if (compute) {
                          ipm$analysis$parameters)
   }
   
-  save(results, file=file.path(mwCache,"figure06.rda"))
+  save(results, file=file.path(mwCache,"figure05.rda"))
 } else 
   if (local) {
-    load(file.path(mwCache,"figure06.rda"))
+    load(file.path(mwCache,"figure05.rda"))
   } else {
     results <- figure06.data
   }
