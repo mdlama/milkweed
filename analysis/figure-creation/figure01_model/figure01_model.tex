@@ -21,12 +21,10 @@
 \begin{framed}
 
 \begin{center}
-\includegraphics[width=5.5in]{life-cycle-diagram.pdf}
 
 \begin{align*}
-n_{t+1}(z_{h}^{\prime\prime}) = \ & \underbrace{\rho_{B}(z_{h}^{\prime\prime})\int\int N_{\mathrm{buds/stem}}(z_{\omega})\rho_{\omega}(z_{\omega})n_{t}(z_{h})\, dz_{h}dz_{\omega}}_\text{Clonal pathway} \ + \\
-  & \underbrace{p_{\mathrm{r}}\rho_{S}(z_{h}^{\prime\prime})N_{\mathrm{seeds/pod}}\int\int N_{\mathrm{pods}}\left(z_{h}^{\prime},z_{\omega}\right)n_{t+\tau}(z_{h}^{\prime},z_{\omega}) \,dz_{h}^{\prime}dz_{\omega}}_\text{Sexual pathway} \\
-n_{t+\tau}(z_{h}^{\prime},z_{\omega}) = \ & \int p_{\mathrm{s}} G(z_{h}^{\prime}\, | \, z_{h},z_{\omega})p_{\mathrm{f}}(z_{h},z_{\omega})\rho_{\omega}(z_{\omega})n_{t}(z_{h})\, dz_{h}
+n_{t+1}(z_{h}^{\prime}) = \ & \underbrace{p_{\mathrm{r}}\rho_{S}(z_{h}^{\prime})N_{\mathrm{seeds/pod}}\int\int\int\int N_{\mathrm{pods}}(\cdot)p_{\mathrm{s}}(\cdot)p_{\mathrm{f}}(\cdot)\rho_{\omega}(z_{\omega})\rho_{c}(z_{c})\rho_{l}(z_{l})n_{t}(z_{h}) \,dz_{h}dz_{\omega}dz_{c}dz_{l}}_\text{Sexual pathway} \ + \\
+& \underbrace{\rho_{B}(z_{h}^{\prime})\int\int N_{\mathrm{sprouts/stem}}(z_{c})\rho_{c}(z_{c})n_{t}(z_{h})\, dz_{h}dz_{c}}_\text{Clonal pathway}
 \end{align*}
 
 \end{center}
@@ -36,18 +34,20 @@ n_{t+\tau}(z_{h}^{\prime},z_{\omega}) = \ & \int p_{\mathrm{s}} G(z_{h}^{\prime}
 \centering
 \begin{tabular}{ |l|l|c| }
 \hline
-\rowcolor{mygray} 
-Terms & Description & Functional form \\ \hline
-$p_{\mathrm{s}}$ & Probability of ramet survival & $logit^{-1}(\alpha + u_{\alpha\iota} + u_{z_{\omega}\iota})$ \\
-$G(z_{h}^{\prime}\, | \, z_{h},z_{\omega})$ & Growth & $\begin{array}{ll}\alpha \ + & \!\!\!\beta_{z_{h}} + \beta_{z_{\omega}} + \beta_{z_{h}:z_{\omega}} + \\ & \!\!\!u_{\alpha\iota} + u_{z_{h}\iota} + u_{z_{\omega}\iota} + N(0,\sigma^2)\end{array}$ \\
-$p_{\mathrm{f}}(z_{h},z_{\omega})$ & Probability of flowering & $logit^{-1}(\alpha + \beta_{z_{h}} + \beta_{z_{\omega}} + \beta_{z_{h}:z_{\omega}} + u_{\alpha\iota})$ \\ 
-$N_{\mathrm{pods}}\left(z_{h}^{\prime},z_{\omega}\right)$ & Number of pods & $exp(\alpha + \beta_{z_{h}} + \beta_{z_{\omega}} + u_{\alpha\iota} + u_{z_{h}\iota} + u_{z_{\omega}\iota})$ \\ 
+\rowcolor{mygray}
+Terms & Description & Functional Form \\ \hline
+$p_{\mathrm{f}}(z_{h},z_{\omega},z_{c})$ & Probability of flowering & $logit^{-1}(\alpha + \beta_{z_{h}} + \beta_{z_{\omega}} + \beta_{z_{c}})$ \\
+$p_{\mathrm{s}}(z_{h},z_{\omega},z_{c},z_{l})$ & Probability of ramet survival & $logit^{-1}(\alpha + \beta_{z_{h}} + \beta_{z_{\omega}} + \beta_{z_{c}} + \beta_{z_{l}})$ \\
+$N_{\mathrm{pods}}(z_{h},z_{\omega},z_{c},z_{l})$ & Number of seed pods & $exp(\alpha + \beta_{z_{h}} + \beta_{z_{\omega}} + \beta_{z_{c}} + \beta_{z_{l}})$ \\
 $N_{\mathrm{seeds/pod}}$ & Number of seeds per pod & $\alpha$ \\
-$N_{\mathrm{buds/stem}}(z_{\omega})$ & Number of buds per stem & $exp(\alpha + \beta_{z_{\omega}})$ \\ 
-$p_{\mathrm{r}}$ & Probability of seed recruitment & $\alpha$ \\
+$p_{\mathrm{r}}$ & Probability of seedling recruitment & $\alpha$ \\
+$\rho_{S}\left(z_{h}^{\prime}\right)$ & Distribution of seedling height & $N(\mu, \sigma^2)$ \\
+$N_{\mathrm{sprouts/stem}}(z_{c})$ & Number of clonal sprouts per stem & $exp(\alpha + \beta_{z_{c}})$ \\
+                                   & (per capita clonal reproduction) & \\
+$\rho_{B}\left(z_{h}^{\prime}\right)$ & Distribution of clonal sprout height & $N(\mu, \sigma^2)$ \\
 $\rho_{\omega}(z_{\omega})$ & Herbivory distribution & $(1-p_{\omega})I(z_{\omega}) + p_{\omega}\ln N(\mu, \sigma^2)$ \\
-$\rho_{S}(z_{h}^{\prime\prime})$ & Seed recruit distribution & $\ln N(\mu, \sigma^2)$ \\
-$\rho_{B}(z_{h}^{\prime\prime})$ & Bud recruit distribution & $N(\mu, \sigma^2)$ \\
+$\rho_{c}(z_{c})$ & Cardenolide distribution & $N(\mu, \sigma^2)$ \\
+$\rho_{l}(z_{l})$ & LMA distribution & $N(\mu, \sigma^2)$ \\
 \hline
 \end{tabular}
 
