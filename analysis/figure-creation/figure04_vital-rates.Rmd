@@ -333,7 +333,7 @@ plotdata <- data.frame(Cardenolides = fit$model$Card_mean,
                        buds_per_stem = exp(fit$model$`log(buds_per_stem)`),
                        transect = as.factor(buds$transect))
 
-p <- plotdata %>% ggplot(aes(x = Cardenolides, 
+d.plot <- plotdata %>% ggplot(aes(x = Cardenolides, 
                              y = buds_per_stem)) + 
                   geom_point(alpha = 0.75)
 
@@ -352,21 +352,20 @@ plotdata <- data.frame(Cardenolides = xpts,
 
 ###Plotting
 ```{r}
-p <- p + geom_line(data = plotdata, 
-                   color = "blue", 
+d.plot <- d.plot + geom_line(data = plotdata, 
+                   col='blue', 
                    linetype = "solid") +
          geom_ribbon(data = plotdata, 
                      aes(ymin=lwr, 
                          ymax=upr), 
-                     alpha = 0.2)
-         
-p <- p + theme_bw() +
+                     alpha = 0.2) +
+  theme_bw() +
          xlab("Cardenolides") +
          ylab("Per capita clonal reproduction\n (sprouts/stem)") +
   theme(axis.text=element_text(size=12),
         axis.title=element_text(size=20,face="bold"))
 
-p
+d.plot
 ```
 
 ```{r}
@@ -377,7 +376,220 @@ p
 
 
 #Composite Plot for Figure 4
-```{r}
 
+##Panel A/B
+###Generating Data
+```{r}
+#uses pods model from above
+
+x = seq(0, 180, 1) #established by taking the range of the desired x variable and making it an even number to fit
+
+#predicting values given the model, using artificial 'categories' for visualization purposes
+#panel A
+min_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = min(metadata$herb_avg, na.rm = T), Cardenolides = min(metadata$Cardenolides, na.rm = T), LMA = mean(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = min_min_plot, type='response')
+min_min_plot %<>% cbind(N_pods, data.frame(h_cat = rep('No Herbivory', length(x)), c_cat = rep('Low Cardenolides', length(x)), l_cat = rep('Mean LMA', length(x))))
+min_mean_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = min(metadata$herb_avg, na.rm = T), Cardenolides = mean(metadata$Cardenolides, na.rm = T), LMA = mean(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = min_mean_plot, type='response')
+min_mean_plot %<>% cbind(N_pods, data.frame(h_cat = rep('No Herbivory', length(x)), c_cat = rep('Mean Cardenolides', length(x)), l_cat = rep('Mean LMA', length(x))))
+min_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = min(metadata$herb_avg, na.rm = T), Cardenolides = max(metadata$Cardenolides, na.rm = T), LMA = mean(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = min_max_plot, type='response')
+min_max_plot %<>% cbind(N_pods, data.frame(h_cat = rep('No Herbivory', length(x)), c_cat = rep('High Cardenolides', length(x)), l_cat = rep('Mean LMA', length(x))))
+
+#panel B
+max_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = max(metadata$herb_avg, na.rm = T), Cardenolides = min(metadata$Cardenolides, na.rm = T), LMA = mean(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = max_min_plot, type='response')
+max_min_plot %<>% cbind(N_pods, data.frame(h_cat = rep('High Herbivory', length(x)), c_cat = rep('Low Cardenolides', length(x)), l_cat = rep('Mean LMA', length(x))))
+max_mean_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = max(metadata$herb_avg, na.rm = T), Cardenolides = mean(metadata$Cardenolides, na.rm = T), LMA = mean(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = max_mean_plot, type='response')
+max_mean_plot %<>% cbind(N_pods, data.frame(h_cat = rep('High Herbivory', length(x)), c_cat = rep('Mean Cardenolides', length(x)), l_cat = rep('Mean LMA', length(x))))
+max_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = max(metadata$herb_avg, na.rm = T), Cardenolides = max(metadata$Cardenolides, na.rm = T), LMA = mean(metadata$LMA, na.rm = T))
+N_pods = predict(pods.mod, newdata = max_max_plot, type='response')
+max_max_plot %<>% cbind(N_pods, data.frame(h_cat = rep('High Herbivory', length(x)), c_cat = rep('High Cardenolides', length(x)), l_cat = rep('Mean LMA', length(x))))
+
+
+#consolidating
+a.data = rbind(min_min_plot, min_mean_plot, min_max_plot) %>% 
+            mutate(h_cat = as.factor(h_cat),
+                   c_cat = as.factor(c_cat),
+                   l_cat = factor(l_cat))
+
+b.data = rbind(max_min_plot, max_mean_plot, max_max_plot) %>% 
+            mutate(h_cat = as.factor(h_cat),
+                   c_cat = as.factor(c_cat),
+                   l_cat = factor(l_cat))
+```
+
+### Rendering Plots
+```{r}
+a.plot = ggplot(a.data, aes(x = h_apical, y = N_pods)) +
+  coord_cartesian(xlim = c(0,150), ylim = c(0, 7)) +
+  geom_point(data = pods.data, alpha= 0.25) +
+  geom_line(data = filter(a.data, c_cat=='Low Cardenolides'), aes(x = h_apical, y = N_pods, col='#D55E00'), size=1) + 
+  geom_line(data = filter(a.data, c_cat=='Mean Cardenolides'), aes(x = h_apical, y = N_pods, col='#7570b3'), size=1) +
+  geom_line(data = filter(a.data, c_cat=='High Cardenolides'), aes(x = h_apical, y = N_pods, col='#009E73'), size=1) +
+  scale_color_discrete(name = "Cardenolides", labels = c("High", "Mean", "Low")) +
+  ggtitle('a) No Herbivory, Average LMA') +
+  labs(x='Height (cm)', y='# Seed Pods Produced') +
+  theme_bw() + 
+  theme(plot.title = element_text(size = 16, face = "bold"), 
+        axis.text.y=element_text(size = 12, hjust = 0, margin = unit(c(0.3,0.3,0.3,0.3), 'cm')),
+        axis.text.x=element_text(size = 12, margin = unit(c(0.3,0.3,0.3,0.3), 'cm')),
+        axis.title=element_text(size=14,face="bold"),
+        axis.ticks.length=unit(-0.15, "cm"),
+        legend.background = element_rect(fill="lightgrey",
+                                         size=0.1,
+                                         linetype="solid"),
+        legend.key.size = unit(0.18, "in"),
+        legend.position = c(0.89, 0.24)) +
+  theme(legend.position = 'none')
+
+a.plot
+```
+
+```{r}
+b.plot = ggplot(b.data, aes(x = h_apical, y = N_pods)) +
+  coord_cartesian(xlim = c(0,150), ylim = c(0, 7)) +
+  geom_point(data = pods.data, alpha= 0.25) +
+  geom_line(data = filter(b.data, c_cat=='Low Cardenolides'), aes(x = h_apical, y = N_pods, col='#D55E00'), size=1) + 
+  geom_line(data = filter(b.data, c_cat=='Mean Cardenolides'), aes(x = h_apical, y = N_pods, col='#7570b3'), size=1) +
+  geom_line(data = filter(b.data, c_cat=='High Cardenolides'), aes(x = h_apical, y = N_pods, col='#009E73'), size=1) +
+  scale_color_discrete(name = "Cardenolides", labels = c("High", "Mean", "Low")) +
+  ggtitle('b) High Herbivory, Average LMA') +
+  labs(x='Height (cm)', y='# Seed Pods Produced') +
+  theme_bw() + 
+  theme(plot.title = element_text(size = 16, face = "bold"), 
+        axis.text.y=element_text(size = 12, hjust = 0, margin = unit(c(0.3,0.3,0.3,0.3), 'cm')),
+        axis.text.x=element_text(size = 12, margin = unit(c(0.3,0.3,0.3,0.3), 'cm')),
+        axis.title=element_text(size=14,face="bold"),
+        axis.ticks.length=unit(-0.15, "cm"),
+        legend.background = element_rect(fill="lightgrey",
+                                         size=0.1,
+                                         linetype="solid"),
+        legend.key.size = unit(0.18, "in"),
+        legend.position = c(0.89, 0.24)) +
+  theme(legend.position = 'none')
+
+b.plot
+```
+
+##Panel C
+###Generating Data
+```{r}
+#uses flower model from above
+
+mean_min_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = mean(metadata$herb_avg, na.rm = T), Cardenolides = min(metadata$Cardenolides, na.rm = T))
+fec.flower = predict(flower.mod, newdata = mean_min_plot, type='response')
+mean_min_plot %<>% cbind(fec.flower, data.frame(h_cat = rep('Mean Herbivory', length(x)), c_cat = rep('Low Cardenolides', length(x))))
+mean_mean_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = mean(metadata$herb_avg, na.rm = T), Cardenolides = mean(metadata$Cardenolides, na.rm = T))
+fec.flower = predict(flower.mod, newdata = mean_mean_plot, type='response')
+mean_mean_plot %<>% cbind(fec.flower, data.frame(h_cat = rep('Mean Herbivory', length(x)), c_cat = rep('Mean Cardenolides', length(x))))
+mean_max_plot = data.frame(h_apical = seq(0, 180, 1), herb_avg = mean(metadata$herb_avg, na.rm = T), Cardenolides = max(metadata$Cardenolides, na.rm = T))
+fec.flower = predict(flower.mod, newdata = mean_max_plot, type='response')
+mean_max_plot %<>% cbind(fec.flower, data.frame(h_cat = rep('Mean Herbivory', length(x)), c_cat = rep('High Cardenolides', length(x))))
+
+#consolidating
+c.data = rbind(mean_min_plot, mean_mean_plot, mean_max_plot) %>% 
+            mutate(h_cat = as.factor(h_cat),
+                   c_cat = as.factor(c_cat))
+```
+
+###Rendering Plot
+```{r}
+c.plot = ggplot(c.data, aes(x = h_apical, y = fec.flower)) +
+  coord_cartesian(xlim = c(0, 150)) +
+  geom_point(data = flower.data, alpha= 0.25) +
+  geom_jitter(data = flower.data, alpha= 0.25, height = 0.1) +
+  geom_line(data = filter(c.data, c_cat=='Low Cardenolides'), aes(x = h_apical, y = fec.flower, col='#D55E00'), size=1) + 
+  geom_line(data = filter(c.data, c_cat=='Mean Cardenolides'), aes(x = h_apical, y = fec.flower, col='#7570b3'), size=1) +
+  geom_line(data = filter(c.data, c_cat=='High Cardenolides'), aes(x = h_apical, y = fec.flower, col='#009E73'), size=1) +
+  scale_color_discrete(name = "Cardenolides", labels = c("High", "Mean", "Low")) +
+  ggtitle('c) Average Herbivory') +
+  labs(x='Height (cm)', y='Probability of Flowering') +
+  theme_bw() +
+  theme(plot.title = element_text(size = 16, face = "bold"), 
+        axis.text.y=element_text(size = 12, hjust = 0, margin = unit(c(0.3,0.3,0.3,0.3), 'cm')),
+        axis.text.x=element_text(size = 12, margin = unit(c(0.3,0.3,0.3,0.3), 'cm')),
+        axis.title=element_text(size=14,face="bold"),
+        axis.ticks.length=unit(-0.15, "cm"),
+        legend.background = element_rect(fill="lightgrey",
+                                         size=0.1,
+                                         linetype="solid"),
+        legend.key.size = unit(0.18, "in"),
+        legend.position = c(0.89, 0.24)) +
+  theme(legend.position = 'none')
+
+c.plot
+```
+
+##Panel D
+###Plotting
+```{r}
+d.plot = d.plot + 
+  ggtitle('d)') +
+  theme_bw() +
+  theme(plot.title = element_text(size = 16, face = "bold"),
+        axis.text.y=element_text(size = 12, hjust = 0, margin = unit(c(0.3,0.3,0.3,0.3), 'cm')),
+        axis.text.x=element_text(size = 12, margin = unit(c(0.3,0.3,0.3,0.3), 'cm')),
+        axis.title=element_text(size=16,face="bold"),
+        axis.ticks.length=unit(-0.15, "cm"),
+        legend.background = element_rect(fill="lightgrey",
+                                         size=0.1,
+                                         linetype="solid"),
+        legend.key.size = unit(0.18, "in"),
+        legend.position = c(0.89, 0.24)) +
+  theme(legend.position = 'none')
+
+d.plot
+```
+
+##Merging Panels
+```{r}
+#using multiplot() function from: http://www.cookbook-r.com/Graphs/Multiple_graphs_on_one_page_(ggplot2)/
+
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+
+  numPlots = length(plots)
+
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                    ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+
+ if (numPlots==1) {
+    print(plots[[1]])
+
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+```
+
+```{r}
+multiplot(a.plot, c.plot, b.plot, d.plot, cols=2)
+```
+
+
+```{r}
+#since legends were scaling wrong, added the legends in post-processing with inkscape
 ```
 
