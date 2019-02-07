@@ -1,0 +1,120 @@
+---
+title: "PCA"
+author: "Soren Struckman"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+#Initialization
+```{r}
+library(milkweed)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(vegan)
+```
+
+#Data
+```{r}
+hist(trait.data$N, breaks = 15)
+hist(trait.data$C, breaks = 15)
+hist(trait.data$LMA, breaks = 15)
+hist(trait.data$ADF, breaks = 15)
+hist(trait.data$ADL, breaks = 15)
+hist(trait.data$Cellulose, breaks = 15)
+hist(trait.data$NDWI, breaks = 15)
+hist(trait.data$Chl_g_m2, breaks = 15)
+hist(trait.data$PRI, breaks = 15)
+hist(trait.data$Cardenolides, breaks = 15)
+```
+
+Everything actually looks fairly normal!
+
+Let's look at how they correlate to each other
+```{r}
+cor.full = cor(select(full.data, h_apical, herb_avg:Cardenolides), use='complete.obs')
+cor.full
+```
+
+#Principal Component Analysis
+So before we go any further with this, we should get a real look at the correlations and variance in the data to get a feel for which variables in our set are quantitatively the most important. We have judged which we think will be intuitively the most important, so now let's see if this matches up. First thing to do is some ordination using PCA to determine which axes through our data space are most important. Following from Numerical Ecology ed.2 by Borcard et al.
+
+```{r}
+#Not including herbivory or height in this as we are just concerned with how the traits are related to each other.
+pca.data = full.data %>% filter(!is.na(LMA), !is.na(Cardenolides)) %>% select(N, C, LMA, ADF, ADL, Cellulose, NDWI, Chl_g_m2, PRI, Cardenolides) #removing NAs that interfere with the pca and selecting only relevant data columns
+
+#scaling all the columns of the data, so that we can work with a correlation matrix rather than a covariance matrix and don't have to worry about the scale of the variables influencing their weights in the ordination
+pca.data = scale(pca.data)
+```
+
+Let's run the pca and look at some summary information.
+```{r}
+pca.traits = rda(pca.data)
+summary(pca.traits, scaling = 2)
+```
+
+Now let's apply and visualize some criteria for selecting 'important' axes.
+```{r}
+ev = pca.traits$CA$eig
+
+#apply Kaiser-Guttman criterion (only those axes whose eigenvalues are above the mean eigenvalue are considered important)
+ev[ev > mean(ev)]
+
+#apply Broken stick model (only those axes whose eigenvalue is larger than the corresponding random length of stick, p.122 Borcard et al 2011)
+n = length(ev)
+bsm = data.frame(j=seq(1:n), p=0)
+bsm$p[1] <- 1/n
+for (i in 2:n) {
+	bsm$p[i] = bsm$p[i-1] + (1/(n + 1 - i))
+}
+bsm$p = 100*bsm$p/n
+bsm
+
+# Plot eigenvalues and % of variance for each axis
+dev.new(title="PCA eigenvalues")
+par(mfrow=c(2,1))
+barplot(ev, main="Eigenvalues", col="bisque", las=2)
+abline(h=mean(ev), col="red")		# average eigenvalue
+legend("topright", "Average eigenvalue", lwd=1, col=2, bty="n")
+barplot(t(cbind(100*ev/sum(ev),bsm$p[n:1])), beside=TRUE, main="% variance", col=c("bisque",2), las=2)
+legend("topright", c("% eigenvalue", "Broken stick model"), pch=15, col=c("bisque",2), bty="n")
+```
+
+So it appears that our first 2 axes are most important by the Kaiser-Guttman Criterion, and the first 2 are important by the BSM. I believe the BSM to be more conservative, so we will keep the first 2 in mind. Let's look at a plot of the ordination.
+
+## Visualization
+```{r}
+#biplot.rda(pca.traits, main='PCA - Scaling 2') #using vegan's biplot.rda() function, which is missing for some reason, scaling 2 is optimal display for variables, the angles between descriptors in the plot reflect their correlations
+
+#using instead a function written by Borcard et al 2011 for doing just this task.
+source('cleanplot.pca.R') #cleanplot file included in source directory
+cleanplot.pca(pca.traits, scaling = 1, plot.sites = T, plot.spe = T, label.sites = F, label.spe = T)
+#including points for sites (plants), and arrowheads and labels on vectors, scaling 2 is default. Distances are meaningless.
+```
+
+```{r}
+#generates Fig. 2
+cleanplot.pca(pca.traits, plot.sites = T, plot.spe = T, label.sites = F, label.spe = T) 
+```
+
+So looks like PCA1 captures the tradeoff between defense (cardenolides) and growth/resproduciton (C, cellulose, fiber, lignin) and PCA2 captures photsynthetic information (N, PRI, Chl_g_m2). This is awesome!!
+
+## Tradeoffs
+Let's look further at this tradeoff between growth and defense.
+```{r}
+trade.off.data = mutate(full.data, h_diff = h_apical.next - h_apical)
+trade.off.1 = lm(Cellulose ~ Cardenolides, data=trade.off.data)
+summary(trade.off.1)
+trade.off.2 = lm(ADL ~ Cardenolides, data=trade.off.data)
+summary(trade.off.2)
+trade.off.3 = lm(ADF ~ Cardenolides, data=trade.off.data)
+summary(trade.off.3)
+trade.off.4 = lm(LMA ~ Cardenolides, data=trade.off.data)
+summary(trade.off.4)
+```
+
+So Cardenolides have a highly significant negative relationship with all the structural traits. Let's see if this holds up in differences in height.
+```{r}
+trade.diff = lm(h_diff ~ Cardenolides, data=trade.off.data)
+summary(trade.diff)
+```

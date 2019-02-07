@@ -8,8 +8,10 @@ output:
 ---
 
 ```{r}
+library(milkweed)
 library(dplyr)
 library(tidyr)
+library(ggplot2)
 library(AICcmodavg)
 ```
 
@@ -73,7 +75,7 @@ endPtsDat <- map.data %>% filter(grepl("end", tolower(plantID))) %>%
 
 
 THESE FUNCTIONS NEED TO BE DEBUGGED... HARD... OR REWRITTEN ENTIRELY
-Calculating budlings/stem for each transect by hand instead... although still using getTransectGeometry... WHICH IS STILL PLOTTING MAPPED DEAD PLANTS
+Calculating budlings/stem for each transect by hand instead... although still using getTransectGeometry (since the error is just in the plotting functionality... plotting mapped dead plants... but works otherwise)
 
 
 

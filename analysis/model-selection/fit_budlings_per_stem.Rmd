@@ -6,9 +6,15 @@ output:
     toc: true
 ---
 
+**NOTE: this code is deprecated in favor of that in "fit_clonal-transect-blocks.Rmd". We suspect this analysis was at the wrong spatial scale, therefore we broke our transects into 1 m^2 square plots along their length and followed a similar model selection process.
+
 Load data.
 ```{r}
-
+library(milkweed)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(AICcmodavg)
 ```
 
 Compute budlings per stem.
@@ -71,7 +77,6 @@ AICc(lin.model)
 AICc(cst.model)
 ```
 
-All three models are rather similar - in this case we will go with the exponential model, as it makes more biological sense (it won't go negative, although neither will a constant model!!!)
 ```{r}
 fit <- exp.model 
 

@@ -1,0 +1,45 @@
+---
+title: "Correlations"
+author: "Soren Struckman"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+#Initialization
+
+```{r}
+library(milkweed)
+library(dplyr)
+library(ggplot2)
+library(RColorBrewer)
+library(ggcorrplot)
+```
+
+#Matrices
+```{r}
+dat = select(full.data, h_apical, herb_avg:Cardenolides)
+colnames(dat) = c('Height', 'Herbivory', 'N', 'C', 'LMA', 'Fiber', 'Lignin', 'Cellulose', 'NDWI', 'Chlorophyll', 'PRI', 'Cardenolides')
+
+cor.full = cor(dat, use='complete.obs')
+cor.full
+```
+
+```{r}
+#calculates significance values
+p.mat = cor_pmat(dat)
+p.mat
+```
+
+#Visualization
+```{r}
+c = ggcorrplot(cor.full, 
+           hc.order = T, #uses heirarchical clustering for ordering
+           type = "lower",
+           show.diag=T,
+           lab = T, lab_size = 2.5,#correlation coefficient labels
+           outline.col = "white",
+           colors = c("#6D9EC1", "white", "#E46726"),
+           p.mat = p.mat, pch.cex = 2.5 #p.values
+           )
+```
+

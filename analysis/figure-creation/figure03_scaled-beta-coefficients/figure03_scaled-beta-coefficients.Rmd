@@ -96,7 +96,7 @@ sbetas$herb_avg = as.numeric(as.character((sbetas$herb_avg)))
 sbetas$Cardenolides = as.numeric(as.character((sbetas$Cardenolides)))
 sbetas$LMA = as.numeric(as.character((sbetas$LMA)))
 sbetas$`Vital Rate` = as.character((sbetas$`Vital Rate`))
-sbetas[4,] = c('Clonal Reproduction', 0, 0, scale.c$coefficients[2], 0)  ## hardcoded to only show cardenolides, since that is the only cofficient in our model (sans intercept)
+sbetas[4,] = c('Clonal Reproduction', 0, 0, scale.c$coefficients[2], 0)  ## hardcoded to only show cardenolides, since that is the only coefficient in our model (sans intercept)
 
 sbetas = sbetas[,2:5]
 sbetas = t(sbetas)
@@ -149,6 +149,6 @@ bars
 
 ##Saving
 ```{r}
-#ggsave() #figure out good sizing and save as pdf
+#ggsave('figure03.pdf', width = 82, height = 159, units = 'mm', device = 'pdf') #82 mm wide x 159 mm tall as pdf (moved labels in inkscape)
 ```
 

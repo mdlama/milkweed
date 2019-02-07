@@ -24,7 +24,7 @@ metadata$transect <- factor(metadata$transect)
 #metadata = cbind(data.frame(X = rep(NA, nrow(metadata))), metadata) #switch on if indeces are not matching when creating scaled dataframes later on, arises from the occasional addition or removal of the X dummy variable column.
 ```
 
-##Flowering
+##Flowering (Supplement 3)
 ###Generating Predicted Data
 ```{r}
 flower.data = metadata %>% filter(!is.na(fec.flower),
@@ -101,10 +101,10 @@ flower.mod.plot
 ```
 
 ```{r}
-#ggsave('flowerplot.png', width = 6.5, height = 3, units = 'in', device = 'png')
+#ggsave('flowerplot.pdf', width = 6.5, height = 3, units = 'in', device = 'pdf')
 ```
 
-##Survival
+##Survival (Supplement 2)
 ###Generating Predicted Data
 ```{r}
 surv.data = metadata %>% filter(!is.na(surv),
@@ -211,10 +211,10 @@ surv.mod.plot
 ```
 
 ```{r}
-#ggsave('survplot.png', width = 6.5, height = 5, units = 'in', device = 'png')
+#ggsave('survplot.pdf', width = 6.5, height = 5, units = 'in', device = 'pdf')
 ```
 
-##Pods
+##Pods (Supplement 4)
 ###Generating Predicted Data
 ```{r}
 pods.data = metadata %>% filter(!is.na(N_pods),
@@ -319,7 +319,7 @@ pods.mod.plot
 ```
 
 ```{r}
-#ggsave('podsplot.png', width = 6.5, height = 5, units = 'in', device = 'png')
+#ggsave('podsplot.pdf', width = 6.5, height = 5, units = 'in', device = 'pdf')
 ```
 
 ##Clonal
@@ -360,8 +360,8 @@ d.plot <- d.plot + geom_line(data = plotdata,
                          ymax=upr), 
                      alpha = 0.2) +
   theme_bw() +
-         xlab("Cardenolides") +
-         ylab("Per capita clonal reproduction\n (sprouts/stem)") +
+         xlab("Cardenolides        ") +
+         ylab("# Sprouts / Stem") +
   theme(axis.text=element_text(size=12),
         axis.title=element_text(size=20,face="bold"))
 
@@ -369,7 +369,7 @@ d.plot
 ```
 
 ```{r}
-#ggsave('budsimple.png', width = 6.5, height = 5, units = 'in', device = 'png')
+#ggsave('budsimple.pdf', width = 6.5, height = 5, units = 'in', device = 'pdf')
 ```
 
 
@@ -425,11 +425,11 @@ b.data = rbind(max_min_plot, max_mean_plot, max_max_plot) %>%
 a.plot = ggplot(a.data, aes(x = h_apical, y = N_pods)) +
   coord_cartesian(xlim = c(0,150), ylim = c(0, 7)) +
   geom_point(data = pods.data, alpha= 0.25) +
-  geom_line(data = filter(a.data, c_cat=='Low Cardenolides'), aes(x = h_apical, y = N_pods, col='#D55E00'), size=1) + 
-  geom_line(data = filter(a.data, c_cat=='Mean Cardenolides'), aes(x = h_apical, y = N_pods, col='#7570b3'), size=1) +
-  geom_line(data = filter(a.data, c_cat=='High Cardenolides'), aes(x = h_apical, y = N_pods, col='#009E73'), size=1) +
+  geom_line(data = filter(a.data, c_cat=='Low Cardenolides'), aes(x = h_apical, y = N_pods, col='#D55E00'), size=1, linetype='dotdash') + 
+  geom_line(data = filter(a.data, c_cat=='Mean Cardenolides'), aes(x = h_apical, y = N_pods, col='#7570b3'), size=1, linetype='longdash') +
+  geom_line(data = filter(a.data, c_cat=='High Cardenolides'), aes(x = h_apical, y = N_pods, col='#009E73'), size=1, linetype='solid') +
   scale_color_discrete(name = "Cardenolides", labels = c("High", "Mean", "Low")) +
-  ggtitle('a) No Herbivory, Average LMA') +
+  ggtitle('a) Pod Production, No Herbivory') +
   labs(x='Height (cm)', y='# Seed Pods Produced') +
   theme_bw() + 
   theme(plot.title = element_text(size = 16, face = "bold"), 
@@ -451,11 +451,11 @@ a.plot
 b.plot = ggplot(b.data, aes(x = h_apical, y = N_pods)) +
   coord_cartesian(xlim = c(0,150), ylim = c(0, 7)) +
   geom_point(data = pods.data, alpha= 0.25) +
-  geom_line(data = filter(b.data, c_cat=='Low Cardenolides'), aes(x = h_apical, y = N_pods, col='#D55E00'), size=1) + 
-  geom_line(data = filter(b.data, c_cat=='Mean Cardenolides'), aes(x = h_apical, y = N_pods, col='#7570b3'), size=1) +
-  geom_line(data = filter(b.data, c_cat=='High Cardenolides'), aes(x = h_apical, y = N_pods, col='#009E73'), size=1) +
+  geom_line(data = filter(b.data, c_cat=='Low Cardenolides'), aes(x = h_apical, y = N_pods, col='#D55E00'), size=1, linetype='dotdash') + 
+  geom_line(data = filter(b.data, c_cat=='Mean Cardenolides'), aes(x = h_apical, y = N_pods, col='#7570b3'), size=1, linetype='longdash') +
+  geom_line(data = filter(b.data, c_cat=='High Cardenolides'), aes(x = h_apical, y = N_pods, col='#009E73'), size=1, linetype='solid') +
   scale_color_discrete(name = "Cardenolides", labels = c("High", "Mean", "Low")) +
-  ggtitle('b) High Herbivory, Average LMA') +
+  ggtitle('b) Pod Production, High Herbivory') +
   labs(x='Height (cm)', y='# Seed Pods Produced') +
   theme_bw() + 
   theme(plot.title = element_text(size = 16, face = "bold"), 
@@ -500,11 +500,11 @@ c.plot = ggplot(c.data, aes(x = h_apical, y = fec.flower)) +
   coord_cartesian(xlim = c(0, 150)) +
   geom_point(data = flower.data, alpha= 0.25) +
   geom_jitter(data = flower.data, alpha= 0.25, height = 0.1) +
-  geom_line(data = filter(c.data, c_cat=='Low Cardenolides'), aes(x = h_apical, y = fec.flower, col='#D55E00'), size=1) + 
-  geom_line(data = filter(c.data, c_cat=='Mean Cardenolides'), aes(x = h_apical, y = fec.flower, col='#7570b3'), size=1) +
-  geom_line(data = filter(c.data, c_cat=='High Cardenolides'), aes(x = h_apical, y = fec.flower, col='#009E73'), size=1) +
+  geom_line(data = filter(c.data, c_cat=='Low Cardenolides'), aes(x = h_apical, y = fec.flower, col='#D55E00'), size=1, linetype='dotdash') + 
+  geom_line(data = filter(c.data, c_cat=='Mean Cardenolides'), aes(x = h_apical, y = fec.flower, col='#7570b3'), size=1, linetype='longdash') +
+  geom_line(data = filter(c.data, c_cat=='High Cardenolides'), aes(x = h_apical, y = fec.flower, col='#009E73'), size=1, linetype='solid') +
   scale_color_discrete(name = "Cardenolides", labels = c("High", "Mean", "Low")) +
-  ggtitle('c) Average Herbivory') +
+  ggtitle('c) Flowering, Average Herbivory') +
   labs(x='Height (cm)', y='Probability of Flowering') +
   theme_bw() +
   theme(plot.title = element_text(size = 16, face = "bold"), 
@@ -526,12 +526,12 @@ c.plot
 ###Plotting
 ```{r}
 d.plot = d.plot + 
-  ggtitle('d)') +
+  ggtitle('d) Per Capita Clonal Reproduction') +
   theme_bw() +
   theme(plot.title = element_text(size = 16, face = "bold"),
         axis.text.y=element_text(size = 12, hjust = 0, margin = unit(c(0.3,0.3,0.3,0.3), 'cm')),
         axis.text.x=element_text(size = 12, margin = unit(c(0.3,0.3,0.3,0.3), 'cm')),
-        axis.title=element_text(size=16,face="bold"),
+        axis.title=element_text(size=14,face="bold"),
         axis.ticks.length=unit(-0.15, "cm"),
         legend.background = element_rect(fill="lightgrey",
                                          size=0.1,
@@ -590,6 +590,9 @@ multiplot(a.plot, c.plot, b.plot, d.plot, cols=2)
 
 
 ```{r}
-#since legends were scaling wrong, added the legends in post-processing with inkscape
+#ggsave('figure04.pdf', width = 9, height = 9, units = 'in', device = 'pdf')
+
+#final size 110 x 110 mm (but saved as 9 in x 9 in and scaled to get text size right)
+#since legends were scaling wrong, added the legend (and mu label in d) in post-processing with inkscape
 ```
 

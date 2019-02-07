@@ -44,7 +44,7 @@ if (compute) {
   if (local) {
     load(file.path(mwCache,"figure05.rda"))
   } else {
-    results <- figure06.data
+    results <- figure05.data
   }
 ```
 
@@ -245,7 +245,7 @@ elastiplot
 ##Paneled Version
 ```{r}
 #universal point types
-shapes = c(15, 18, 6, 17, 19)
+shapes = c(15, 0, 6, 17, 19)
 names(shapes) = c('Mean', 'Variance', 'Constant', 'Intercept', 'Slope')
 ```
 
@@ -306,10 +306,11 @@ dist.plot <- dist.plot.data %>%
              linetype = 1,
              size = 0.2) +
   scale_color_manual(values = group.colors) +
-  geom_point() + 
+  geom_point(size = 3.4) + 
   geom_errorbarh(aes(xmin = meanElasticity - ci,
                      xmax = meanElasticity + ci),
-                height = 0.3)
+                height = 0.3,
+                size = 1.3)
 
 # Highlight rects for functional forms
 ym <- 0.25
@@ -322,7 +323,7 @@ r_card <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 10-ym, ymax = 11+ym, 
 
 # Functional form labels
 xc <- -0.3
-sz <- 2.5
+sz <- 4.2
 t_seedlings <- annotate("text", x = xc, y = 1.5, label = "Seedling Recruit Height", size = sz)
 t_budlings <- annotate("text", x = xc, y = 3.5, label = "Sprout Recruit Height", size = sz)
 t_herbivory <- annotate("text", x = xc, y = 6, label = "Herbivory", size = sz)
@@ -369,6 +370,10 @@ dist.plot <- dist.plot +
 dist.plot
 
 #110 mm wide x 56.9 mm tall
+```
+
+```{r}
+#ggsave('figure05a.pdf', width = 110, height = 53.9, units = 'mm', device = 'pdf')
 ```
 
 ###Prep vital rate plot data
@@ -443,10 +448,11 @@ vr.plot <- vr.plot.data %>%
              linetype = 1,
              size = 0.2) +
   scale_color_manual(values = group.colors) +
-  geom_point() + 
+  geom_point(size = 3.15) + 
   geom_errorbarh(aes(xmin = meanElasticity - ci,
                      xmax = meanElasticity + ci),
-                height = 0.3)
+                height = 0.3,
+                size = 1.3)
 
 # Highlight rects for functional forms
 ym <- 0.25
@@ -461,7 +467,7 @@ r_flowering <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 15-ym, ymax = 18
 
 # Functional form labels
 xc <- -0.3
-sz <- 2.5
+sz <- 4.2
 t_bdlgs_per_stem <- annotate("text", x = xc, y = 1.5, label = "Clonal Reproduction", size = sz)
 t_seeds_per_pod <- annotate("text", x = xc, y = 3, label = "Seedling Recruitment", size = sz)
 t_seed_succ <- annotate("text", x = xc, y = 4, label = "Seeds per Pod", size = sz)
@@ -513,6 +519,10 @@ vr.plot
 #110 mm wide x 93.1 mm tall
 ```
 
+```{r}
+#ggsave('figure05b.pdf', width = 110, height = 93.1, units = 'mm', device = 'pdf')
+```
+
 ### Put panels together
 ```{r}
 #using multiplot() function from: http://www.cookbook-r.com/Graphs/Multiple_graphs_on_one_page_(ggplot2)/
@@ -558,3 +568,8 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
 #visualizing only, postprocessing to add legends due to scaling issues and resizing
 multiplot(dist.plot, vr.plot, cols=1)
 ```
+
+```{r}
+#saved panels separately, to scale them so that the axes are equal (i.e. panel b is longer), then adding full legend... final dimension 110 mm wide x 150 mm tall
+```
+
