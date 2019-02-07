@@ -6,1031 +6,579 @@ output:
     toc: true
 ---
 
-Load necessary packages and data and perform initializations.
+#Initialization
 
-```{r, message=FALSE, warning=FALSE}
+```{r}
 library(milkweed)
 library(dplyr)
+library(tidyr)
 library(ggplot2)
-library(lme4)
 library(AICcmodavg)
-requirePackages("DHARMa")
-
-data("stemdata")
-metadata <- stemdata
-metadata$year <- factor(metadata$year)
-metadata$transect <- factor(metadata$transect)
-
-# https://stat.ethz.ch/pipermail/r-sig-mixed-models/2014q4/022870.html
-glmerCtrl <- glmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
-lmerCtrl <- lmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
+library(vegan)
 ```
 
-# Model Selection
-We will use the top-down approach for model selection discussed in Zuur et al 2009 (reccomended by Diggle et al 2002) starting with the full ("beyond optimal") model and refining the random effects first before moving on to the fixed effects.  
-
+# Exploratory Model Selection
+We want to know if including any of these traits (and/or herbivory) ever predicts the vital rates better than just height alone. ... first, N LMA ADL and cardenolides
 ## Flowering
-
 ```{r}
-metadata_usc <- metadata %>% filter(!is.na(h_apical),
-                                    !is.na(herb_avg),
-                                    !is.na(fec.flower))
-
-metadata_sc <- metadata_usc %>% mutate_at(.vars = vars(h_apical, herb_avg),
-                                          .funs = funs(as.numeric(scale(.)))) 
-
-# Get scaling parameters (really just mean and sd)
-h_apical_sc <- scale(metadata_usc$h_apical)
-herb_avg_sc <- scale(metadata_usc$herb_avg)
-
-metadata_sc %>% ggplot(aes(x = h_apical, 
-                           y = fec.flower, 
-                           color = year)) + 
-                geom_jitter(height = 0.1, 
-                            alpha = 0.3) +
-                facet_wrap(~ site)
+flower.data = full.data %>% filter(!is.na(h_apical), !is.na(fec.flower))
 ```
 
-### Random Effects
-Use nAGQ = 0 for quick approximations, but less exact form of parameter estimation.
+Let's make some plots to see what the data looks like.
 ```{r}
-flower.reg.mdl1 <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical*herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+f1 = ggplot(flower.data, aes(x = h_apical, y = fec.flower)) + 
+            geom_jitter(height = 0.1, alpha = 0.3, color = 'blue')
+
+f2 = ggplot(flower.data, aes(x = herb_avg, y = fec.flower)) + 
+            geom_jitter(height = 0.1, alpha = 0.3, color = 'blue')
+
+f3 = ggplot(flower.data, aes(x = N, y = fec.flower)) + 
+            geom_jitter(height = 0.1, alpha = 0.3, color = 'blue')
+
+f4 = ggplot(flower.data, aes(x = LMA, y = fec.flower)) + 
+            geom_jitter(height = 0.1, alpha = 0.3, color = 'blue')
+
+f5 = ggplot(flower.data, aes(x = ADL, y = fec.flower)) + 
+            geom_jitter(height = 0.1, alpha = 0.3, color = 'blue')
+
+f6 = ggplot(flower.data, aes(x = Cardenolides, y = fec.flower)) + 
+            geom_jitter(height = 0.1, alpha = 0.3, color = 'blue')
+
+flower.plots = grid.arrange(f1, f2, f3, f4, f5, f6)
 ```
 
-Let's try and simplify `site/transect` random effect first, but we'll keep `herb_avg` in as that is our main interest.
+Here's the model with height as the only predictor to compare against.
 ```{r}
-flower.reg.mdl2=glmer(fec.flower ~ h_apical*herb_avg + (herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-
-flower.reg.mdl3=glmer(fec.flower ~ h_apical*herb_avg + (1|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-
-aictab(list(flower.reg.mdl1, flower.reg.mdl2, flower.reg.mdl3), 
-       modnames = c("mdl1", "mdl2", "mdl3"))
+flower.null = glm(fec.flower ~ h_apical, data = flower.data, family = binomial())
 ```
 
-Models 2 and 3 are indistinguishable based on AIC, so we will move onto fixed effect selection keeping the more complicated random effect model, leading us to choose model 2. Let's move to `year` and compare all the different models.
+Here are the models that contain height and 1 other additional predictor. We want to see if any of these are a better fit than height alone.
 ```{r}
-flower.reg.mdl4=glmer(fec.flower ~ h_apical*herb_avg + (herb_avg|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-flower.reg.mdl5=glmer(fec.flower ~ h_apical*herb_avg + (herb_avg|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=0, family=binomial())
-flower.reg.mdl6=glmer(fec.flower ~ h_apical*herb_avg + (herb_avg|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-flower.reg.mdl7=glmer(fec.flower ~ h_apical*herb_avg + (herb_avg|site/transect) + (1|year), data=metadata_sc, nAGQ=0, family=binomial())
+flower.herb = glm(fec.flower ~ h_apical + herb_avg, data = flower.data, family = binomial())
+flower.N = glm(fec.flower ~ h_apical + N, data = flower.data, family = binomial())
+flower.LMA = glm(fec.flower ~ h_apical + LMA, data = flower.data, family = binomial())
+flower.ADL = glm(fec.flower ~ h_apical + ADL, data = flower.data, family = binomial())
+flower.Card = glm(fec.flower ~ h_apical + Cardenolides, data = flower.data, family = binomial())
 
-aictab(list(flower.reg.mdl2, flower.reg.mdl4, flower.reg.mdl5, flower.reg.mdl6, flower.reg.mdl7),
-       modnames = c("mdl2","mdl4","mdl5","mdl6","mdl7"))
-
-# AIC still indicates Models 2 easily
-
-# nAGQ=1 uses Laplace approximation rather than quick approximation of before, for better estimation in the winning model.
-flower.reg.winner=glmer(fec.flower ~ h_apical*herb_avg + (herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
-
-summary(flower.reg.winner)
+aictab(list(flower.null, flower.herb, flower.N, flower.LMA, flower.ADL, flower.Card), modnames = c('null', 'herb', 'N', 'LMA', 'ADL', 'Cardenolides'))
 ```
 
-### Fixed Effects
-Moving onto selection for fixed effects, first drop h_apical:herb_avg interaction term, since the p-value is the lowest non-stat. sig. then eliminate lowest term by term until only stat. sig. terms remain.
+It looks like all of them are a better fit than height alone (except N)! And Cardenolides is even better than herb_avg as an additional predictor. Let's try combining with herb_avg to see if that gives us a better combination, since we know herb is also a good predictor. 
 ```{r}
-flower.reg.mdl2a = glmer(fec.flower ~ h_apical + herb_avg + (herb_avg|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
-summary(flower.reg.mdl2a)
+flower.hN = glm(fec.flower ~ h_apical + herb_avg + N, data = flower.data, family = binomial())
+flower.hLMA = glm(fec.flower ~ h_apical + herb_avg + LMA, data = flower.data, family = binomial())
+flower.hADL = glm(fec.flower ~ h_apical + herb_avg + ADL, data = flower.data, family = binomial())
+flower.hCard = glm(fec.flower ~ h_apical + herb_avg + Cardenolides, data = flower.data, family = binomial())
 
-flower.reg.mdl2b = glmer(fec.flower ~ h_apical + herb_avg - 1 + (herb_avg|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
-summary(flower.reg.mdl2b)
+# We can also try this, since these we think these are the two most promising.
+flower.CardLMA = glm(fec.flower ~ h_apical + Cardenolides + LMA, data = flower.data, family = binomial())
 
-flower.reg.mdl2c = glmer(fec.flower ~ h_apical - 1 + (herb_avg|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
-summary(flower.reg.mdl2c)
-
-aictab(list(flower.reg.winner, flower.reg.mdl2a, flower.reg.mdl2b, flower.reg.mdl2c), 
-       modnames = c("winner", "mdl2a", "mdl2b", "mdl2c"))
+aictab(list(flower.herb, flower.hN, flower.hLMA, flower.hADL, flower.hCard, flower.Card, flower.LMA, flower.CardLMA), modnames = c('herb', 'N + herb', 'LMA + herb', 'ADL + herb', 'Cardenolides + herb', 'Cardenolides alone', 'LMA alone',  'Card + LMA'))
 ```
 
-Looks like Model 2c and 2b are indistinguishable based on AICc. In the event of ties in the fixed effects, we have decided to use the model that includes herbivory, since we are interested to see if it is a predictor. If it is only a weak predictor after all, we will see that in sensitivity analysis of the IPM. Let's check p-values and create class to verify that unscaled version is correct.
+Let's try adding in some interactions.
 ```{r}
-flower.reg.final <- flower.reg.mdl2b
-summary(flower.reg.final)
+flower.Card.full = glm(fec.flower ~ h_apical*Cardenolides, data = flower.data, family = binomial())
+flower.CardLMA.full = glm(fec.flower ~ h_apical*Cardenolides*LMA, data = flower.data, family = binomial())
+flower.hCard.full = glm(fec.flower ~ h_apical*Cardenolides*herb_avg, data = flower.data, family = binomial())
+
+aictab(list(flower.herb, flower.hCard, flower.Card, flower.CardLMA, flower.Card.full, flower.CardLMA.full, flower.hCard.full), modnames = c('herb', 'Cardenolides + herb', 'Cardenolides alone', 'Card + LMA', 'Cardenolides full', 'Card + LMA full', "Card + herb full"))
 ```
 
-### Model Validation and Diagnostics
-Now some diagnostics (aka model validation). Creating the standard residual plots. Interpretting these plots is questionable for a non-linear model fit, so we will also imploy non-linear diagnostics next.
+Let's see if some of these are correlated.
 ```{r}
-par(mfrow=c(2,2))
-plot(fitted(flower.reg.final), residuals(flower.reg.final, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
-plot(metadata_sc$h_apical, residuals(flower.reg.final, "deviance"), xlab="Apical height", ylab="Deviance residuals")
-plot(metadata_sc$herb_avg, residuals(flower.reg.final, "deviance"), xlab="Herbivory average", ylab="Deviance residuals")
-par(mfrow=c(1,1))
-```
+plot(Cardenolides ~ h_apical, data = flower.data)
+plot(LMA ~ h_apical, data = flower.data)
+plot(herb_avg ~ Cardenolides, data = flower.data)
 
-DHARMa package diagnostics for non-linear, hierarchical, mixed models. This simulates new data from the fitted model for the predictor variable combination of each observation. Then for each observation, calculates the empirical cumulative density function for the simulated data, which describes the expected spread for an observation at the respective point in predictor space, conditional on the fitted model. The residual is defined as the value of the empirical density function at the value of the observed data (DHARMa package vignette).
-```{r}
-flower.simulationOutput <- DHARMa::simulateResiduals(fittedModel = flower.reg.final, n=1000) #simulate data, n set to 1000 for high precision
-```
-
-```{r}
-# DHARMa diagnostic plot, then plots of residuals against the predictor variables independently, we want flat horizontal lines at 0.25, 0.5, and 0.75 in a perfect world.
-DHARMa::plotSimulatedResiduals(flower.simulationOutput)
-DHARMa::plotResiduals(metadata_sc$h_apical, flower.simulationOutput$scaledResiduals)
-DHARMa::plotResiduals(metadata_sc$herb_avg, flower.simulationOutput$scaledResiduals)
-```
-
-```{r}
-# tests to see if the residuals fit the expected distribution
-DHARMa::testUniformity(flower.simulationOutput)
-```
-Plots look great! Looks like the final model is a good fit. The Uniformity Test is probably failing since we have such a large sample size and it is not a particularly strong test. It does have a relatively large p-value compared to some other decent fits we've seen.
-
-### Visualizations
-
-Create model class
-```{r}
-scaled <- list(h_apical = h_apical_sc, herb_avg = herb_avg_sc)
-flower.fit <- mwMod(list(mdl = flower.reg.final, vars = c("h_apical", "herb_avg"), scaled = scaled))
-checkPars(flower.fit) # Check parameters
-```
-
-Scaled parameters across site:
-```{r}
-flower.fit$pars$scaled
-```
-
-Unscaled parameters across site:
-```{r}
-flower.fit$pars$unscaled
-```
-
-Let's plot full data.
-```{r}
-# Add points
-flower.plot <- metadata_usc %>% 
-  ggplot(aes(x = h_apical, y = fec.flower, color = site, size = herb_avg)) +
-  geom_jitter(width = 0, 
-              height = 0.05,
-              alpha = 0.4)
-
-# Create plot data for prediction curves
-plotdata <- metadata_usc %>% 
-  group_by(site) %>% 
-  summarize(mean_herb_avg = mean(herb_avg),
-            min_h_apical = min(h_apical),
-            max_h_apical = max(h_apical)) %>%
-  add_row(site = "Bertha",
-          mean_herb_avg = mean(metadata_usc$herb_avg, na.rm=T),
-          min_h_apical = min(metadata_usc$h_apical, na.rm=T),
-          max_h_apical = max(metadata_usc$h_apical, na.rm=T))
-
-# Create prediction curves
-N <- 100
-suppressWarnings( # Hiding the follow warnings: (1) Unequal factor levels: coercing to character and (2) binding character and factor vector, coercing into character vector
-  curves <- bind_rows(
-    lapply(as.vector(plotdata$site), function(site) {
-      i <- which(plotdata$site == site)
-      data.frame(
-        site = site,
-        h_apical = seq(plotdata$min_h_apical[i], plotdata$max_h_apical[i], length.out = N),
-        herb_avg = plotdata$mean_herb_avg[i],
-        fec.flower = predict(
-          flower.fit,
-          type = site,
-          newdata = data.frame(
-            h_apical = seq(plotdata$min_h_apical[i], plotdata$max_h_apical[i], length.out = N),
-            herb_avg = rep(plotdata$mean_herb_avg[i], N)
-          )
-        )
-      )
-    })
-  )
-)
-
-flower.plot + geom_line(data = curves)
-```
-
-
-```{r, eval=FALSE}
-par_usc <- as.data.frame(flower.fit$pars$unscaled)
-plot(NULL, axes=T, xlim=c(0,160), ylim=c(-0.1,1.1), xlab="", ylab="")
-xpts <- seq(min(metadata_usc$h_apical), max(metadata_usc$h_apical), length.out=100)
-for (i in 2:6) {
-  site <- row.names(par_usc[i,])
-  points(metadata_usc[metadata_usc$site == site,]$h_apical, jitter(metadata_usc[metadata_usc$site == site,]$fec.flower, factor=0.2), col=i, xlim=c(0,160))
-  meanha <- mean(metadata_usc[metadata_usc$site == site,]$log_herb_avg)
-  coeff <- par_usc[i,]
-  ypred <- with(coeff, 1/(1+exp(-1*(`(Intercept)` + `h_apical`*xpts + `log_herb_avg`*meanha + `h_apical:log_herb_avg`*xpts*meanha))))
-  lines(xpts, ypred, col = i)
-}
-meanha <- mean(metadata_usc$log_herb_avg)
-# ypts = 1/(1+exp(-1*(pars$unscaled['(Intercept)'] + pars$unscaled['h_apical']*xpts + pars$unscaled['log_herb_avg']*meanha + pars$unscaled['h_apical:log_herb_avg']*xpts*meanha)))
-ypts = 1/(1+exp(-1*(par_usc['Bertha','(Intercept)'] + par_usc['Bertha','h_apical']*xpts + par_usc['Bertha','log_herb_avg']*meanha + 
-lines(xpts, ypts, col="black", lwd=2, lty=2)
-legend("bottomright", sort(unique(as.character(metadata_usc$site))), col=1:5, pch=1)
-```
-
-Now site-specific models.
-```{r}
-xyplot(jitter(fec.flower, factor=0.2) ~ h_apical|site, data=metadata_usc, para=par_usc, metadata=metadata_usc, xpts=xpts, panel = function(x,y,metadata,para,xpts) {
-  panel.xyplot(x, y)
-  site <- row.names(para[packet.number(),])
-  meanha <- mean(metadata[metadata$site == site,]$log_herb_avg)
-  coeff <- para[packet.number(),]
-  ypred <- with(coeff, 1/(1+exp(-1*(`(Intercept)` + `h_apical`*xpts + `log_herb_avg`*meanha + `h_apical:log_herb_avg`*xpts*meanha))))
-  panel.lines(xpts, ypred, col = "red")
-})
+cor.test(flower.data$Cardenolides, flower.data$h_apical)
+cor.test(flower.data$LMA, flower.data$h_apical)
+cor.test(flower.data$Cardenolides, flower.data$herb_avg)
 ```
 
 ## Survival
-
 ```{r}
-metadata_usc <- metadata %>% filter(!is.na(h_apical),
-                                    !is.na(h_apical.next),
-                                    !is.na(herb_avg),
-                                    fec.flower == 1,
-                                    !is.na(surv)) %>%
-  mutate(log_herb_avg = log(0.01 + herb_avg))
-
-metadata_sc <- metadata_usc %>% mutate_each(funs(as.numeric(scale(.))), 
-                                            h_apical, 
-                                            log_herb_avg)
-
-# Get scaling parameters (really just mean and sd)
-h_apical_sc <- scale(metadata_usc$h_apical)
-log_herb_avg_sc <- scale(metadata_usc$log_herb_avg)
-
-xyplot(jitter(surv, factor=0.2) ~ h_apical|site, data=metadata_sc, group=year, auto.key = TRUE)
+surv.data = full.data %>% filter(!is.na(h_apical), !is.na(surv))
 ```
 
-First fit full model.
-
+Let's make some plots to see what the data looks like.
 ```{r}
-# nAGQ = 0 for quick approximation (matches results with nAGQ = 1)
-surv.reg.full = glmer(surv ~ h_apical*log_herb_avg +  (h_apical*log_herb_avg|site/transect)+(h_apical*log_herb_avg|year), data=metadata_sc, nAGQ = 0, family=binomial())
+s1 = ggplot(surv.data, aes(x = h_apical, y = surv)) + 
+            geom_jitter(height = 0.1, alpha = 0.3, color = 'blue')      # Interesting that this plot doesn't suggest much of a correlation
 
-summary(surv.reg.full)
+s2 = ggplot(surv.data, aes(x = herb_avg, y = surv)) + 
+            geom_jitter(height = 0.1, alpha = 0.3, color = 'blue')
+
+s3 = ggplot(surv.data, aes(x = N, y = surv)) + 
+            geom_jitter(height = 0.1, alpha = 0.3, color = 'blue')
+
+s4 = ggplot(surv.data, aes(x = LMA, y = surv)) + 
+            geom_jitter(height = 0.1, alpha = 0.3, color = 'blue')
+
+s5 = ggplot(surv.data, aes(x = ADL, y = surv)) + 
+            geom_jitter(height = 0.1, alpha = 0.3, color = 'blue')
+
+s6 = ggplot(surv.data, aes(x = Cardenolides, y = surv)) + 
+            geom_jitter(height = 0.1, alpha = 0.3, color = 'blue')
+
+surv.plots = grid.arrange(s1, s2, s3, s4, s5, s6)
 ```
 
-First thing to go is interaction on site and transect.
-
+Height doesn't look like it's doing so hot here. Maybe we should test it against other stuff before just including it by default.
 ```{r}
-surv.reg.mdl1 = glmer(surv ~ h_apical*log_herb_avg +  (h_apical+log_herb_avg|site/transect)+(h_apical*log_herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+surv.null = glm(surv ~ h_apical, data = surv.data, family = binomial())
+surv.null.herb = glm(surv ~ herb_avg, data = surv.data, family = binomial())
+surv.null.N = glm(surv ~ N, data = surv.data, family = binomial())
+surv.null.LMA = glm(surv ~ LMA, data = surv.data, family = binomial())
+surv.null.ADL = glm(surv ~ ADL, data = surv.data, family = binomial())
+surv.null.Card = glm(surv ~ Cardenolides, data = surv.data, family = binomial())
 
-# h_apical is minimal in both
-surv.reg.mdl2 = glmer(surv ~ h_apical*log_herb_avg +  (log_herb_avg|site/transect)+(log_herb_avg+h_apical:log_herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-
-# Dropping interaction term on year
-surv.reg.mdl3 = glmer(surv ~ h_apical*log_herb_avg +  (log_herb_avg|site/transect)+(log_herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-
-# Let's try combo of dropping log_herb_avg
-surv.reg.mdl4a = glmer(surv ~ h_apical*log_herb_avg +  (1|site/transect)+(log_herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-
-surv.reg.mdl4b = glmer(surv ~ h_apical*log_herb_avg +  (log_herb_avg|site/transect)+(1|year), data=metadata_sc, nAGQ=0, family=binomial())
-
-surv.reg.mdl4c = glmer(surv ~ h_apical*log_herb_avg +  (1|site/transect)+(1|year), data=metadata_sc, nAGQ=0, family=binomial())
-
-sAICtab <- AIC(surv.reg.full, surv.reg.mdl1, surv.reg.mdl2, surv.reg.mdl3, surv.reg.mdl4a, surv.reg.mdl4b, surv.reg.mdl4c)
-sAICtab$dAIC <- min(sAICtab$AIC)-sAICtab$AIC
-sAICtab
-
-sBICtab <- BIC(surv.reg.full, surv.reg.mdl1, surv.reg.mdl2, surv.reg.mdl3, surv.reg.mdl4a, surv.reg.mdl4b, surv.reg.mdl4c)
-sBICtab$dBIC <- min(sBICtab$BIC)-sBICtab$BIC
-sBICtab
-
-# Winner: AIC gives mdl4b, BIC mdl4c - let's go with mdl4b
-surv.reg.winner = glmer(surv ~ h_apical*log_herb_avg +  (log_herb_avg|site/transect)+(1|year), data=metadata_sc, family=binomial(), nAGQ=1, control=glmerCtrl)
-
-summary(surv.reg.winner)
+aictab(list(surv.null, surv.null.herb, surv.null.N, surv.null.LMA, surv.null.ADL, surv.null.Card), modnames = c('height', 'herb (no height)', 'N (no height)', 'LMA (no height)', 'ADL (no height)', 'Card (no height)'))
 ```
 
-That's better.  On to fixed effects.
-
+Wow, height seems to be among the worst! No surprise that Cardenolides, herb, and LMA are the top 3. Let's use Cardenolides (no height) as the null this time.
 ```{r}
-surv.reg.mdl1 = glmer(surv ~ log_herb_avg + h_apical:log_herb_avg + (log_herb_avg|site/transect)+(1|year), data=metadata_sc, family=binomial(), nAGQ=1, control=glmerCtrl)
+surv.null = surv.null.Card
 
-surv.reg.mdl2 = glmer(surv ~ log_herb_avg + (log_herb_avg|site/transect)+(1|year), data=metadata_sc, family=binomial(), nAGQ=1, control=glmerCtrl)
+surv.herb = glm(surv ~ Cardenolides + herb_avg, data = surv.data, family = binomial())
+surv.N = glm(surv ~ Cardenolides + N, data = surv.data, family = binomial())
+surv.LMA = glm(surv ~ Cardenolides + LMA, data = surv.data, family = binomial())
+surv.ADL = glm(surv ~ Cardenolides + ADL, data = surv.data, family = binomial())
+surv.height = glm(surv ~ Cardenolides + h_apical, data = surv.data, family = binomial())
 
-surv.reg.mdl3 = glmer(surv ~ 1 + (log_herb_avg|site/transect)+(1|year), data=metadata_sc, family=binomial(), nAGQ=1, control=glmerCtrl)
-
-sAICtab <- AIC(surv.reg.winner, surv.reg.mdl1, surv.reg.mdl2, surv.reg.mdl3)
-sAICtab$dAIC <- min(sAICtab$AIC)-sAICtab$AIC
-sAICtab
-
-sBICtab <- BIC(surv.reg.winner, surv.reg.mdl1, surv.reg.mdl2, surv.reg.mdl3)
-sBICtab$dBIC <- min(sBICtab$BIC)-sBICtab$BIC
-sBICtab
+aictab(list(surv.null, surv.herb, surv.N, surv.LMA, surv.ADL, surv.height), modnames = c('null', 'herb', 'N', 'LMA', 'ADL', 'height'))
 ```
 
+Cardenolides and herb is once again the best combo, followed by Card and LMA.
 ```{r}
-# mdl3 wins by large margin in AIC and BIC
-surv.reg.final <- surv.reg.mdl3
-summary(surv.reg.final)
+surv.hLMA = glm(surv ~ Cardenolides + herb_avg + LMA, data = surv.data, family = binomial())
+surv.herb.full = glm(surv ~ Cardenolides*herb_avg, data = surv.data, family = binomial())
+surv.LMA.full = glm(surv ~ Cardenolides*LMA, data = surv.data, family = binomial())
+surv.hLMA.full = glm(surv ~ Cardenolides*herb_avg*LMA, data = surv.data, family = binomial())
 
-# Create model class
-scaled <- list(h_apical = h_apical_sc, log_herb_avg = log_herb_avg_sc)
-surv.fit <- mwMod(list(mdl = surv.reg.final, vars = c("h_apical", "log_herb_avg"), scaled = scaled))
-checkPars(surv.fit) # Check parameters
+aictab(list(surv.herb, surv.LMA, surv.hLMA, surv.herb.full, surv.LMA.full, surv.hLMA.full), modnames = c('herb + Card', 'LMA + Card', 'herb + Card + LMA', 'herb + Card full', 'LMA + Card full', 'herb + Card + LMA full'))
 ```
 
-Winner:
-```
-surv ~ 1 + (log_herb_avg|site/transect) + (1|year)
-```
-
-Unscaling:
-```{r, eval=FALSE}
-par_intercept_sc <- coef(summary(surv.reg.final))["(Intercept)","Estimate"]
-
-muha <- attributes(h_apical_sc)$'scaled:center'
-sdha <- attributes(h_apical_sc)$'scaled:scale'
-muhe <- attributes(log_herb_avg_sc)$'scaled:center'
-sdhe <- attributes(log_herb_avg_sc)$'scaled:scale'
-
-par_intercept_usc <- par_intercept_sc
-
-pars <- c(par_intercept_usc, 0, 0, 0)
-names(pars) <- c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
-pars
-
-par_sc <- cbind(coef(surv.reg.final)$site[,2], rep(0, 5), coef(surv.reg.final)$site[,1], rep(0, 5))
-colnames(par_sc) <- c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
-rownames(par_sc) <- rownames(coef(surv.reg.final)$site)
-par_usc <- par_sc
-for (i in 1:5) {
-  par_usc[i,1] <- par_sc[i,1] - 1*par_sc[i,2]*(muha/sdha) - 1*par_sc[i,3]*(muhe/sdhe) + par_sc[i,4]*muha*muhe/(sdha*sdhe)
-  par_usc[i,2] <- par_sc[i,2]/sdha - 1*par_sc[i,4]*muhe/(sdha*sdhe)
-  par_usc[i,3] <- par_sc[i,3]/sdhe - 1*par_sc[i,4]*muha/(sdha*sdhe)
-  par_usc[i,4] <- par_sc[i,4]/(sdha*sdhe)
-}
-par_usc
-```
-
-First, check to make sure unscaled parameters are correct.
-
+Not including the interactions seems to be the best here. Let's see if Card and LMA are correlated.
 ```{r}
-# Get parameters from model
-pars <- getParameters(surv.reg.final, scaled = list(h_apical_sc = h_apical_sc, log_herb_avg_sc = log_herb_avg_sc))
-pars_usc <- pars$unscaled
+plot(LMA ~ Cardenolides, data = surv.data)
 
-# Bertha
-h_apical <- metadata_usc$h_apical
-log_herb_avg <- metadata_usc$log_herb_avg
-estresp <- 1/(1+exp(-1*(pars_usc['Bertha', '(Intercept)'] + pars_usc['Bertha', 'h_apical']*h_apical + pars_usc['Bertha', 'log_herb_avg']*log_herb_avg + pars_usc['Bertha', 'h_apical:log_herb_avg']*h_apical*log_herb_avg)))
-
-fitresp <- predict(surv.reg.final, type="response", re.form=NA)
-
-(error <- max(abs(estresp-fitresp)))
-
-# Sites
-sites <- rownames(pars_usc)[-1]
-fitresp <- predict(surv.reg.final, type="response", re.form=~(log_herb_avg|site))
-E <- rep(0, 5)
-for (i in 1:length(sites)) {
-  isite <- sites[i]
-  h_apical <- (metadata_usc %>% filter(site == isite))$h_apical
-  log_herb_avg <- (metadata_usc %>% filter(site == isite))$log_herb_avg
-  estresp <- 1/(1+exp(-1*(pars_usc[isite,'(Intercept)'] + pars_usc[isite,'h_apical']*h_apical + pars_usc[isite,'log_herb_avg']*log_herb_avg + pars_usc[isite,'h_apical:log_herb_avg']*h_apical*log_herb_avg)))
-  
-  E[i] <- max(abs(estresp-fitresp[which(metadata_usc$site == isite)]))
-}
-max(E)
+cor.test(surv.data$LMA, surv.data$Cardenolides)
 ```
-
-Now some diagnostics (aka model validation).
-
-```{r}
-par(mfrow=c(2,2))
-plot(fitted(surv.reg.final), residuals(surv.reg.final, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
-plot(metadata_sc$h_apical, residuals(surv.reg.final, "deviance"), xlab="Apical height", ylab="Deviance residuals")
-plot(metadata_sc$log_herb_avg, residuals(surv.reg.final, "deviance"), xlab="Log(Herbivory average)", ylab="Deviance residuals")
-par(mfrow=c(1,1))
-```
-
-Let's plot full data, first on h_apical scale.
-
-```{r}
-plot(NULL, axes=T, xlim=c(0,160), ylim=c(-0.1,1.1), xlab="", ylab="")
-xpts <- seq(min(metadata_usc$h_apical), max(metadata_usc$h_apical), length.out=100)
-for (i in 1:5) {
-  site <- rownames(par_usc)[i]
-  points(metadata_usc[metadata_usc$site == site,]$h_apical, jitter(metadata_usc[metadata_usc$site == site,]$surv, factor=0.2), col=i, xlim=c(0,160))
-  coeff <- par_usc[i,]
-  meanha <- mean(metadata_usc[metadata_usc$site == site,]$log_herb_avg)
-  ypred <- 1/(1+exp(-1*(coeff['(Intercept)'] + coeff['h_apical']*xpts + coeff['log_herb_avg']*meanha + coeff['h_apical:log_herb_avg']*xpts*meanha)))
-  lines(xpts, ypred, col = i)
-}
-meanha <- mean(metadata_usc$log_herb_avg)
-ypts = 1/(1+exp(-1*(pars['(Intercept)'] + pars['h_apical']*xpts + pars['log_herb_avg']*meanha + pars['h_apical:log_herb_avg']*xpts*meanha)))
-lines(xpts, ypts, col="black", lwd=2, lty=2)
-legend("bottomright", sort(unique(as.character(metadata_usc$site))), col=1:5, pch=1)
-```
-
-Now on log_herb_avg scale.
-
-```{r}
-plot(NULL, axes=T, xlim=c(-2.5,1.5), ylim=c(0.9,1.1), xlab="", ylab="")
-xpts <- seq(min(metadata_usc$log_herb_avg), max(metadata_usc$log_herb_avg), length.out=100)
-for (i in 1:5) {
-  site <- rownames(par_usc)[i]
-  points(metadata_usc[metadata_usc$site == site,]$log_herb_avg, jitter(metadata_usc[metadata_usc$site == site,]$surv, factor=0.2), col=i, xlim=c(-2.5,1.5))
-  coeff <- par_usc[i,]
-  meanha <- mean(metadata_usc[metadata_usc$site == site,]$h_apical)
-  ypred <- 1/(1+exp(-1*(coeff['(Intercept)'] + coeff['h_apical']*meanha + coeff['log_herb_avg']*xpts + coeff['h_apical:log_herb_avg']*xpts*meanha)))
-  lines(xpts, ypred, col = i)
-}
-meanha <- mean(metadata_usc$h_apical)
-ypts = 1/(1+exp(-1*(pars['(Intercept)'] + pars['h_apical']*meanha + pars['log_herb_avg']*xpts + pars['h_apical:log_herb_avg']*xpts*meanha)))
-lines(xpts, ypts, col="black", lwd=2, lty=2)
-legend("bottomright", sort(unique(as.character(metadata_usc$site))), col=1:5, pch=1)
-```
-
-Now site-specific models.  First, h_apical.
-```{r}
-xpts <- seq(min(metadata_usc$h_apical), max(metadata_usc$h_apical), length.out=100)
-xyplot(jitter(surv, factor=0.2) ~ h_apical|site, data=metadata_usc, para=par_usc, metadata=metadata_usc, xpts=xpts, panel = function(x,y,metadata,para,xpts) {
-  panel.xyplot(x, y)
-  site <- rownames(para)[packet.number()]
-  coeff <- para[packet.number(),]
-  meanhe <- mean(metadata[metadata$site == site,]$log_herb_avg)
-  ypred <- 1/(1+exp(-1*(coeff['(Intercept)'] + coeff['h_apical']*xpts + coeff['log_herb_avg']*meanhe + coeff['h_apical:log_herb_avg']*xpts*meanhe)))
-  panel.lines(xpts, ypred, col = "red")
-})
-```
-
-Now site-specific models.  Now, log_herb_avg.
-```{r}
-xpts <- seq(min(metadata_usc$log_herb_avg), max(metadata_usc$log_herb_avg), length.out=100)
-xyplot(jitter(surv, factor=0.2) ~ log_herb_avg|site, data=metadata_usc, para=par_usc, metadata=metadata_usc, xpts=xpts, panel = function(x,y,metadata,para,xpts) {
-  panel.xyplot(x, y)
-  site <- rownames(para)[packet.number()]
-  coeff <- para[packet.number(),]
-  meanha <- mean(metadata[metadata$site == site,]$h_apical)
-  ypred <- 1/(1+exp(-1*(coeff['(Intercept)'] + coeff['h_apical']*meanha + coeff['log_herb_avg']*xpts + coeff['h_apical:log_herb_avg']*xpts*meanha)))
-  panel.lines(xpts, ypred, col = "red")
-})
-```
+So LMA and Cardenolides are somewhat negatively correlated. The Cor is starting to approach +-0.5 where it starts getting questionable, bu thas not gotten there yet.
 
 ## Growth
+```{r}
+growth.data = full.data %>% filter(!is.na(h_apical), !is.na(h_apical.next))
+```
 
 ```{r}
-# Transform data
-metadata_usc <- metadata %>% filter(!is.na(h_apical),
-                                    !is.na(h_apical.next),
-                                    !is.na(herb_avg),
-                                    fec.flower == 1,
-                                    surv == 1) %>%
-  mutate(log_herb_avg = log(0.01 + herb_avg))
-                                        
-metadata_sc <- metadata_usc %>% mutate_each(funs(as.numeric(scale(.))), 
-                                            h_apical,
-                                            h_apical.next, 
-                                            log_herb_avg)
+g1 = ggplot(growth.data, aes(x = h_apical, y = h_apical.next)) + 
+            geom_point(alpha = 0.3, color = 'blue')      
 
-# Get scaling parameters (really just mean and sd)
-h_apical_sc <- scale(metadata_usc$h_apical)
-h_apical.next_sc <- scale(metadata_usc$h_apical.next)
-log_herb_avg_sc <- scale(metadata_usc$log_herb_avg)
+g2 = ggplot(growth.data, aes(x = herb_avg, y = h_apical.next)) + 
+            geom_point(alpha = 0.3, color = 'blue')
 
-xyplot(h_apical.next ~ h_apical|site, data=metadata_sc, group=year, auto.key = TRUE)
+g3 = ggplot(growth.data, aes(x = N, y = h_apical.next)) + 
+            geom_point(alpha = 0.3, color = 'blue')
+
+g4 = ggplot(growth.data, aes(x = LMA, y = h_apical.next)) + 
+            geom_point(alpha = 0.3, color = 'blue')
+
+g5 = ggplot(growth.data, aes(x = ADL, y = h_apical.next)) + 
+            geom_point(alpha = 0.3, color = 'blue')
+
+g6 = ggplot(growth.data, aes(x = Cardenolides, y = h_apical.next)) + 
+            geom_point(alpha = 0.3, color = 'blue')
+
+growth.plots = grid.arrange(g1, g2, g3, g4, g5, g6)
 ```
-
-As this is a bona-fide LME, we can do the method mentioned in Zuur.  First, model selection on random effects with REML.
 
 ```{r}
-growth.reg.full=lmer(h_apical.next~h_apical*log_herb_avg + (h_apical*log_herb_avg|site/transect)+(h_apical*log_herb_avg|year),data=metadata_sc, REML=T)
-
-growth.reg.mdl1a=lmer(h_apical.next~h_apical*log_herb_avg + (h_apical+log_herb_avg|site/transect)+(h_apical*log_herb_avg|year),data=metadata_sc, REML=T)
-
-growth.reg.mdl1b=lmer(h_apical.next~h_apical*log_herb_avg + (h_apical*log_herb_avg|site/transect)+(h_apical+log_herb_avg|year),data=metadata_sc, REML=T)
-
-growth.reg.mdl1c=lmer(h_apical.next~h_apical*log_herb_avg + (h_apical+log_herb_avg|site/transect)+(h_apical+log_herb_avg|year),data=metadata_sc, REML=T)
-
-AIC(growth.reg.full, growth.reg.mdl1a, growth.reg.mdl1b, growth.reg.mdl1c)
-
-growth.reg.mdl2=lmer(h_apical.next~h_apical*log_herb_avg + (h_apical+log_herb_avg|site/transect)+(h_apical|year),data=metadata_sc, REML=T)
-
-growth.reg.mdl2a=lmer(h_apical.next~h_apical*log_herb_avg+(h_apical+log_herb_avg|site/transect)+(1|year),data=metadata_sc,REML=T)
-
-growth.reg.mdl2b=lmer(h_apical.next~h_apical*log_herb_avg+(h_apical|site/transect)+(h_apical|year),data=metadata_sc,REML=T)
-
-growth.reg.mdl2c=lmer(h_apical.next~h_apical*log_herb_avg+(log_herb_avg|site/transect)+(h_apical|year),data=metadata_sc,REML=T)
-
-gAICtab <- AIC(growth.reg.full, growth.reg.mdl1a, growth.reg.mdl1b, growth.reg.mdl1c, growth.reg.mdl2, growth.reg.mdl2a, growth.reg.mdl2b, growth.reg.mdl2c)
-gAICtab$dAIC <- min(gAICtab$AIC)-gAICtab$AIC
-gAICtab
-
-gBICtab <- BIC(growth.reg.full, growth.reg.mdl1a, growth.reg.mdl1b, growth.reg.mdl1c, growth.reg.mdl2, growth.reg.mdl2a, growth.reg.mdl2b, growth.reg.mdl2c)
-gBICtab$dBIC <- min(gBICtab$BIC)-gBICtab$BIC
-gBICtab
-
-# Seems to be the best for random effects with AIC
-# growth.reg.han2=lmer(h_apical.next~h_apical*log_herb_avg+(h_apical + log_herb_avg|site/transect)+(h_apical|year),data=metadata_sc,REML=T)
-
-# Seems to be the best for fixed effects
-# growth.reg.mdl4=lmer(h_apical.next~h_apical + (h_apical + herb_avg:munched|site/transect)+(h_apical|year),data=metadata_sc,REML=T)
+growth.null = lm(h_apical.next ~ h_apical, data = growth.data) #obvious choice for the null here
 ```
-
-Winner:
-```
-(h_apical + log_herb_avg|site/transect)+(h_apical|year)
-```
-
-Now fixed effects, with ML this time.
 
 ```{r}
-growth.reg.fmdl1=lmer(h_apical.next ~ h_apical*log_herb_avg + (h_apical + log_herb_avg|site/transect)+(h_apical|year), data=metadata_sc, REML=F)
+growth.herb = lm(h_apical.next ~ h_apical + herb_avg, data = growth.data)
+growth.N = lm(h_apical.next ~ h_apical + N, data = growth.data)
+growth.LMA = lm(h_apical.next ~ h_apical + LMA, data = growth.data)
+growth.ADL = lm(h_apical.next ~ h_apical + ADL, data = growth.data)
+growth.Card = lm(h_apical.next ~ h_apical + Cardenolides, data = growth.data)
 
-drop1(growth.reg.fmdl1, scope=c("h_apical", "log_herb_avg", "h_apical:log_herb_avg"))
-
-# Looks like log_herb_avg goes
-growth.reg.fmdl2=lmer(h_apical.next ~ h_apical + h_apical:log_herb_avg + (h_apical+log_herb_avg|site/transect)+(h_apical|year), data=metadata_sc, REML=F)
-
-growth.reg.fmdl2a=lmer(h_apical.next ~ h_apical + (h_apical+log_herb_avg|site/transect)+(h_apical|year), data=metadata_sc, REML=F)
-
-growth.reg.fmdl2b=lmer(h_apical.next ~ h_apical + h_apical:log_herb_avg - 1 + (h_apical+log_herb_avg|site/transect)+(h_apical|year), data=metadata_sc, REML=F)
-
-growth.reg.fmdl2c=lmer(h_apical.next ~ h_apical:log_herb_avg + (h_apical+log_herb_avg|site/transect)+(h_apical|year), data=metadata_sc, REML=F)
-
-# growth.reg.fmdl2b wins.  Let's try and drop one more...
-
-growth.reg.fmdl3a=lmer(h_apical.next ~ h_apical - 1 + (h_apical+log_herb_avg|site/transect)+(h_apical|year), data=metadata_sc, REML=F)
-
-growth.reg.fmdl3b=lmer(h_apical.next ~ h_apical:log_herb_avg - 1 + (h_apical+log_herb_avg|site/transect)+(h_apical|year), data=metadata_sc, REML=F)
-
-# fmdl2b still seems the best.  Let's combine and reassess
-gAICtab <- AIC(growth.reg.fmdl2, growth.reg.fmdl2a, growth.reg.fmdl2b, growth.reg.fmdl2c, growth.reg.fmdl3a, growth.reg.fmdl3b)
-gAICtab$dAIC <- gAICtab$AIC-min(gAICtab$AIC)
-gAICtab$wAIC <- exp(-0.5*gAICtab$dAIC)
-gAICtab$wAIC <- gAICtab$wAIC/sum(gAICtab$wAIC)
-(gAICtab <- gAICtab[order(gAICtab$AIC),])
-
-gBICtab <- BIC(growth.reg.fmdl2, growth.reg.fmdl2a, growth.reg.fmdl2b, growth.reg.fmdl2c, growth.reg.fmdl3a, growth.reg.fmdl3b)
-gBICtab$dBIC <- gBICtab$BIC-min(gBICtab$BIC)
-gBICtab[order(gBICtab$BIC),]
+aictab(list(growth.null, growth.herb, growth.N, growth.LMA, growth.ADL, growth.Card), modnames = c('null', 'herb', 'N', 'LMA', 'ADL', 'Cardenolides'))
 ```
 
-Need to refit with REML.
-
+Wow, Cardenolides is standing out a lot. Let's throw in some interactions.
 ```{r}
-growth.reg.final=lmer(h_apical.next ~ h_apical + h_apical:log_herb_avg + (h_apical+log_herb_avg|site/transect) + (h_apical|year), data=metadata_sc, REML=T)
-summary(growth.reg.final)
+growth.Card.full = lm(h_apical.next ~ h_apical*Cardenolides, data = growth.data)
 
-# Create model class
-scaled <- list(h_apical = h_apical_sc, log_herb_avg = log_herb_avg_sc, h_apical.next = h_apical.next_sc)
-growth.fit <- mwMod(list(mdl = growth.reg.final, vars = c("h_apical", "log_herb_avg"), scaled = scaled))
-checkPars(growth.fit) # Check parameters
+aictab(list(growth.null, growth.Card, growth.Card.full), modnames = c('null', 'Cardenolides + height', 'Card + height full'))
 ```
-
-Winner:
-```
-h_apical.next ~ h_apical + h_apical:log_herb_avg + (h_apical + log_herb_avg|site)+(h_apical|year)
-```
-
-Let's get the unscaled parameters:
-```{r, eval=FALSE}
-par_intercept_sc <- coef(summary(growth.reg.final))["(Intercept)","Estimate"]
-par_h_apical_sc <- coef(summary(growth.reg.final))["h_apical","Estimate"]
-par_log_herb_avg_sc <- 0
-par_interact_sc <- coef(summary(growth.reg.final))["h_apical:log_herb_avg","Estimate"]
-
-muha <- attributes(h_apical_sc)$'scaled:center'
-sdha <- attributes(h_apical_sc)$'scaled:scale'
-muhan <- attributes(h_apical.next_sc)$'scaled:center'
-sdhan <- attributes(h_apical.next_sc)$'scaled:scale'
-muhe <- attributes(log_herb_avg_sc)$'scaled:center'
-sdhe <- attributes(log_herb_avg_sc)$'scaled:scale'
-
-par_intercept_usc <- muhan + sdhan*(par_intercept_sc - par_h_apical_sc*(muha/sdha) - par_log_herb_avg_sc*(muhe/sdhe) + par_interact_sc*muha*muhe/(sdha*sdhe))
-par_h_apical_usc <- sdhan*(par_h_apical_sc/sdha - par_interact_sc*muhe/(sdha*sdhe))
-par_log_herb_avg_usc <- sdhan*(par_log_herb_avg_sc/sdhe - par_interact_sc*muha/(sdha*sdhe))
-par_interact_usc <- sdhan*(par_interact_sc/(sdha*sdhe))
-
-pars <- c(par_intercept_usc, par_h_apical_usc, par_log_herb_avg_usc, par_interact_usc)
-names(pars) <- c("(Intercept)", "h_apical", "log_herb_avg", "h_apical:log_herb_avg")
-pars
-
-par_sc <- coef(growth.reg.final)$site[c("(Intercept)","h_apical","log_herb_avg","h_apical:log_herb_avg")]
-par_usc <- par_sc
-for (i in 1:5) {
-  par_usc[i,"(Intercept)"] <- muhan + sdhan*(par_sc[i,"(Intercept)"] - par_sc[i,"h_apical"]*(muha/sdha) - par_sc[i,"log_herb_avg"]*(muhe/sdhe) + par_sc[i,"h_apical:log_herb_avg"]*muha*muhe/(sdha*sdhe))
-  par_usc[i,"h_apical"] <- sdhan*(par_sc[i,"h_apical"]/sdha - par_sc[i,"h_apical:log_herb_avg"]*muhe/(sdha*sdhe))
-  par_usc[i,"log_herb_avg"] <- sdhan*(par_sc[i,"log_herb_avg"]/sdhe - par_sc[i,"h_apical:log_herb_avg"]*muha/(sdha*sdhe))
-  par_usc[i,"h_apical:log_herb_avg"] <- sdhan*(par_sc[i,"h_apical:log_herb_avg"]/(sdha*sdhe))
-}
-par_usc
-```
-
-Let's check functions & compute standard deviation of residuals.
-```{r}
-# Get parameters from model
-pars <- getParameters(growth.reg.final, scaled = list(h_apical_sc = h_apical_sc, log_herb_avg_sc = log_herb_avg_sc, h_apical.next_sc = h_apical.next_sc), growth=TRUE)
-pars_usc <- pars$unscaled
-
-# Bertha
-h_apical <- metadata_usc$h_apical
-log_herb_avg <- metadata_usc$log_herb_avg
-estresp <- pars_usc['Bertha', '(Intercept)'] + pars_usc['Bertha', 'h_apical']*h_apical + pars_usc['Bertha', 'log_herb_avg']*log_herb_avg + pars_usc['Bertha', 'h_apical:log_herb_avg']*h_apical*log_herb_avg
-
-muhan <- attributes(h_apical.next_sc)$'scaled:center'
-sdhan <- attributes(h_apical.next_sc)$'scaled:scale'
-fitresp <- muhan+sdhan*predict(growth.reg.final, type="response", re.form=NA)
-
-(error <- max(abs(estresp-fitresp)))
-
-# Sites
-sites <- rownames(pars_usc)[-1]
-fitresp <- muhan+sdhan*predict(growth.reg.final, type="response", re.form=~(h_apical+log_herb_avg|site))
-E <- rep(0, 5)
-for (i in 1:length(sites)) {
-  isite <- sites[i]
-  h_apical <- (metadata_usc %>% filter(site == isite))$h_apical
-  log_herb_avg <- (metadata_usc %>% filter(site == isite))$log_herb_avg
-  estresp <- pars_usc[isite,'(Intercept)'] + pars_usc[isite,'h_apical']*h_apical + pars_usc[isite,'log_herb_avg']*log_herb_avg + pars_usc[isite,'h_apical:log_herb_avg']*h_apical*log_herb_avg
-  
-  E[i] <- max(abs(estresp-fitresp[which(metadata_usc$site == isite)]))
-}
-max(E)
-```
-
-Now some diagnostics (aka model validation).
-
-```{r}
-par(mfrow=c(2,2))
-plot(fitted(growth.reg.final), residuals(growth.reg.final, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
-plot(metadata_sc$h_apical, residuals(growth.reg.final, "deviance"), xlab="Apical height", ylab="Deviance residuals")
-plot(metadata_sc$log_herb_avg, residuals(growth.reg.final, "deviance"), xlab="Log(Herbivory average)", ylab="Deviance residuals")
-par(mfrow=c(1,1))
-```
-
-Let's plot full data.
-
-```{r}
-plot(NULL, axes=T, xlim=c(0,160), ylim=c(0, 200), xlab="", ylab="")
-xpts <- seq(min(metadata_usc$h_apical), max(metadata_usc$h_apical), length.out=100)
-for (i in 1:5) {
-  site <- rownames(par_usc)[i]
-  meanhe <- mean(metadata_usc[metadata_usc$site == site,]$log_herb_avg)
-  points(metadata_usc[metadata_usc$site == site,]$h_apical, metadata_usc[metadata_usc$site == site,]$h_apical.next, col=i)
-  ypred <- par_usc[site,'(Intercept)'] + par_usc[site,'h_apical']*xpts + par_usc[site,'log_herb_avg']*meanhe + par_usc[site,'h_apical:log_herb_avg']*xpts*meanhe
-  lines(xpts, ypred, col = i)
-}
-meanhe <- mean(metadata_usc$log_herb_avg)
-ypts = pars['(Intercept)'] + pars['h_apical']*xpts + pars['log_herb_avg']*meanhe + pars['h_apical:log_herb_avg']*xpts*meanhe
-lines(xpts, ypts, col="black", lwd=2, lty=2)
-
-legend("bottomright", sort(unique(as.character(metadata_usc$site))), col=1:5, pch=1)
-```
-
-Now site-specific models.
-```{r}
-xyplot(h_apical.next ~ h_apical|site, data=metadata_usc, para=par_usc, metadata=metadata_usc, xpts=xpts, panel = function(x,y,metadata,para,xpts) {
-  panel.xyplot(x, y)
-  isite <- rownames(para)[packet.number()]
-  meanhe <- mean(metadata[metadata$site == isite,]$log_herb_avg)
-  allha <- metadata[metadata$site == isite,]$h_apical
-  allhe <- metadata[metadata$site == isite,]$log_herb_avg
-  coeff <- para[packet.number(),]
-  ymean <- coeff[,'(Intercept)'] + coeff[,'h_apical']*xpts + coeff[,'log_herb_avg']*meanhe + coeff[,'h_apical:log_herb_avg']*meanhe*xpts
-  ypred <- coeff[,'(Intercept)'] + coeff[,'h_apical']*allha + coeff[,'log_herb_avg']*allhe + coeff[,'h_apical:log_herb_avg']*allha*allhe
-  panel.lines(xpts, ymean, col = "red")
-  panel.xyplot(allha, ypred, col='red')
-})
-```
-
-Let's add year plots (just use predict function):
-```{r, eval=FALSE}
-xyplot(h_apical.next ~ h_apical|site, data=metadata_usc, para=ypar_usc, metadata=metadata_usc, xpts=xpts, fit=growth.reg.null, group=year, auto.key = TRUE, subscripts=FALSE, panel = function(x,y,groups=groups,subscripts=subscripts,metadata,para,xpts,fit) {
-  panel.xyplot(x, y, groups=groups,subscripts=subscripts)
-  site <- rownames(para)[packet.number()]
-  cols <- c(4,6,3)
-  for (i in 1:3) {
-    meanhe <- mean(metadata[(metadata$site == site & metadata$year == dimnames(para)[[3]][i]),]$herb_avg)
-    
-    # First, explicit function
-    coeff <- para[packet.number(),,i]
-    ypred <- coeff['(Intercept)'] + coeff['h_apical']*xpts + coeff['herb_avg']*meanhe
-    panel.lines(xpts, ypred, col = cols[i])
-    
-    # Now from fit
-    # ypred <- predict(fit, newdata = data.frame(h_apical = (xpts-muha)/sdha, herb_avg = rep((meanhe-muhe)/sdhe, length(xpts)), site = site, year = dimnames(para)[[3]][i]))
-    # panel.lines(xpts, ypred, col = cols[i], lty=2)
-  }
-})
-```
-
-Slopes are for some reason looking backwards!  Let's do model validation now.
-
-```{r}
-plot(growth.reg.final)
-E <- resid(growth.reg.final)
-hist(E, xlab = "Residuals", main = "")
-plot(metadata_usc$h_apical, E, xlab = "Apical height", ylab = "Residuals")
-plot(metadata_usc$log_herb_avg, E, xlab = "Avg. Herbivory Score", ylab = "Residuals")
-```
+Adding in the interaction term doesn't improve it, and we've already done the cor test and seen no significant correlation.
 
 ## Pods
-
 ```{r}
-metadata_usc <- metadata %>% filter(!is.na(h_apical),
-                                    !is.na(h_apical.next),
-                                    !is.na(herb_avg),
-                                    fec.flower == 1,
-                                    surv == 1,
-                                    !is.na(N_pods),
-                                    h_apical.next > 50,
-                                    !(site == "YTB" & h_apical <= 50))
-
-metadata_sc <- metadata_usc %>% mutate_each(funs(sc = as.numeric(scale(.))), h_apical, h_apical.next, log_herb_avg)
-
-# Get scaling parameters (really just mean and sd)
-h_apical_sc <- scale(metadata_usc$h_apical)
-h_apical.next_sc <- scale(metadata_usc$h_apical.next)
-log_herb_avg_sc <- scale(metadata_usc$log_herb_avg)
-
-glmerCtrl <- glmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
-
-xyplot(N_pods ~ h_apical.next|site, data=metadata_sc, group=year, auto.key = TRUE)
-```
-
-First, do full model.
-
-```{r}
-pods.reg.full_sept = glmer(N_pods ~ h_apical.next*log_herb_avg + (h_apical.next*log_herb_avg|site/transect)+(h_apical.next*log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
-
-pods.reg.full_june = glmer(N_pods ~ h_apical*log_herb_avg + (h_apical*log_herb_avg|site/transect)+(h_apical*log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
-
-AIC(pods.reg.full_june, pods.reg.full_sept)
-summary(pods.reg.full_sept)
-```
-
-We can try and drop h_apical.next:log_herb_avg in the random effect due to small variation.
-
-```{r}
-pods.reg.mdl1 = glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next*log_herb_avg|site/transect)+(h_apical.next+log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
-
-pods.reg.mdl2 = glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next+log_herb_avg|site/transect)+(h_apical.next+log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
-
-pods.reg.mdl3a = glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect)+(h_apical.next+log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
-
-pods.reg.mdl3b = glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next+log_herb_avg|site/transect)+(log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
-
-pods.reg.mdl3c = glmer(N_pods ~ h_apical.next*herb_avg + (log_herb_avg|site/transect)+(h_apical.next+log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
-
-AIC(pods.reg.full_sept, pods.reg.mdl1, pods.reg.mdl2, pods.reg.mdl3a, pods.reg.mdl3b, pods.reg.mdl3c)
-
-summary(pods.reg.mdl2)
-```
-
-Winner:
-```
-(h_apical.next+log_herb_avg|site/transect)+(h_apical.next+log_herb_avg|year)
+pods.data = full.data %>% filter(!is.na(h_apical), !is.na(N_pods))
 ```
 
 ```{r}
-pods.reg.fmdl1a = glmer(N_pods ~ h_apical.next + log_herb_avg + (h_apical.next+log_herb_avg|site/transect)+(h_apical.next+log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
+p1 = ggplot(pods.data, aes(x = h_apical, y = N_pods)) + 
+            geom_point(alpha = 0.3, color = 'blue')      
 
-pods.reg.fmdl1b = glmer(N_pods ~ h_apical.next + h_apical.next:log_herb_avg + (h_apical.next+log_herb_avg|site/transect)+(h_apical.next+log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
+p2 = ggplot(pods.data, aes(x = herb_avg, y = N_pods)) + 
+            geom_point(alpha = 0.3, color = 'blue')
 
-pods.reg.fmdl2a = glmer(N_pods ~ h_apical.next + log_herb_avg - 1 + (h_apical.next+log_herb_avg|site/transect)+(h_apical.next+log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
+p3 = ggplot(pods.data, aes(x = N, y = N_pods)) + 
+            geom_point(alpha = 0.3, color = 'blue')
 
-pods.reg.fmdl2b = glmer(N_pods ~ h_apical.next +  (h_apical.next+log_herb_avg|site/transect)+(h_apical.next+log_herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(), control=glmerCtrl)
+p4 = ggplot(pods.data, aes(x = LMA, y = N_pods)) + 
+            geom_point(alpha = 0.3, color = 'blue')
 
-pAICtab <- AIC(pods.reg.mdl2, pods.reg.fmdl1a, pods.reg.fmdl1b, pods.reg.fmdl2a, pods.reg.fmdl2b)
-pAICtab$dAIC <- pAICtab$AIC-min(pAICtab$AIC)
-pAICtab$wAIC <- exp(-0.5*pAICtab$dAIC)
-pAICtab$wAIC <- pAICtab$wAIC/sum(pAICtab$wAIC)
-(pAICtab <- pAICtab[order(pAICtab$AIC),])
+p5 = ggplot(pods.data, aes(x = ADL, y = N_pods)) + 
+            geom_point(alpha = 0.3, color = 'blue')
 
-pBICtab <- BIC(pods.reg.mdl2, pods.reg.fmdl1a, pods.reg.fmdl1b, pods.reg.fmdl2a, pods.reg.fmdl2b)
-pBICtab$dBIC <- pBICtab$BIC-min(pBICtab$BIC)
-pBICtab
+p6 = ggplot(pods.data, aes(x = Cardenolides, y = N_pods)) + 
+            geom_point(alpha = 0.3, color = 'blue')
+
+pods.plots = grid.arrange(p1, p2, p3, p4, p5, p6)
 ```
 
+Height and N, look good for a Poisson. Herb could arguably be exponential...
 
 ```{r}
-pods.reg.final <- pods.reg.fmdl2a
-summary(pods.reg.final)
-
-# Create model class
-scaled <- list(h_apical = h_apical_sc, log_herb_avg = log_herb_avg_sc, h_apical.next = h_apical.next_sc)
-pods.fit <- mwMod(list(mdl = pods.reg.final, vars = c("h_apical.next", "log_herb_avg"), scaled = scaled))
-checkPars(pods.fit) # Check parameters
+pods.null = glm(N_pods ~ h_apical, data = pods.data, family = poisson())
 ```
 
-Winner:
-```
-h_apical.next + log_herb_avg - 1 + (h_apical.next+log_herb_avg|site/transect)+(h_apical.next+log_herb_avg|year)
-```
-### Check for overdispersion
+```{r}
+pods.herb = glm(N_pods ~ h_apical + herb_avg, data = pods.data, family = poisson())
+pods.N = glm(N_pods ~ h_apical + N, data = pods.data, family = poisson())
+pods.LMA = glm(N_pods ~ h_apical + LMA, data = pods.data, family = poisson())
+pods.ADL = glm(N_pods ~ h_apical + ADL, data = pods.data, family = poisson())
+pods.Card = glm(N_pods ~ h_apical + Cardenolides, data = pods.data, family = poisson())
 
-From [GLMM Wiki](http://glmm.wikidot.com/faq), we grabbed and use the `overdisp_fun` function.
+aictab(list(pods.null, pods.herb, pods.N, pods.LMA, pods.ADL, pods.Card), modnames = c('null', 'herb', 'N', 'LMA', 'ADL', 'Cardenolides'))
+```
 
-```{r, echo=F}
-overdisp_fun <- function(model) {
-  ## number of variance parameters in 
-  ##   an n-by-n variance-covariance matrix
-  vpars <- function(m) {
-    nrow(m)*(nrow(m)+1)/2
-  }
-  model.df <- sum(sapply(VarCorr(model),vpars))+length(fixef(model))
-  rdf <- nrow(model.frame(model))-model.df
-  rp <- residuals(model,type="pearson")
-  Pearson.chisq <- sum(rp^2)
-  prat <- Pearson.chisq/rdf
-  pval <- pchisq(Pearson.chisq, df=rdf, lower.tail=FALSE)
-  c(chisq=Pearson.chisq,ratio=prat,rdf=rdf,p=pval)
+Wait, what... why is Cardenolides so high? That doesn't make sense looking at the data. We are dubious... but it has no weight anyway, so it really isn't very close.
+
+
+
+
+
+
+#Principal Component Analysis
+So before we go any further with this, we should get a real look at the correlations and variance in the data to get a feel for which variables in our set are quantitatively the most important. We have judged which we think will be intuitively the most important, so now let's see if this matches up. First thing to do is some ordination using PCA to determine which axes through our data space are most important. Following from Numerical Ecology ed.2 by Borcard et al.
+
+```{r}
+#Not including herbivory or height in this as we are just concerned with how the traits are related to each other.
+pca.data = full.data %>% filter(!is.na(LMA), !is.na(Cardenolides)) %>% select(N, C, LMA, ADF, ADL, Cellulose, NDWI, Chl_g_m2, PRI, Cardenolides) #removing NAs that interfere with the pca and selecting only relevant data columns
+
+#scaling all the columns of the data, so that we can work with a correlation matrix rather than a covariance matrix and don't have to worry about the scale of the variables influencing their weights in the ordination
+pca.data = scale(pca.data)
+```
+
+Let's run the pca and look at some summary information.
+```{r}
+pca.traits = rda(pca.data)
+summary(pca.traits, scaling = 2)
+```
+
+Now let's apply and visualize some criteria for selecting 'important' axes.
+```{r}
+ev = pca.traits$CA$eig
+
+#apply Kaiser-Guttman criterion (only those axes whose eigenvalues are above the mean eigenvalue are considered important)
+ev[ev > mean(ev)]
+
+#apply Broken stick model (only those axes whose eigenvalue is larger than the corresponding random length of stick, p.122 Borcard et al 2011)
+n = length(ev)
+bsm = data.frame(j=seq(1:n), p=0)
+bsm$p[1] <- 1/n
+for (i in 2:n) {
+	bsm$p[i] = bsm$p[i-1] + (1/(n + 1 - i))
 }
+bsm$p = 100*bsm$p/n
+bsm
+
+# Plot eigenvalues and % of variance for each axis
+dev.new(title="PCA eigenvalues")
+par(mfrow=c(2,1))
+barplot(ev, main="Eigenvalues", col="bisque", las=2)
+abline(h=mean(ev), col="red")		# average eigenvalue
+legend("topright", "Average eigenvalue", lwd=1, col=2, bty="n")
+barplot(t(cbind(100*ev/sum(ev),bsm$p[n:1])), beside=TRUE, main="% variance", col=c("bisque",2), las=2)
+legend("topright", c("% eigenvalue", "Broken stick model"), pch=15, col=c("bisque",2), bty="n")
+```
+
+So it appears that our first 2 axes are most important by the Kaiser-Guttman Criterion, and the first 2 are important by the BSM. I believe the BSM to be more conservative, so we will keep the first 2 in mind. Let's look at a plot of the ordination.
+```{r}
+#biplot.rda(pca.traits, main='PCA - Scaling 2') #using vegan's biplot.rda() function, which is missing for some reason, scaling 2 is optimal display for variables, the angles between descriptors in the plot reflect their correlations
+
+#using instead a function written by Borcard et al 2011 for doing just this task.
+source('cleanplot.pca.R') #cleanplot file included in source directory
+cleanplot.pca(pca.traits, scaling = 1, plot.sites = T, plot.spe = T, label.sites = F, label.spe = T)
+cleanplot.pca(pca.traits, plot.sites = T, plot.spe = T, label.sites = F, label.spe = T) #including points for sites (plants), and arrowheads and labels on vectors, scaling 2 is default. Distances are meaningless.
+```
+
+So looks like PCA1 captures the tradeoff between defense (cardenolides) and growth/resproduciton (C, cellulose, fiber, lignin) and PCA2 captures photsynthetic information (N, PRI, Chl_g_m2). This is awesome!!
+
+## Tradeoffs
+Let's look further at this tradeoff between growth and defense.
+```{r}
+trade.off.data = mutate(full.data, h_diff = h_apical.next - h_apical)
+trade.off.1 = lm(Cellulose ~ Cardenolides, data=trade.off.data)
+summary(trade.off.1)
+trade.off.2 = lm(ADL ~ Cardenolides, data=trade.off.data)
+summary(trade.off.2)
+trade.off.3 = lm(ADF ~ Cardenolides, data=trade.off.data)
+summary(trade.off.3)
+trade.off.4 = lm(LMA ~ Cardenolides, data=trade.off.data)
+summary(trade.off.4)
+```
+
+So Cardenolides have a highly significant negative relationship with all the structural traits. Let's see if this holds up in differences in height.
+```{r}
+trade.diff = lm(h_diff ~ Cardenolides, data=trade.off.data)
+summary(trade.diff)
+```
+
+
+# Modelling Vital Rates with Traits
+So now that we have these PC axes, we would like to see if they can be used as predictors variables in the model, and compare them to using LMA, N and Cardenolides since the PCA indicated that these were the most orthogonal and the exploratory model seletion showed the most promise in these variables. We are doing this by finding the best model from two sets of predictors: raw trait variables (N, LMA, Cardenolides + h_apical and herb_avg), and pc variables (PC1, PC2 + h_apical and herb_avg), then comparing these two best models with AIC to determine which is better.
+
+## Data
+Move some data around so we can use the PC axes as variables.
+```{r}
+#switching to prcomp for ease of retrieving info, pca is the same
+prcomp.traits = prcomp(pca.data) #data have already been scaled
+
+PC1 = prcomp.traits$x[,1]
+PC2 = prcomp.traits$x[,2]
+
+model.data = full.data %>% filter(!is.na(LMA), !is.na(Cardenolides)) %>%
+                           select(-c(C, ADF, ADL, Cellulose, NDWI, PRI, Chl_g_m2))
+model.data = bind_cols(model.data, data.frame(PC1, PC2))
+```
+
+## Investigating Potential Interactions
+Next, we want to look at whether or not there might be relevant interactions between some of these variables that would make sense to include in the models of the demographic rates. To do this, we will model herb as functions of N and Cardenolides and compare the combinations. If the N*Cardenolides model has a significant relationship with herb_avg then this would indicate that there is a relationship between N and Card in determining the herbivory score (ie. high N, low Card might be the highest herb; or low N, high Card the lowest)...  but our herbivory score might not be on a fine enough scale to capture these relationships, so it might not appear in our data.
+
+First we would like to know whether or not herbivory should be included in the models at all. To decide this, we will look at the correlations between the vatriables and herbivory when we exclude the 0s for herb_avg. The thought behind this is thus: if there is a correlation between the traits and herbivory score (given that they have been eaten), we can exclude it from the model for those plants since this information will be present in the trait data. For the plants with 0 herbivory, herb_avg is a dummy variable that tells us nothing, since they are all the same, therefore it can be excluded for those plants as well... If there is no correlation even after filtering the 0s, then we will keep herb_avg as a candidate predictor in the models because it might provid more information.
+```{r}
+model.data.munch = model.data %>% filter(herb_avg > 0)
+```
+
+Now we should check to see some correlations.
+```{r}
+model.cors.munch = cor(select(model.data.munch, h_apical, herb_avg, N:PC2), use = 'complete.obs')
+model.cors.munch #ignore PCs except wrt height and herb
+```
+Nothing is very highly correlated when munch filter is applied, except (maybe?) LMA and CArdenolides, which never appear in the same model anyway. There is not much correlation between N or Cardenloides and herb_avg.
+
+Okay, now onto the potential interactions...First let's plot some data to see what they look like.
+```{r}
+plot(herb_avg ~ N, data=model.data)
+plot(herb_avg ~ Cardenolides, data=model.data)
 ```
 
 ```{r}
-overdisp_fun(pods.reg.final)
+herb.N = lm(herb_avg ~ N, data=model.data)
+herb.Card = lm(herb_avg ~ Cardenolides, data=model.data)
+herb.Both = lm(herb_avg ~ N + Cardenolides, data=model.data)
+herb.Int = lm(herb_avg ~ N*Cardenolides, data=model.data)
+
+aictab(list(herb.N, herb.Card, herb.Both, herb.Int), modnames = c('N', 'Cardenolides', 'Both', 'Interactions'))
 ```
+Including interactions does not make the model any better.
 
-We have a ratio of $1.0073585$ and a "large" $p$-value, so it looks like Poisson is a good fit!
-
-Let's plot full data.
-
-```{r, eval=FALSE}
-plot(NULL, axes=T, xlim=c(50,160), ylim=c(0, 15), xlab="", ylab="")
-h_apical.next <- attributes(pods.fit$scaled$h_apical.next)$'scaled:center'+attributes(pods.fit$scaled$h_apical.next)$'scaled:scale'*pods.fit$scaled$h_apical.next
-log_herb_avg <- attributes(pods.fit$scaled$log_herb_avg)$'scaled:center'+attributes(pods.fit$scaled$log_herb_avg)$'scaled:scale'*pods.fit$scaled$log_herb_avg
-xpts <- seq(min(h_apical.next), max(h_apical.next), length.out=100)
-for (i in 1:5) {
-  isite <- rownames(pods.fit$pars$unscaled)[i]
-  I <- pods.fit$mdl@frame$site == isite
-  points(h_apical.next[I], pods.fit$mdl@frame$N_pods[I], col=i)
-}
-for (i in 1:5) {
-  isite <- rownames(pods.fit$pars$unscaled)[1+i]
-  I <- which(pods.fit$mdl@frame$site == isite)
-  meanhe <- mean(log_herb_avg[I])
-  ypred <- predict(pods.fit, newdata = list(h_apical.next = xpts, log_herb_avg = meanhe), type=isite)
-  lines(xpts, ypred, col = i, lwd=2)
-}
-meanhe <- mean(log_herb_avg)
-ypred <- predict(pods.fit, newdata = list(h_apical.next = xpts, log_herb_avg = meanhe))
-lines(xpts, ypred, col="black", lwd=4, lty=2)
-
-legend("topleft", sort(unique(as.character(pods.fit$mdl@frame$site))), col=1:5, pch=1)
-```
-
-Now site-specific models.
+Do the same process for PC1 and PC2 as proxies for Card and N, respectively.
 ```{r}
-xyplot(N_pods ~ h_apical.next|site, data=metadata_usc, para=par_usc, metadata=metadata_usc, xpts=xpts, panel = function(x,y,metadata,para,xpts) {
-  panel.xyplot(x, y)
-  isite <- rownames(para)[packet.number()]
-  meanhe <- mean(metadata[metadata$site == isite,]$log_herb_avg)
-  allha <- metadata[metadata$site == isite,]$h_apical.next
-  allhe <- metadata[metadata$site == isite,]$log_herb_avg
-  coeff <- para[packet.number(),]
-  ymean <- exp(coeff[,'(Intercept)'] + coeff[,'h_apical.next']*xpts + coeff[,'log_herb_avg']*meanhe + coeff[,'h_apical.next:log_herb_avg']*meanhe*xpts)
-  ypred <- exp(coeff[,'(Intercept)'] + coeff[,'h_apical.next']*allha + coeff[,'log_herb_avg']*allhe + coeff[,'h_apical.next:log_herb_avg']*allha*allhe)
-  panel.lines(xpts, ymean, col = "red")
-  panel.xyplot(allha, ypred, col='red')
-})
+herb.1 = lm(herb_avg ~ PC1, data=model.data)
+herb.2 = lm(herb_avg ~ PC2, data=model.data)
+herb.Both2 = lm(herb_avg ~ PC1 + PC2, data=model.data)
+herb.Int2 = lm(herb_avg ~ PC1*PC2, data=model.data)
+
+aictab(list(herb.1, herb.2, herb.Both2, herb.Int2), modnames = c('PC1', 'PC2', 'Both', 'Interactions'))
+```
+Including interactions actually makes it worse.
+
+Now height.
+```{r}
+height.N = lm(h_apical ~ N, data=model.data)
+height.Card = lm(h_apical ~ Cardenolides, data=model.data)
+height.Both = lm(h_apical ~ N + Cardenolides, data=model.data)
+height.Int = lm(h_apical ~ N*Cardenolides, data=model.data)
+
+aictab(list(height.N, height.Card, height.Both, height.Int), modnames = c('N', 'Cardenolides', 'Both', 'Interactions'))
+```
+Including interactions does not make the model any better.
+
+Do the same process for PC1 and PC2 as proxies for Card and N, respectively.
+```{r}
+height.1 = lm(h_apical ~ PC1, data=model.data)
+height.2 = lm(h_apical ~ PC2, data=model.data)
+height.Both2 = lm(h_apical ~ PC1 + PC2, data=model.data)
+height.Int2 = lm(h_apical ~ PC1*PC2, data=model.data)
+
+aictab(list(height.1, height.2, height.Both2, height.Int2), modnames = c('PC1', 'PC2', 'Both', 'Interactions'))
+```
+Hmm... using PC axes, we get an interaction, but not when using raw traits... not including interactions for now.
+
+## Vital Rate Model Selection
+### Flowering
+```{r}
+flower.m.data = model.data %>% filter(!is.na(fec.flower))
 ```
 
-# References
+Backward model selection method for raw traits predictor set.
+```{r}
+flower.raw.full = glm(fec.flower ~ h_apical + herb_avg + N + LMA + Cardenolides, data = flower.m.data, family = binomial())
+drop1(flower.raw.full)
+flower.raw.1 = glm(fec.flower ~ h_apical + herb_avg + LMA + Cardenolides, data = flower.m.data, family = binomial())
+drop1(flower.raw.1)
+flower.raw.2 = glm(fec.flower ~ h_apical + LMA + Cardenolides, data = flower.m.data, family = binomial())
+drop1(flower.raw.2)
+flower.raw.2.1 = glm(fec.flower ~ h_apical + herb_avg + Cardenolides, data = flower.m.data, family = binomial()) #since droptable is weird, this would be the next best to drop
+drop1(flower.raw.2.1)
 
- * [Model selection in GLMMs](http://stats.stackexchange.com/questions/74220/generalized-linear-mixed-models-model-selection)
- * [glmmLasso manual](https://cran.r-project.org/web/packages/glmmLasso/glmmLasso.pdf)
- * [Optimizing random effects in GLMMs](https://www.researchgate.net/post/How_can_I_optimize_the_random_effect_structure_in_a_GLMM)
- * [Paper discussing the need to use maximal random effects](http://www.ncbi.nlm.nih.gov/pmc/articles/PMC3881361/)
- * [Bayesian IPMs](http://onlinelibrary.wiley.com/doi/10.1890/15-1526.1/epdf)
- * [Discussion on how to check for overdispersion in GLMM from lme4](https://github.com/lme4/lme4/issues/220)
- * [Heteroscedasticity in lme4](http://r-sig-mixed-models.r-project.narkive.com/qfqOsMAN/r-sig-me-lme4-heteroscedasticity)
- * [Difference between lme4 and nlme](http://stats.stackexchange.com/questions/5344/how-to-choose-nlme-or-lme4-r-library-for-mixed-effects-models)
- * [Specifying multiple random effects in nlme](http://stats.stackexchange.com/questions/58669/specifying-multiple-separate-random-effects-in-lme)
- * [Variance-covariance structure for random effects in glmer](http://stats.stackexchange.com/questions/86958/variance-covariance-structure-for-random-effects-in-glmer)
- * [Displaying model fits in lattice plots](http://lattice.r-forge.r-project.org/Vignettes/src/lattice-tricks/regression-lines.pdf)
- * [Extracting slopes for cases from a mixed effects model (lme4)](http://stats.stackexchange.com/questions/122009/extracting-slopes-for-cases-from-a-mixed-effects-model-lme4)
- * [Taking control of qualitative colors in lattice](http://www.stat.ubc.ca/~jenny/STAT545A/block16_colorsLatticeQualitative.html)
- 
-# Appendix
+flower.raw.3 = glm(fec.flower ~ h_apical + Cardenolides, data = flower.m.data, family = binomial()) #dropping herb_avg doesn't actually lower AIC
+drop1(flower.raw.3)
 
-## glmmLasso
+aictab(list(flower.raw.full, flower.raw.1, flower.raw.2, flower.raw.2.1, flower.raw.3), modnames = c('full', '1', '2', '2.1', '3'))
 
-The next bit is stuff from the function `glmmLasso`, which is another package that does variable selection for GLMMs.  Keeping it for reference (took me a bit to figure out how to use the damn thing).
-
-```{r, eval=FALSE}
-gL1 <- glmmLasso(fec.flower ~ h_apical + herb_avg + h_apical:herb_avg, rnd = list(site=~1, year=~1+h_apical), lambda=10, data=metadata_sc, family=binomial(link=logit))
-gL2 <- glmmLasso(fec.flower ~ h_apical + herb_avg + h_apical:herb_avg, rnd = list(site=~1+herb_avg, year=~1+h_apical), lambda=10, data=metadata_sc, family=binomial(link=logit))
+## drop table not matching up... so 2 and 3 are actually worse than 2.1 when you do the AIC by hand (AIC()), so sticking with 2.1
+flower.raw.final = flower.raw.2.1
+summary(flower.raw.final)                   
 ```
 
-To use it properly, `lambda` needs to be optimized.  Type ` demo("glmmLasso-soccer")` in R to see how this is done (draft code is in the file `glmmFit.R`).
+Backward model selection for PCA predictor set.
+```{r}
+flower.pc.full = glm(fec.flower ~ h_apical + herb_avg + PC1 + PC2, data = flower.m.data, family = binomial())
+drop1(flower.pc.full)
+flower.pc.1 = glm(fec.flower ~ h_apical + PC1 + PC2, data = flower.m.data, family = binomial())
+drop1(flower.pc.1)
+flower.pc.1.1 = glm(fec.flower ~ h_apical + herb_avg + PC1, data = flower.m.data, family = binomial())
+drop1(flower.pc.1.1)
 
-## Growth (individual sites)
-
-Let's look at BLD1 first:
-
-```{r, eval=F}
-metaBLD1 <- metadata %>% filter(site == "BLD1",
-                                !is.na(h_apical),
-                                !is.na(h_apical.next),
-                                !is.na(herb_avg),
-                                fec.flower == 1,
-                                surv == 1)
-xyplot(h_apical.next ~ h_apical, data=metaBLD1, group = year, auto.key = TRUE)
-
-growth.reg.null=lmer(h_apical.next~h_apical*herb_avg+(1|year),data=metaBLD1, REML=T)
-
-growth.reg.height=lmer(h_apical.next~h_apical*herb_avg+(h_apical|year),data=metaBLD1, REML=T)
-
-growth.reg.herb=lmer(h_apical.next~h_apical*herb_avg+(herb_avg|year),data=metaBLD1, REML=T)
-
-AIC(growth.reg.null, growth.reg.height, growth.reg.herb)
-
-growth.mdl1.BLD1 <- lm(h_apical.next ~ h_apical*herb_avg, data=metaBLD1)
-growth.mdlnoi.BLD1 <- lm(h_apical.next ~ h_apical+herb_avg, data=metaBLD1)
-growth.mdlnohe.BLD1 <- lm(h_apical.next ~ h_apical+h_apical:herb_avg, data=metaBLD1)
-growth.mdl0.BLD1 <- lm(h_apical.next ~ h_apical, data=metaBLD1)
-
-AIC(growth.mdl1.BLD1, growth.mdlnoi.BLD1, growth.mdlnohe.BLD1, growth.mdl0.BLD1)
-
-par(mfrow=c(2,2))
-plot(growth.mdlnohe.BLD1)
-par(mfrow=c(1,1))
+## 2 is worse than 1, so keeping herb_avg
+flower.pc.final = flower.pc.1
+summary(flower.pc.final)
 ```
 
-Now BLD2:
-
-```{r, eval=F}
-metaBLD2 <- metadata %>% filter(site == "BLD2",
-                                fec.flower == 1,
-                                !is.na(h_apical),
-                                !is.na(h_apical.next),
-                                !is.na(herb_avg))
-growth.mdl1.BLD2 <- lm(h_apical.next ~ h_apical*herb_avg, data=metaBLD2)
-growth.mdlnoi.BLD2 <- lm(h_apical.next ~ h_apical+herb_avg, data=metaBLD2)
-growth.mdlnohe.BLD2 <- lm(h_apical.next ~ h_apical+h_apical:herb_avg, data=metaBLD2)
-growth.mdl0.BLD2 <- lm(h_apical.next ~ h_apical, data=metaBLD2)
-
-AIC(growth.mdl1.BLD2, growth.mdlnoi.BLD2, growth.mdlnohe.BLD2, growth.mdl0.BLD2)
-
-par(mfrow=c(2,2))
-plot(growth.mdlnohe.BLD2)
-par(mfrow=c(1,1))
+Now we will compare the best models from the two predictor sets with AIC.
+```{r}
+aictab(list(flower.raw.final, flower.pc.final), modnames= c('Raw Plant Traits', 'PC Axes'))
 ```
 
-Now PWR:
+So from this we can see that the raw plant traits produced a best model with lower AIC.
 
-```{r, eval=F}
-metaPWR <- metadata %>% filter(site == "PWR",
-                                fec.flower == 1,
-                                !is.na(h_apical),
-                                !is.na(h_apical.next),
-                                !is.na(herb_avg))
-growth.mdl1.PWR <- lm(h_apical.next ~ h_apical*herb_avg, data=metaPWR)
-growth.mdlnoi.PWR <- lm(h_apical.next ~ h_apical+herb_avg, data=metaPWR)
-growth.mdlnohe.PWR <- lm(h_apical.next ~ h_apical+h_apical:herb_avg, data=metaPWR)
-growth.mdl0.PWR <- lm(h_apical.next ~ h_apical, data=metaPWR)
-
-AIC(growth.mdl1.PWR, growth.mdlnoi.PWR, growth.mdlnohe.PWR, growth.mdl0.PWR)
-
-par(mfrow=c(2,2))
-plot(growth.mdlnohe.PWR)
-par(mfrow=c(1,1))
+### Survival
+```{r}
+surv.m.data = model.data %>% filter(!is.na(surv))
 ```
 
-Now SKY:
+Backward model selection method for raw traits predictor set.
+```{r}
+surv.raw.full = glm(surv ~ h_apical + herb_avg + N + LMA + Cardenolides, data = surv.m.data, family = binomial())
+drop1(surv.raw.full)
+surv.raw.1 = glm(surv ~ h_apical + herb_avg + LMA + Cardenolides, data = surv.m.data, family = binomial())
+drop1(surv.raw.1)
 
-```{r, eval=F}
-metaSKY <- metadata %>% filter(site == "SKY",
-                                fec.flower == 1,
-                                !is.na(h_apical),
-                                !is.na(h_apical.next),
-                                !is.na(herb_avg))
-growth.mdl1.SKY <- lm(h_apical.next ~ h_apical*herb_avg, data=metaSKY)
-growth.mdlnoi.SKY <- lm(h_apical.next ~ h_apical+herb_avg, data=metaSKY)
-growth.mdlnohe.SKY <- lm(h_apical.next ~ h_apical+h_apical:herb_avg, data=metaSKY)
-growth.mdl0.SKY <- lm(h_apical.next ~ h_apical, data=metaSKY)
-
-AIC(growth.mdl1.SKY, growth.mdlnoi.SKY, growth.mdlnohe.SKY, growth.mdl0.SKY)
-
-par(mfrow=c(2,2))
-plot(growth.mdl1.SKY)
-par(mfrow=c(1,1))
+surv.raw.final = surv.raw.1
+summary(surv.raw.final)
 ```
 
-Now YTB:
+Backward model selection for PCA predictor set.
+```{r}
+surv.pc.full = glm(surv ~ h_apical + herb_avg + PC1 + PC2, data = surv.m.data, family = binomial())
+drop1(surv.pc.full)
+surv.pc.1 = glm(surv ~ h_apical + herb_avg + PC1, data = surv.m.data, family = binomial()) #dropping PC2 to compare a simpler model
+drop1(surv.pc.1)
 
-```{r, eval=F}
-metaYTB <- metadata %>% filter(site == "YTB",
-                               fec.flower == 1,
-                               surv == 1,
-                               h_apical > 50,
-                               h_apical.next > 50,
-                               !is.na(h_apical),
-                               !is.na(h_apical.next),
-                               !is.na(herb_avg))
-
-xyplot(h_apical.next ~ h_apical, data=metaYTB, group = year, auto.key = TRUE)
-
-growth.reg.null=lmer(h_apical.next~h_apical*herb_avg+(1|year),data=metaYTB, REML=T)
-
-growth.reg.height=lmer(h_apical.next~h_apical*herb_avg+(h_apical|year),data=metaYTB, REML=T)
-
-AIC(growth.reg.null, growth.reg.height)
-
-growth.mdl1.YTB <- lm(h_apical.next ~ h_apical*herb_avg, data=metaYTB)
-growth.mdlnoi.YTB <- lm(h_apical.next ~ h_apical+herb_avg, data=metaYTB)
-growth.mdlnohe.YTB <- lm(h_apical.next ~ h_apical+h_apical:herb_avg, data=metaYTB)
-growth.mdl0.YTB <- lm(h_apical.next ~ h_apical, data=metaYTB)
-
-AIC(growth.mdl1.YTB, growth.mdlnoi.YTB, growth.mdlnohe.YTB, growth.mdl0.YTB)
-
-par(mfrow=c(2,2))
-plot(growth.mdl1.YTB)
-par(mfrow=c(1,1))
+## full better than 1, so keeping PC2
+surv.pc.final = surv.pc.full
+summary(surv.pc.final)
 ```
+
+Now we will compare the best models from the two predictor sets with AIC.
+```{r}
+aictab(list(surv.raw.final, surv.pc.final), modnames= c('Raw Plant Traits', 'PC Axes'))
+```
+
+So from this we can see that the PC traits produced a best model with lower AIC... although indistinguishable.
+
+### Growth
+```{r}
+growth.m.data = model.data %>% filter(!is.na(h_apical), !is.na(h_apical.next))
+```
+
+Backward model selection method for raw traits predictor set.
+```{r}
+growth.raw.full = lm(h_apical.next ~ h_apical + herb_avg + N + LMA + Cardenolides, data = growth.m.data)
+drop1(growth.raw.full)
+growth.raw.1 = lm(h_apical.next ~ h_apical + herb_avg + N + Cardenolides, data = growth.m.data) #indistinguishable, so comparing simpler model
+drop1(growth.raw.1)
+
+#nothing better emerged, so sticking with full
+growth.raw.final = growth.raw.full
+summary(growth.raw.final)
+```
+
+Backward model selection method for PCA predictor set.
+```{r}
+growth.pc.full = lm(h_apical.next ~ h_apical + herb_avg + PC1 + PC2, data = growth.m.data)
+drop1(growth.pc.full)
+
+growth.pc.final = growth.pc.full
+summary(growth.pc.final)
+```
+
+Now we will compare the best models from the two predictor sets with AIC.
+```{r}
+aictab(list(growth.raw.final, growth.pc.final), modnames= c('Raw Plant Traits', 'PC Axes'))
+```
+
+So from this we can see that the PC traits produced a best model with distinguishably lower AIC...
+
+### Pods
+```{r}
+pods.m.data = model.data %>% filter(!is.na(N_pods))
+```
+
+Comparison of June vs September Height.
+```{r}
+pods.raw.full.j = glm(N_pods ~ h_apical + herb_avg + N + LMA + Cardenolides, data = pods.m.data, family = poisson())
+pods.raw.full.s = glm(N_pods ~ h_apical.next + herb_avg + N + LMA + Cardenolides, data = pods.m.data, family = poisson())
+aictab(list(pods.raw.full.j, pods.raw.full.s), modnames = c('June', 'September'))
+```
+
+Hmmm... so now June height is a comparable predictor of pod production to September height... this means we can make a simpler IPM and a change in the life cycle diagram (removing growth and tau, which should make the IPM simpler).
+
+Backward model selection method for raw traits predictor set.
+```{r}
+pods.raw.full = glm(N_pods ~ h_apical + herb_avg + N + LMA + Cardenolides, data = pods.m.data, family = poisson())
+drop1(pods.raw.full)
+pods.raw.1 = glm(N_pods ~ h_apical + herb_avg + LMA + Cardenolides, data = pods.m.data, family = poisson())
+drop1(pods.raw.1)
+
+pods.raw.final = pods.raw.1
+summary(pods.raw.final)
+```
+
+Backward model selection method for PCA predictor set.
+```{r}
+pods.pc.full = glm(N_pods ~ h_apical + herb_avg + PC1 + PC2, data = pods.m.data, family = poisson())
+drop1(pods.pc.full)
+pods.pc.1 = glm(N_pods ~ h_apical + herb_avg + PC1, data = pods.m.data, family = poisson())
+drop1(pods.pc.1)
+
+pods.pc.final = pods.pc.1
+summary(pods.pc.final)
+```
+
+Now we will compare the best models from the two predictor sets with AICc.
+```{r}
+aictab(list(pods.raw.final, pods.pc.final), modnames= c('Raw Plant Traits', 'PC Axes'))
+```
+
+So from this we can see that the raw plant traits produced a best model with lower AICc.
