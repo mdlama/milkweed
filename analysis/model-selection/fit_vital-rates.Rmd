@@ -6,7 +6,7 @@ output:
     toc: true
 ---
 
-#Initialization
+# Initialization
 
 ```{r}
 library(milkweed)
@@ -18,9 +18,12 @@ library(vegan)
 ```
 
 # Exploratory Model Selection
+
 We want to know if including any of these traits (and/or herbivory) ever predicts the vital rates better than just height alone. ... first, N LMA ADL and cardenolides
+
 ## Flowering
 ```{r}
+# full.data <- read.csv("../../inst/extdata/fulldata.csv")
 flower.data = full.data %>% filter(!is.na(h_apical), !is.na(fec.flower))
 ```
 
@@ -44,7 +47,7 @@ f5 = ggplot(flower.data, aes(x = ADL, y = fec.flower)) +
 f6 = ggplot(flower.data, aes(x = Cardenolides, y = fec.flower)) + 
             geom_jitter(height = 0.1, alpha = 0.3, color = 'blue')
 
-flower.plots = grid.arrange(f1, f2, f3, f4, f5, f6)
+flower.plots = gridExtra::grid.arrange(f1, f2, f3, f4, f5, f6)
 ```
 
 Here's the model with height as the only predictor to compare against.
@@ -121,7 +124,7 @@ s5 = ggplot(surv.data, aes(x = ADL, y = surv)) +
 s6 = ggplot(surv.data, aes(x = Cardenolides, y = surv)) + 
             geom_jitter(height = 0.1, alpha = 0.3, color = 'blue')
 
-surv.plots = grid.arrange(s1, s2, s3, s4, s5, s6)
+surv.plots = gridExtra::grid.arrange(s1, s2, s3, s4, s5, s6)
 ```
 
 Height doesn't look like it's doing so hot here. Maybe we should test it against other stuff before just including it by default.
@@ -191,7 +194,7 @@ g5 = ggplot(growth.data, aes(x = ADL, y = h_apical.next)) +
 g6 = ggplot(growth.data, aes(x = Cardenolides, y = h_apical.next)) + 
             geom_point(alpha = 0.3, color = 'blue')
 
-growth.plots = grid.arrange(g1, g2, g3, g4, g5, g6)
+growth.plots = gridExtra::grid.arrange(g1, g2, g3, g4, g5, g6)
 ```
 
 ```{r}
@@ -240,7 +243,7 @@ p5 = ggplot(pods.data, aes(x = ADL, y = N_pods)) +
 p6 = ggplot(pods.data, aes(x = Cardenolides, y = N_pods)) + 
             geom_point(alpha = 0.3, color = 'blue')
 
-pods.plots = grid.arrange(p1, p2, p3, p4, p5, p6)
+pods.plots = gridExtra::grid.arrange(p1, p2, p3, p4, p5, p6)
 ```
 
 Height and N, look good for a Poisson. Herb could arguably be exponential...
@@ -261,12 +264,8 @@ aictab(list(pods.null, pods.herb, pods.N, pods.LMA, pods.ADL, pods.Card), modnam
 
 Wait, what... why is Cardenolides so high? That doesn't make sense looking at the data. We are dubious... but it has no weight anyway, so it really isn't very close.
 
+# Principal Component Analysis
 
-
-
-
-
-#Principal Component Analysis
 So before we go any further with this, we should get a real look at the correlations and variance in the data to get a feel for which variables in our set are quantitatively the most important. We have judged which we think will be intuitively the most important, so now let's see if this matches up. First thing to do is some ordination using PCA to determine which axes through our data space are most important. Following from Numerical Ecology ed.2 by Borcard et al.
 
 ```{r}
