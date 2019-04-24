@@ -17,12 +17,15 @@ library(AICcmodavg)
 library(vegan)
 library(flextable)
 library(webshot)
+
+model.data = full.data %>% filter(!is.na(LMA), !is.na(Cardenolides)) %>%
+                           select(-c(C, ADF, Cellulose, NDWI, PRI, Chl_g_m2))
 ```
 
 # Flowering
 
 ```{r}
-flower.data = full.data %>% filter(!is.na(h_apical), !is.na(fec.flower))
+flower.data = model.data %>% filter(!is.na(fec.flower))
 ```
 
 ## Forward selection
@@ -183,7 +186,7 @@ ft <- flextable(fAIC) %>%
   add_header(Modnames = "Flowering") %>%
   fontsize(part = "header", size = 12) %>%
   set_header_labels(Modnames = "Model") %>% 
-  bg(i = 2, bg = "#dedede") %>% 
+  bg(i = 1, bg = "#dedede") %>% 
   width(j = ~ Modnames, width = 2.6) %>%
   set_formatter(
     K = function(x) sprintf("%d", x)
@@ -206,84 +209,84 @@ webshot(html_name, zoom = 2, file = "floweringAIC.png",
         selector = "body > div.container-fluid.main-container > div.tabwid > table")
 ```
 
-# podsival
+# Survival
 
 ```{r}
-pods.data = full.data %>% filter(!is.na(h_apical), !is.na(pods))
+surv.data = model.data %>% filter(!is.na(surv))
 ```
 
 ## Forward selection
 
 Single variable:
 ```{r}
-pods.height = glm(pods ~ h_apical, data = pods.data, family = binomial())
-pods.herb = glm(pods ~ herb_avg, data = pods.data, family = binomial())
-pods.N = glm(pods ~ N, data = pods.data, family = binomial())
-pods.LMA = glm(pods ~ LMA, data = pods.data, family = binomial())
-pods.ADL = glm(pods ~ ADL, data = pods.data, family = binomial())
-pods.Card = glm(pods ~ Cardenolides, data = pods.data, family = binomial())
+surv.height = glm(surv ~ h_apical, data = surv.data, family = binomial())
+surv.herb = glm(surv ~ herb_avg, data = surv.data, family = binomial())
+surv.N = glm(surv ~ N, data = surv.data, family = binomial())
+surv.LMA = glm(surv ~ LMA, data = surv.data, family = binomial())
+surv.ADL = glm(surv ~ ADL, data = surv.data, family = binomial())
+surv.Card = glm(surv ~ Cardenolides, data = surv.data, family = binomial())
 
-aictab(list(pods.height, pods.herb, pods.N, pods.LMA, pods.ADL, pods.Card), modnames = c('height', 'herb', 'N', 'LMA', 'ADL', 'Card'))
+aictab(list(surv.height, surv.herb, surv.N, surv.LMA, surv.ADL, surv.Card), modnames = c('height', 'herb', 'N', 'LMA', 'ADL', 'Card'))
 ```
 
 Two variables:
 ```{r}
-pods.Cherb = glm(pods ~ Cardenolides + herb_avg, data = pods.data, family = binomial())
-pods.CN = glm(pods ~ Cardenolides + N, data = pods.data, family = binomial())
-pods.CLMA = glm(pods ~ Cardenolides + LMA, data = pods.data, family = binomial())
-pods.CADL = glm(pods ~ Cardenolides + ADL, data = pods.data, family = binomial())
-pods.Cheight = glm(pods ~ Cardenolides + h_apical, data = pods.data, family = binomial())
+surv.Cherb = glm(surv ~ Cardenolides + herb_avg, data = surv.data, family = binomial())
+surv.CN = glm(surv ~ Cardenolides + N, data = surv.data, family = binomial())
+surv.CLMA = glm(surv ~ Cardenolides + LMA, data = surv.data, family = binomial())
+surv.CADL = glm(surv ~ Cardenolides + ADL, data = surv.data, family = binomial())
+surv.Cheight = glm(surv ~ Cardenolides + h_apical, data = surv.data, family = binomial())
 
-aictab(list(pods.Card, pods.Cherb, pods.CN, pods.CLMA, pods.CADL, pods.Cheight), modnames = c('Card', 'Card + herb', 'Card + N', 'Card + LMA', 'Card + ADL', 'Card + height'))
+aictab(list(surv.Card, surv.Cherb, surv.CN, surv.CLMA, surv.CADL, surv.Cheight), modnames = c('Card', 'Card + herb', 'Card + N', 'Card + LMA', 'Card + ADL', 'Card + height'))
 ```
 
 Three variables:
 ```{r}
-pods.Chha = glm(pods ~ Cardenolides + herb_avg + h_apical, data = pods.data, family = binomial())
-pods.ChN = glm(pods ~ Cardenolides + herb_avg + N, data = pods.data, family = binomial())
-pods.ChLMA = glm(pods ~ Cardenolides + herb_avg + LMA, data = pods.data, family = binomial())
-pods.ChADL = glm(pods ~ Cardenolides + herb_avg + ADL, data = pods.data, family = binomial())
+surv.Chha = glm(surv ~ Cardenolides + herb_avg + h_apical, data = surv.data, family = binomial())
+surv.ChN = glm(surv ~ Cardenolides + herb_avg + N, data = surv.data, family = binomial())
+surv.ChLMA = glm(surv ~ Cardenolides + herb_avg + LMA, data = surv.data, family = binomial())
+surv.ChADL = glm(surv ~ Cardenolides + herb_avg + ADL, data = surv.data, family = binomial())
 
-aictab(list(pods.Cherb, pods.Chha, pods.ChN, pods.ChLMA, pods.ChADL),
+aictab(list(surv.Cherb, surv.Chha, surv.ChN, surv.ChLMA, surv.ChADL),
        modnames = c('Card + herb', 'Card + herb + height', 'Card + herb + N', 'Card + herb + LMA', 'Card + herb + ADL'))
 ```
 
 Four variables
 ```{r}
-pods.ChhaLMA = glm(pods ~ Cardenolides + herb_avg + h_apical + LMA, data = pods.data, family = binomial())
-pods.ChhaN = glm(pods ~ Cardenolides + herb_avg + h_apical + N, data = pods.data, family = binomial())
-pods.ChhaADL = glm(pods ~ Cardenolides + herb_avg + h_apical + ADL, data = pods.data, family = binomial())
+surv.ChhaLMA = glm(surv ~ Cardenolides + herb_avg + h_apical + LMA, data = surv.data, family = binomial())
+surv.ChhaN = glm(surv ~ Cardenolides + herb_avg + h_apical + N, data = surv.data, family = binomial())
+surv.ChhaADL = glm(surv ~ Cardenolides + herb_avg + h_apical + ADL, data = surv.data, family = binomial())
 
-aictab(list(pods.Chha, pods.ChhaLMA, pods.ChhaN, pods.ChhaADL),
+aictab(list(surv.Chha, surv.ChhaLMA, surv.ChhaN, surv.ChhaADL),
                modnames = c('Card + herb + height', 'Card + herb + height + LMA', 'Card + herb + height + N', 'Card + herb + height + ADL'))
 ```
 
 Five variables
 ```{r}
-pods.ChhaLMAN = glm(pods ~ Cardenolides + herb_avg + h_apical + LMA + N, data = pods.data, family = binomial())
-pods.ChhaLMAADL = glm(pods ~ Cardenolides + herb_avg + h_apical + LMA + ADL, data = pods.data, family = binomial())
+surv.ChhaLMAN = glm(surv ~ Cardenolides + herb_avg + h_apical + LMA + N, data = surv.data, family = binomial())
+surv.ChhaLMAADL = glm(surv ~ Cardenolides + herb_avg + h_apical + LMA + ADL, data = surv.data, family = binomial())
 
-aictab(list(pods.ChhaLMA, pods.ChhaLMAN, pods.ChhaLMAADL),
+aictab(list(surv.ChhaLMA, surv.ChhaLMAN, surv.ChhaLMAADL),
        modnames = c('Card + herb + height + LMA', 'Card + herb + height + LMA + N', 'Card + herb + height + LMA + ADL'))
 ```
 
 Full model
 ```{r}
-pods.ChhaLMAADLN = glm(pods ~ Cardenolides + herb_avg + h_apical + LMA + ADL + N, data = pods.data, family = binomial())
+surv.ChhaLMAADLN = glm(surv ~ Cardenolides + herb_avg + h_apical + LMA + ADL + N, data = surv.data, family = binomial())
 
-aictab(list(pods.ChhaLMA, pods.ChhaLMAADL, pods.ChhaLMAADLN), 
+aictab(list(surv.ChhaLMA, surv.ChhaLMAADL, surv.ChhaLMAADLN), 
        modnames = c('Card + herb + height + LMA', 'Card + herb + height + LMA + ADL', 'Card + herb + height + LMA + ADL + N'))
 ```
 
 ```{r}
-sAIC <- aictab(list(pods.height, pods.herb, pods.N, pods.LMA, pods.ADL, pods.Card, pods.Cherb, pods.CN, pods.CLMA, pods.CADL, pods.Cheight, pods.Chha, pods.ChN, pods.ChLMA, pods.ChADL, pods.ChhaLMA, pods.ChhaN, pods.ChhaADL, pods.ChhaLMAN, pods.ChhaLMAADL), modnames = c('height', 'herb', 'N', 'LMA', 'ADL', 'Card', 'Card + herb', 'Card + N', 'Card + LMA', 'Card + ADL', 'Card + height', 'Card + herb + height', 'Card + herb + N', 'Card + herb + LMA', 'Card + herb + ADL', 'Card + herb + height + LMA', 'Card + herb + height + N', 'Card + herb + height + ADL', 'Card + herb + height + LMA + N', 'Card + herb + height + LMA + ADL'))
+sAIC <- aictab(list(surv.height, surv.herb, surv.N, surv.LMA, surv.ADL, surv.Card, surv.Cherb, surv.CN, surv.CLMA, surv.CADL, surv.Cheight, surv.Chha, surv.ChN, surv.ChLMA, surv.ChADL, surv.ChhaLMA, surv.ChhaN, surv.ChhaADL, surv.ChhaLMAN, surv.ChhaLMAADL), modnames = c('height', 'herb', 'N', 'LMA', 'ADL', 'Card', 'Card + herb', 'Card + N', 'Card + LMA', 'Card + ADL', 'Card + height', 'Card + herb + height', 'Card + herb + N', 'Card + herb + LMA', 'Card + herb + ADL', 'Card + herb + height + LMA', 'Card + herb + height + N', 'Card + herb + height + ADL', 'Card + herb + height + LMA + N', 'Card + herb + height + LMA + ADL'))
 sAIC
 ```
 
 Let's format this puppy:
 ```{r}
 ft <- flextable(sAIC) %>%
-  add_header(Modnames = "podsival") %>%
+  add_header(Modnames = "Survival") %>%
   fontsize(part = "header", size = 12) %>%
   set_header_labels(Modnames = "Model") %>%
   bg(i = 1, bg = "#dedede") %>% 
@@ -305,20 +308,20 @@ html_name <- tempfile(fileext = ".html")
 rmarkdown::render(rmd_name, output_format = "html_document", output_file = html_name)
 
 # get a png from the html file with webshot ----
-webshot(html_name, zoom = 2, file = "podsivalAIC.png", 
+webshot(html_name, zoom = 2, file = "survivalAIC.png", 
         selector = "body > div.container-fluid.main-container > div.tabwid > table")
 ```
 
 ## Backward selection
 
 ```{r}
-pods.full = glm(pods ~ h_apical + herb_avg + N + LMA + Cardenolides, data = pods.data, family = binomial())
-pods.height = glm(pods ~ herb_avg + N + LMA + Cardenolides, data = pods.data, family = binomial())
-pods.herb = glm(pods ~ h_apical + N + LMA + Cardenolides, data = pods.data, family = binomial())
-pods.N = glm(pods ~ h_apical + herb_avg + LMA + Cardenolides, data = pods.data, family = binomial())
-pods.LMA = glm(pods ~ h_apical + herb_avg + N + Cardenolides, data = pods.data, family = binomial())
-pods.Card = glm(pods ~ h_apical + herb_avg + N + LMA, data = pods.data, family = binomial())
-aictab(list(pods.full, pods.height, pods.herb, pods.N, pods.LMA, pods.Card), 
+surv.full = glm(surv ~ h_apical + herb_avg + N + LMA + Cardenolides, data = surv.data, family = binomial())
+surv.height = glm(surv ~ herb_avg + N + LMA + Cardenolides, data = surv.data, family = binomial())
+surv.herb = glm(surv ~ h_apical + N + LMA + Cardenolides, data = surv.data, family = binomial())
+surv.N = glm(surv ~ h_apical + herb_avg + LMA + Cardenolides, data = surv.data, family = binomial())
+surv.LMA = glm(surv ~ h_apical + herb_avg + N + Cardenolides, data = surv.data, family = binomial())
+surv.Card = glm(surv ~ h_apical + herb_avg + N + LMA, data = surv.data, family = binomial())
+aictab(list(surv.full, surv.height, surv.herb, surv.N, surv.LMA, surv.Card), 
        modnames = c("height + herb + N + LMA + Card", 
                     "herb + N + LMA + Card",
                     "height + N + LMA + Card",
@@ -329,15 +332,15 @@ aictab(list(pods.full, pods.height, pods.herb, pods.N, pods.LMA, pods.Card),
 
 Dropping N.
 ```{r}
-pods.N_height = glm(pods ~ herb_avg + LMA + Cardenolides, data = pods.data, family = binomial())
+surv.N_height = glm(surv ~ herb_avg + LMA + Cardenolides, data = surv.data, family = binomial())
 
-pods.N_herb = glm(pods ~ h_apical + LMA + Cardenolides, data = pods.data, family = binomial())
+surv.N_herb = glm(surv ~ h_apical + LMA + Cardenolides, data = surv.data, family = binomial())
 
-pods.N_LMA = glm(pods ~ h_apical + herb_avg + Cardenolides, data = pods.data, family = binomial())
+surv.N_LMA = glm(surv ~ h_apical + herb_avg + Cardenolides, data = surv.data, family = binomial())
 
-pods.N_Card = glm(pods ~ h_apical + herb_avg + LMA, data = pods.data, family = binomial())
+surv.N_Card = glm(surv ~ h_apical + herb_avg + LMA, data = surv.data, family = binomial())
 
-aictab(list(pods.N, pods.N_height, pods.N_herb, pods.N_LMA, pods.N_Card), 
+aictab(list(surv.N, surv.N_height, surv.N_herb, surv.N_LMA, surv.N_Card), 
        modnames = c("height + herb + LMA + Card", 
                     "herb + LMA + Card",
                     "height + LMA + Card",
@@ -347,7 +350,7 @@ aictab(list(pods.N, pods.N_height, pods.N_herb, pods.N_LMA, pods.N_Card),
 
 Ready for publication.
 ```{r}
-sAIC <- aictab(list(pods.full, pods.height, pods.herb, pods.N, pods.LMA, pods.Card, pods.N_height, pods.N_herb, pods.N_LMA, pods.N_Card),
+sAIC <- aictab(list(surv.full, surv.height, surv.herb, surv.N, surv.LMA, surv.Card, surv.N_height, surv.N_herb, surv.N_LMA, surv.N_Card),
        modnames = c("height + herb + N + LMA + Card", 
                     "herb + N + LMA + Card",
                     "height + N + LMA + Card",
@@ -365,7 +368,7 @@ sAIC
 Let's format this puppy:
 ```{r}
 ft <- flextable(sAIC) %>%
-  add_header(Modnames = "podsival") %>%
+  add_header(Modnames = "Survival") %>%
   fontsize(part = "header", size = 12) %>%
   set_header_labels(Modnames = "Model") %>%
   bg(i = 1, bg = "#dedede") %>% 
@@ -387,14 +390,14 @@ html_name <- tempfile(fileext = ".html")
 rmarkdown::render(rmd_name, output_format = "html_document", output_file = html_name)
 
 # get a png from the html file with webshot ----
-webshot(html_name, zoom = 2, file = "podsivalAIC.png", 
+webshot(html_name, zoom = 2, file = "survivalAIC.png", 
         selector = "body > div.container-fluid.main-container > div.tabwid > table")
 ```
 
 # Pods
 
 ```{r}
-pods.data = full.data %>% filter(!is.na(h_apical), !is.na(N_pods))
+pods.data = model.data %>% filter(!is.na(N_pods))
 ```
 
 ## Forward selection
