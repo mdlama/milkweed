@@ -1,0 +1,559 @@
+---
+title: "Supplement - Parameter Tables"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: true
+---
+
+# Initialization
+
+```{r}
+library(milkweed)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(flextable)
+library(webshot)
+library(boot)
+library(kable)
+library(kableExtra)
+```
+
+# Distribution Parameters
+
+```{r}
+# Cardenolides
+load(here::here('data/mwCache/cardenolideDistFit.RData'))
+CI <- unname(summary(fitdistrplus::bootdist(card.fit$fit))$CI)
+df <- data.frame(Model = rep("Cardenolides",2),
+           Parameter = c("$\\mu$", "$\\sigma$"),
+           Lower = CI[,2],
+           Value = unname(card.fit$fit$estimate),
+           Upper = CI[,3])
+
+# LMA
+load(here::here('data/mwCache/lmaDistFit.RData'))
+CI <- unname(summary(fitdistrplus::bootdist(lma.fit$fit))$CI)
+df <- rbind(df,
+  data.frame(Model = rep("LMA",2),
+           Parameter = c("$\\mu$", "$\\sigma$"),
+           Lower = CI[,2],
+           Value = unname(lma.fit$fit$estimate),
+           Upper = CI[,3])
+)
+
+# Herbivory
+load(here::here('data/mwCache/herbivoryDistFit.RData'))
+CI <- unname(summary(fitdistrplus::bootdist(munched.fit$fit))$CI)
+df <- rbind(df,
+  data.frame(Model = rep("Herbivory", 3),
+           Parameter = c("$p_{\\omega}$", "$\\mu$", "$\\sigma$"),
+           Lower = c(NA, CI[,2]),
+           Value = c(munched.fit$pmunch, unname(munched.fit$fit$estimate)),
+           Upper = c(NA, CI[,3]))
+)
+
+# Sprout Recruit Height
+load(here::here('data/mwCache/budlingDistFit.RData'))
+CI <- unname(summary(fitdistrplus::bootdist(budling.fit$fit))$CI)
+df <- rbind(df,
+  data.frame(Model = rep("Sprout Recruit Height",2),
+           Parameter = c("$\\mu$", "$\\sigma$"),
+           Lower = CI[,2],
+           Value = unname(budling.fit$fit$estimate),
+           Upper = CI[,3])
+)
+
+# Seedling Recruit Height
+load(here::here('data/mwCache/seedlingDistFit.RData'))
+CI <- unname(summary(fitdistrplus::bootdist(seedling.fit$fit))$CI)
+df <- rbind(df,
+  data.frame(Model = rep("Seedling Recruit Height",2),
+           Parameter = c("$\\mu$", "$\\sigma$"),
+           Lower = CI[,2],
+           Value = unname(seedling.fit$fit$estimate),
+           Upper = CI[,3])
+)
+
+kable(df, "latex", booktabs = T, align = "c", escape = F, digits = 3, col.names = c("Variable", "Parameter", "$2.5\\%$", "Value", "$97.5\\%$")) %>%
+  collapse_rows(columns = 1, latex_hline = "major", valign = "middle") %>%
+  kable_as_image(keep_pdf = TRUE)
+```
+
+Let's format this puppy:
+```{r}
+ft <- flextable(fAIC) %>%
+  add_header(Modnames = "Flowering") %>%
+  fontsize(part = "header", size = 12) %>%
+  set_header_labels(Modnames = "Model") %>% 
+  bg(i = 2, bg = "#dedede") %>% 
+  width(j = ~ Modnames, width = 2.6) %>%
+  set_formatter(
+    K = function(x) sprintf("%d", x)
+  )
+ft
+```
+
+Now save as image:
+```{r}
+# create an Rmd file ----
+rmd_name <- tempfile(fileext = ".Rmd")
+cat("```{r echo=FALSE}\nft\n```", file = rmd_name)
+
+# render as an html file ----
+html_name <- tempfile(fileext = ".html")
+rmarkdown::render(rmd_name, output_format = "html_document", output_file = html_name)
+
+# get a png from the html file with webshot ----
+webshot(html_name, zoom = 2, file = "floweringAIC.png", 
+        selector = "body > div.container-fluid.main-container > div.tabwid > table")
+```
+
+## Backward Selection
+
+```{r}
+flower.full = glm(fec.flower ~ h_apical + herb_avg + N + LMA + Cardenolides, data = flower.data, family = binomial())
+
+flower.height = glm(fec.flower ~ herb_avg + N + LMA + Cardenolides, data = flower.data, family = binomial())
+
+flower.herb = glm(fec.flower ~ h_apical + N + LMA + Cardenolides, data = flower.data, family = binomial())
+
+flower.N = glm(fec.flower ~ h_apical + herb_avg + LMA + Cardenolides, data = flower.data, family = binomial())
+
+flower.LMA = glm(fec.flower ~ h_apical + herb_avg + N + Cardenolides, data = flower.data, family = binomial())
+
+flower.Card = glm(fec.flower ~ h_apical + herb_avg + N + LMA, data = flower.data, family = binomial())
+
+aictab(list(flower.full, flower.height, flower.herb, flower.N, flower.LMA, flower.Card), 
+       modnames = c("height + herb + N + LMA + Card", 
+                    "herb + N + LMA + Card",
+                    "height + N + LMA + Card",
+                    "height + herb + LMA + Card",
+                    "height + herb + N + Card",
+                    "height + herb + N + LMA"))
+```
+
+Dropping N.
+```{r}
+flower.N_height = glm(fec.flower ~ herb_avg + LMA + Cardenolides, data = flower.data, family = binomial())
+
+flower.N_herb = glm(fec.flower ~ h_apical + LMA + Cardenolides, data = flower.data, family = binomial())
+
+flower.N_LMA = glm(fec.flower ~ h_apical + herb_avg + Cardenolides, data = flower.data, family = binomial())
+
+flower.N_Card = glm(fec.flower ~ h_apical + herb_avg + LMA, data = flower.data, family = binomial())
+
+aictab(list(flower.N, flower.N_height, flower.N_herb, flower.N_LMA, flower.N_Card), 
+       modnames = c("height + herb + LMA + Card", 
+                    "herb + LMA + Card",
+                    "height + LMA + Card",
+                    "height + herb + Card",
+                    "height + herb + LMA"))
+```
+
+Full table for publications.
+```{r}
+fAIC <- aictab(list(flower.full, flower.height, flower.herb, flower.N, flower.LMA, flower.Card, flower.N_height, flower.N_herb, flower.N_LMA, flower.N_Card),
+       modnames = c("height + herb + N + LMA + Card", 
+                    "herb + N + LMA + Card",
+                    "height + N + LMA + Card",
+                    "height + herb + LMA + Card",
+                    "height + herb + N + Card",
+                    "height + herb + N + LMA",
+                    "herb + LMA + Card",
+                    "height + LMA + Card",
+                    "height + herb + Card",
+                    "height + herb + LMA"
+                    ))
+fAIC
+```
+
+Let's format this puppy:
+```{r}
+ft <- flextable(fAIC) %>%
+  add_header(Modnames = "Flowering") %>%
+  fontsize(part = "header", size = 12) %>%
+  set_header_labels(Modnames = "Model") %>% 
+  bg(i = 1, bg = "#dedede") %>% 
+  width(j = ~ Modnames, width = 2.6) %>%
+  set_formatter(
+    K = function(x) sprintf("%d", x)
+  )
+ft
+```
+
+Now save as image:
+```{r}
+# create an Rmd file ----
+rmd_name <- tempfile(fileext = ".Rmd")
+cat("```{r echo=FALSE}\nft\n```", file = rmd_name)
+
+# render as an html file ----
+html_name <- tempfile(fileext = ".html")
+rmarkdown::render(rmd_name, output_format = "html_document", output_file = html_name)
+
+# get a png from the html file with webshot ----
+webshot(html_name, zoom = 2, file = "floweringAIC.png", 
+        selector = "body > div.container-fluid.main-container > div.tabwid > table")
+```
+
+# Survival
+
+```{r}
+surv.data = model.data %>% filter(!is.na(surv))
+```
+
+## Forward selection
+
+Single variable:
+```{r}
+surv.height = glm(surv ~ h_apical, data = surv.data, family = binomial())
+surv.herb = glm(surv ~ herb_avg, data = surv.data, family = binomial())
+surv.N = glm(surv ~ N, data = surv.data, family = binomial())
+surv.LMA = glm(surv ~ LMA, data = surv.data, family = binomial())
+surv.ADL = glm(surv ~ ADL, data = surv.data, family = binomial())
+surv.Card = glm(surv ~ Cardenolides, data = surv.data, family = binomial())
+
+aictab(list(surv.height, surv.herb, surv.N, surv.LMA, surv.ADL, surv.Card), modnames = c('height', 'herb', 'N', 'LMA', 'ADL', 'Card'))
+```
+
+Two variables:
+```{r}
+surv.Cherb = glm(surv ~ Cardenolides + herb_avg, data = surv.data, family = binomial())
+surv.CN = glm(surv ~ Cardenolides + N, data = surv.data, family = binomial())
+surv.CLMA = glm(surv ~ Cardenolides + LMA, data = surv.data, family = binomial())
+surv.CADL = glm(surv ~ Cardenolides + ADL, data = surv.data, family = binomial())
+surv.Cheight = glm(surv ~ Cardenolides + h_apical, data = surv.data, family = binomial())
+
+aictab(list(surv.Card, surv.Cherb, surv.CN, surv.CLMA, surv.CADL, surv.Cheight), modnames = c('Card', 'Card + herb', 'Card + N', 'Card + LMA', 'Card + ADL', 'Card + height'))
+```
+
+Three variables:
+```{r}
+surv.Chha = glm(surv ~ Cardenolides + herb_avg + h_apical, data = surv.data, family = binomial())
+surv.ChN = glm(surv ~ Cardenolides + herb_avg + N, data = surv.data, family = binomial())
+surv.ChLMA = glm(surv ~ Cardenolides + herb_avg + LMA, data = surv.data, family = binomial())
+surv.ChADL = glm(surv ~ Cardenolides + herb_avg + ADL, data = surv.data, family = binomial())
+
+aictab(list(surv.Cherb, surv.Chha, surv.ChN, surv.ChLMA, surv.ChADL),
+       modnames = c('Card + herb', 'Card + herb + height', 'Card + herb + N', 'Card + herb + LMA', 'Card + herb + ADL'))
+```
+
+Four variables
+```{r}
+surv.ChhaLMA = glm(surv ~ Cardenolides + herb_avg + h_apical + LMA, data = surv.data, family = binomial())
+surv.ChhaN = glm(surv ~ Cardenolides + herb_avg + h_apical + N, data = surv.data, family = binomial())
+surv.ChhaADL = glm(surv ~ Cardenolides + herb_avg + h_apical + ADL, data = surv.data, family = binomial())
+
+aictab(list(surv.Chha, surv.ChhaLMA, surv.ChhaN, surv.ChhaADL),
+               modnames = c('Card + herb + height', 'Card + herb + height + LMA', 'Card + herb + height + N', 'Card + herb + height + ADL'))
+```
+
+Five variables
+```{r}
+surv.ChhaLMAN = glm(surv ~ Cardenolides + herb_avg + h_apical + LMA + N, data = surv.data, family = binomial())
+surv.ChhaLMAADL = glm(surv ~ Cardenolides + herb_avg + h_apical + LMA + ADL, data = surv.data, family = binomial())
+
+aictab(list(surv.ChhaLMA, surv.ChhaLMAN, surv.ChhaLMAADL),
+       modnames = c('Card + herb + height + LMA', 'Card + herb + height + LMA + N', 'Card + herb + height + LMA + ADL'))
+```
+
+Full model
+```{r}
+surv.ChhaLMAADLN = glm(surv ~ Cardenolides + herb_avg + h_apical + LMA + ADL + N, data = surv.data, family = binomial())
+
+aictab(list(surv.ChhaLMA, surv.ChhaLMAADL, surv.ChhaLMAADLN), 
+       modnames = c('Card + herb + height + LMA', 'Card + herb + height + LMA + ADL', 'Card + herb + height + LMA + ADL + N'))
+```
+
+```{r}
+sAIC <- aictab(list(surv.height, surv.herb, surv.N, surv.LMA, surv.ADL, surv.Card, surv.Cherb, surv.CN, surv.CLMA, surv.CADL, surv.Cheight, surv.Chha, surv.ChN, surv.ChLMA, surv.ChADL, surv.ChhaLMA, surv.ChhaN, surv.ChhaADL, surv.ChhaLMAN, surv.ChhaLMAADL), modnames = c('height', 'herb', 'N', 'LMA', 'ADL', 'Card', 'Card + herb', 'Card + N', 'Card + LMA', 'Card + ADL', 'Card + height', 'Card + herb + height', 'Card + herb + N', 'Card + herb + LMA', 'Card + herb + ADL', 'Card + herb + height + LMA', 'Card + herb + height + N', 'Card + herb + height + ADL', 'Card + herb + height + LMA + N', 'Card + herb + height + LMA + ADL'))
+sAIC
+```
+
+Let's format this puppy:
+```{r}
+ft <- flextable(sAIC) %>%
+  add_header(Modnames = "Survival") %>%
+  fontsize(part = "header", size = 12) %>%
+  set_header_labels(Modnames = "Model") %>%
+  bg(i = 1, bg = "#dedede") %>% 
+  width(j = ~ Modnames, width = 2.6) %>%
+  set_formatter(
+    K = function(x) sprintf("%d", x)
+  )
+ft
+```
+
+Now save as image:
+```{r}
+# create an Rmd file ----
+rmd_name <- tempfile(fileext = ".Rmd")
+cat("```{r echo=FALSE}\nft\n```", file = rmd_name)
+
+# render as an html file ----
+html_name <- tempfile(fileext = ".html")
+rmarkdown::render(rmd_name, output_format = "html_document", output_file = html_name)
+
+# get a png from the html file with webshot ----
+webshot(html_name, zoom = 2, file = "survivalAIC.png", 
+        selector = "body > div.container-fluid.main-container > div.tabwid > table")
+```
+
+## Backward selection
+
+```{r}
+surv.full = glm(surv ~ h_apical + herb_avg + N + LMA + Cardenolides, data = surv.data, family = binomial())
+surv.height = glm(surv ~ herb_avg + N + LMA + Cardenolides, data = surv.data, family = binomial())
+surv.herb = glm(surv ~ h_apical + N + LMA + Cardenolides, data = surv.data, family = binomial())
+surv.N = glm(surv ~ h_apical + herb_avg + LMA + Cardenolides, data = surv.data, family = binomial())
+surv.LMA = glm(surv ~ h_apical + herb_avg + N + Cardenolides, data = surv.data, family = binomial())
+surv.Card = glm(surv ~ h_apical + herb_avg + N + LMA, data = surv.data, family = binomial())
+aictab(list(surv.full, surv.height, surv.herb, surv.N, surv.LMA, surv.Card), 
+       modnames = c("height + herb + N + LMA + Card", 
+                    "herb + N + LMA + Card",
+                    "height + N + LMA + Card",
+                    "height + herb + LMA + Card",
+                    "height + herb + N + Card",
+                    "height + herb + N + LMA"))
+```
+
+Dropping N.
+```{r}
+surv.N_height = glm(surv ~ herb_avg + LMA + Cardenolides, data = surv.data, family = binomial())
+
+surv.N_herb = glm(surv ~ h_apical + LMA + Cardenolides, data = surv.data, family = binomial())
+
+surv.N_LMA = glm(surv ~ h_apical + herb_avg + Cardenolides, data = surv.data, family = binomial())
+
+surv.N_Card = glm(surv ~ h_apical + herb_avg + LMA, data = surv.data, family = binomial())
+
+aictab(list(surv.N, surv.N_height, surv.N_herb, surv.N_LMA, surv.N_Card), 
+       modnames = c("height + herb + LMA + Card", 
+                    "herb + LMA + Card",
+                    "height + LMA + Card",
+                    "height + herb + Card",
+                    "height + herb + LMA"))
+```
+
+Ready for publication.
+```{r}
+sAIC <- aictab(list(surv.full, surv.height, surv.herb, surv.N, surv.LMA, surv.Card, surv.N_height, surv.N_herb, surv.N_LMA, surv.N_Card),
+       modnames = c("height + herb + N + LMA + Card", 
+                    "herb + N + LMA + Card",
+                    "height + N + LMA + Card",
+                    "height + herb + LMA + Card",
+                    "height + herb + N + Card",
+                    "height + herb + N + LMA",
+                    "herb + LMA + Card",
+                    "height + LMA + Card",
+                    "height + herb + Card",
+                    "height + herb + LMA"
+                    ))
+sAIC
+```
+
+Let's format this puppy:
+```{r}
+ft <- flextable(sAIC) %>%
+  add_header(Modnames = "Survival") %>%
+  fontsize(part = "header", size = 12) %>%
+  set_header_labels(Modnames = "Model") %>%
+  bg(i = 1, bg = "#dedede") %>% 
+  width(j = ~ Modnames, width = 2.6) %>%
+  set_formatter(
+    K = function(x) sprintf("%d", x)
+  )
+ft
+```
+
+Now save as image:
+```{r}
+# create an Rmd file ----
+rmd_name <- tempfile(fileext = ".Rmd")
+cat("```{r echo=FALSE}\nft\n```", file = rmd_name)
+
+# render as an html file ----
+html_name <- tempfile(fileext = ".html")
+rmarkdown::render(rmd_name, output_format = "html_document", output_file = html_name)
+
+# get a png from the html file with webshot ----
+webshot(html_name, zoom = 2, file = "survivalAIC.png", 
+        selector = "body > div.container-fluid.main-container > div.tabwid > table")
+```
+
+# Pods
+
+```{r}
+pods.data = model.data %>% filter(!is.na(N_pods))
+```
+
+## Forward selection
+
+One variable:
+```{r}
+pods.height = glm(N_pods ~ h_apical, data = pods.data, family = poisson())
+pods.herb = glm(N_pods ~ herb_avg, data = pods.data, family = poisson())
+pods.N = glm(N_pods ~ N, data = pods.data, family = poisson())
+pods.LMA = glm(N_pods ~ LMA, data = pods.data, family = poisson())
+pods.ADL = glm(N_pods ~ ADL, data = pods.data, family = poisson())
+pods.Card = glm(N_pods ~ Cardenolides, data = pods.data, family = poisson())
+aictab(list(pods.height, pods.herb, pods.N, pods.LMA, pods.ADL, pods.Card), modnames = c('height', 'herb', 'N', 'LMA', 'ADL', 'Card'))
+```
+
+Two variable:
+```{r}
+pods.herbha = glm(N_pods ~ herb_avg + h_apical, data = pods.data, family = poisson())
+pods.herbN = glm(N_pods ~ herb_avg + N, data = pods.data, family = poisson())
+pods.herbLMA = glm(N_pods ~ herb_avg + LMA, data = pods.data, family = poisson())
+pods.herbADL = glm(N_pods ~ herb_avg + ADL, data = pods.data, family = poisson())
+pods.herbCard = glm(N_pods ~ herb_avg + Cardenolides, data = pods.data, family = poisson())
+
+aictab(list(pods.herb, pods.herbha, pods.herbN, pods.herbLMA, pods.herbADL, pods.herbCard), modnames = c('herb', 'herb + height', 'herb + N', 'herb + LMA', 'herb + ADL', 'herb + Card'))
+```
+
+Three variable:
+```{r}
+pods.herbhaN = glm(N_pods ~ h_apical + herb_avg + N, data = pods.data, family = poisson())
+pods.herbhaLMA = glm(N_pods ~ h_apical + herb_avg + LMA, data = pods.data, family = poisson())
+pods.herbhaADL = glm(N_pods ~ h_apical + herb_avg + ADL, data = pods.data, family = poisson())
+pods.herbhaCard = glm(N_pods ~ h_apical + herb_avg + Cardenolides, data = pods.data, family = poisson())
+
+aictab(list(pods.herbha, pods.herbhaN, pods.herbhaLMA, pods.herbhaADL, pods.herbhaCard), modnames = c('height + herb', 'height + herb + N', 'height + herb + LMA', 'height + herb + ADL', 'height + herb + Card'))
+```
+
+Four variable:
+```{r}
+pods.herbhaCardN = glm(N_pods ~ h_apical + herb_avg + Cardenolides + N, data = pods.data, family = poisson())
+pods.herbhaCardLMA = glm(N_pods ~ h_apical + herb_avg + Cardenolides + LMA, data = pods.data, family = poisson())
+pods.herbhaCardADL = glm(N_pods ~ h_apical + herb_avg + Cardenolides + ADL, data = pods.data, family = poisson())
+aictab(list(pods.herbhaCard, pods.herbhaCardN, pods.herbhaCardLMA, pods.herbhaCardADL),
+       modnames = c('height + herb + Card', 'height + herb + Card + N', 'height + herb + Card + LMA', 'height + herb + Card + ADL'))
+```
+
+Five variables:
+```{r}
+pods.herbhaCardLMAN = glm(N_pods ~ h_apical + herb_avg + Cardenolides + LMA + N, data = pods.data, family = poisson())
+pods.herbhaCardLMAADL = glm(N_pods ~ h_apical + herb_avg + Cardenolides + LMA + ADL, data = pods.data, family = poisson())
+aictab(list(pods.herbhaCardLMA, pods.herbhaCardLMAN, pods.herbhaCardLMAADL),
+       modnames = c('height + herb + Card + LMA', 'height + herb + Card + LMA + N', 'height + herb + Card + LMA + ADL'))
+```
+
+Full table.
+```{r}
+pAIC <- aictab(list(pods.height, pods.herb, pods.N, pods.LMA, pods.ADL, pods.Card, pods.herbha, pods.herbN, pods.herbLMA, pods.herbADL, pods.herbCard, pods.herbhaN, pods.herbhaLMA, pods.herbhaADL, pods.herbhaCard, pods.herbhaCardN, pods.herbhaCardLMA, pods.herbhaCardADL, pods.herbhaCardLMAN, pods.herbhaCardLMAADL),
+               modnames = c('height', 'herb', 'N', 'LMA', 'ADL', 'Card', 'herb + height', 'herb + N', 'herb + LMA', 'herb + ADL', 'herb + Card', 'height + herb + N', 'height + herb + LMA', 'height + herb + ADL', 'height + herb + Card', 'height + herb + Card + N', 'height + herb + Card + LMA', 'height + herb + Card + ADL', 'height + herb + Card + LMA + N', 'height + herb + Card + LMA + ADL'))
+pAIC
+```
+
+Let's format this puppy:
+```{r}
+ft <- flextable(pAIC) %>%
+  add_header(Modnames = "Number of Pods") %>%
+  fontsize(part = "header", size = 12) %>%
+  bg(i = 1, bg = "#dedede") %>% 
+  set_header_labels(Modnames = "Model") %>% 
+  width(j = ~ Modnames, width = 2.6) %>%
+  set_formatter(
+    K = function(x) sprintf("%d", x)
+  )
+ft
+```
+
+Now save as image:
+```{r}
+# create an Rmd file ----
+rmd_name <- tempfile(fileext = ".Rmd")
+cat("```{r echo=FALSE}\nft\n```", file = rmd_name)
+
+# render as an html file ----
+html_name <- tempfile(fileext = ".html")
+rmarkdown::render(rmd_name, output_format = "html_document", output_file = html_name)
+
+# get a png from the html file with webshot ----
+webshot(html_name, zoom = 2, file = "podsAIC.png", 
+        selector = "body > div.container-fluid.main-container > div.tabwid > table")
+```
+
+## Backward selection
+
+```{r}
+pods.full = glm(N_pods ~ h_apical + herb_avg + N + LMA + Cardenolides, data = pods.data, family = poisson())
+pods.height = glm(N_pods ~ herb_avg + N + LMA + Cardenolides, data = pods.data, family = poisson())
+pods.herb = glm(N_pods ~ h_apical + N + LMA + Cardenolides, data = pods.data, family = poisson())
+pods.N = glm(N_pods ~ h_apical + herb_avg + LMA + Cardenolides, data = pods.data, family = poisson())
+pods.LMA = glm(N_pods ~ h_apical + herb_avg + N + Cardenolides, data = pods.data, family = poisson())
+pods.Card = glm(N_pods ~ h_apical + herb_avg + N + LMA, data = pods.data, family = poisson())
+aictab(list(pods.full, pods.height, pods.herb, pods.N, pods.LMA, pods.Card), 
+       modnames = c("height + herb + N + LMA + Card", 
+                    "herb + N + LMA + Card",
+                    "height + N + LMA + Card",
+                    "height + herb + LMA + Card",
+                    "height + herb + N + Card",
+                    "height + herb + N + LMA"))
+```
+
+Dropping N.
+```{r}
+pods.N_height = glm(N_pods ~ herb_avg + LMA + Cardenolides, data = pods.data, family = poisson())
+
+pods.N_herb = glm(N_pods ~ h_apical + LMA + Cardenolides, data = pods.data, family = poisson())
+
+pods.N_LMA = glm(N_pods ~ h_apical + herb_avg + Cardenolides, data = pods.data, family = poisson())
+
+pods.N_Card = glm(N_pods ~ h_apical + herb_avg + LMA, data = pods.data, family = poisson())
+
+aictab(list(pods.N, pods.N_height, pods.N_herb, pods.N_LMA, pods.N_Card), 
+       modnames = c("height + herb + LMA + Card", 
+                    "herb + LMA + Card",
+                    "height + LMA + Card",
+                    "height + herb + Card",
+                    "height + herb + LMA"))
+```
+
+Ready for publication.
+```{r}
+pAIC <- aictab(list(pods.full, pods.height, pods.herb, pods.N, pods.LMA, pods.Card, pods.N_height, pods.N_herb, pods.N_LMA, pods.N_Card),
+       modnames = c("height + herb + N + LMA + Card", 
+                    "herb + N + LMA + Card",
+                    "height + N + LMA + Card",
+                    "height + herb + LMA + Card",
+                    "height + herb + N + Card",
+                    "height + herb + N + LMA",
+                    "herb + LMA + Card",
+                    "height + LMA + Card",
+                    "height + herb + Card",
+                    "height + herb + LMA"
+                    ))
+pAIC
+```
+
+Let's format this puppy:
+```{r}
+ft <- flextable(pAIC) %>%
+  add_header(Modnames = "Number of Pods") %>%
+  fontsize(part = "header", size = 12) %>%
+  bg(i = 1, bg = "#dedede") %>% 
+  set_header_labels(Modnames = "Model") %>% 
+  width(j = ~ Modnames, width = 2.6) %>%
+  set_formatter(
+    K = function(x) sprintf("%d", x)
+  )
+ft
+```
+
+Now save as image:
+```{r}
+# create an Rmd file ----
+rmd_name <- tempfile(fileext = ".Rmd")
+cat("```{r echo=FALSE}\nft\n```", file = rmd_name)
+
+# render as an html file ----
+html_name <- tempfile(fileext = ".html")
+rmarkdown::render(rmd_name, output_format = "html_document", output_file = html_name)
+
+# get a png from the html file with webshot ----
+webshot(html_name, zoom = 2, file = "podsAIC.png", 
+        selector = "body > div.container-fluid.main-container > div.tabwid > table")
+```
