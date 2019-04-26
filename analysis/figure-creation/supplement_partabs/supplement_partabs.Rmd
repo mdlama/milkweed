@@ -16,7 +16,7 @@ library(ggplot2)
 library(flextable)
 library(webshot)
 library(boot)
-library(kable)
+library(binom)
 library(kableExtra)
 ```
 
@@ -45,13 +45,17 @@ df <- rbind(df,
 
 # Herbivory
 load(here::here('data/mwCache/herbivoryDistFit.RData'))
+metadata <- dem.data %>% filter(!is.na(h_apical), !is.na(munched))
+N_munched <- sum(metadata$munched == 1)
+N <- nrow(metadata)
+pmunch <- unname(binom.agresti.coull(N_munched, N))
 CI <- unname(summary(fitdistrplus::bootdist(munched.fit$fit))$CI)
 df <- rbind(df,
   data.frame(Model = rep("Herbivory", 3),
            Parameter = c("$p_{\\omega}$", "$\\mu$", "$\\sigma$"),
-           Lower = c(NA, CI[,2]),
-           Value = c(munched.fit$pmunch, unname(munched.fit$fit$estimate)),
-           Upper = c(NA, CI[,3]))
+           Lower = c(pmunch[[5]], CI[,2]),
+           Value = c(pmunch[[4]], unname(munched.fit$fit$estimate)),
+           Upper = c(pmunch[[6]], CI[,3]))
 )
 
 # Sprout Recruit Height
