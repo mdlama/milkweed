@@ -1,14 +1,14 @@
 Package: milkweed
-Title: What the Package Does (one line, title case)
-Version: 0.0.0.9000
+Title: Code for "The demographic effects of functional traits: ..."
+Description: Code for "The demographic effects of functional traits: An integral projection model approach reveals population-level consequences of reproduction-defense tradeoffs"
+Version: 1.0
 Authors@R: c(
   person("M. Drew", "LaMar", email = "mdlama@wm.edu", role = c("aut", "cre")),
   person("Harmony", "Dalgleish", email = "hjdalgleish@wm.edu", role = "ctb"),
   person("Sivan", "Yair", email = "", role = "ctb"),
   person("Soren", "Struckman", email = "", role = "ctb"))
-Description: What the package does (one paragraph).
 Depends: R (>= 3.4.1)
-License: What license is it under?
+License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Imports: fitdistrplus (>= 1.0.9),
