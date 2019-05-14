@@ -568,3 +568,114 @@ rmarkdown::render(rmd_name, output_format = "html_document", output_file = html_
 webshot(html_name, zoom = 2, file = "podsAIC.png", 
         selector = "body > div.container-fluid.main-container > div.tabwid > table")
 ```
+
+# Clonal Reproduction
+
+```{r}
+load(here::here("data/budata.rda"))
+bud.data <- bud.data %>% filter(!is.na(buds_per_stem), !is.na(herb_mean), !is.na(Card_mean))
+```
+
+```{r}
+buds.full = lm(log(buds_per_stem) ~ herb_mean + h_apical_mean + N_mean + LMA_mean + Card_mean, data=bud.data)
+buds.Card = lm(log(buds_per_stem) ~ herb_mean + h_apical_mean + N_mean + LMA_mean, data=bud.data)
+buds.LMA = lm(log(buds_per_stem) ~ herb_mean + h_apical_mean + N_mean + Card_mean, data=bud.data)
+buds.N = lm(log(buds_per_stem) ~ herb_mean + h_apical_mean + LMA_mean + Card_mean, data=bud.data)
+buds.height = lm(log(buds_per_stem) ~ herb_mean + N_mean + LMA_mean + Card_mean, data=bud.data)
+buds.herb = lm(log(buds_per_stem) ~ h_apical_mean + N_mean + LMA_mean + Card_mean, data=bud.data)
+
+aictab(list(buds.full, buds.height, buds.herb, buds.N, buds.LMA, buds.Card), 
+       modnames = c("height + herb + N + LMA + Card", 
+                    "herb + N + LMA + Card",
+                    "height + N + LMA + Card",
+                    "height + herb + LMA + Card",
+                    "height + herb + N + Card",
+                    "height + herb + N + LMA"))
+```
+
+Dropping height.
+```{r}
+buds.height.Card = lm(log(buds_per_stem) ~ herb_mean + N_mean + LMA_mean, data=bud.data)
+buds.height.LMA = lm(log(buds_per_stem) ~ herb_mean + N_mean + Card_mean, data=bud.data)
+buds.height.N = lm(log(buds_per_stem) ~ herb_mean + LMA_mean + Card_mean, data=bud.data)
+buds.height.herb = lm(log(buds_per_stem) ~ N_mean + LMA_mean + Card_mean, data=bud.data)
+
+aictab(list(buds.height, buds.height.Card, buds.height.LMA, buds.height.N, buds.height.herb),
+       modnames = c("herb + N + LMA + Card",
+                    "herb + N + LMA",
+                    "herb + N + Card",
+                    "herb + LMA + Card",
+                    "N + LMA + Card"))
+```
+
+Dropping N.
+```{r}
+buds.height.N.Card = lm(log(buds_per_stem) ~ herb_mean + LMA_mean, data=bud.data)
+buds.height.N.LMA = lm(log(buds_per_stem) ~ herb_mean + Card_mean, data=bud.data)
+buds.height.N.herb = lm(log(buds_per_stem) ~ LMA_mean + Card_mean, data=bud.data)
+aictab(list(buds.height.N, buds.height.N.Card, buds.height.N.LMA, buds.height.N.herb),
+       c("herb + LMA + Card",
+         "herb + LMA",
+         "herb + Card",
+         "LMA + Card"))
+```
+
+Dropping LMA.
+```{r}
+buds.height.N.LMA.herb = lm(log(buds_per_stem) ~ Card_mean, data=bud.data)
+buds.height.N.LMA.Card = lm(log(buds_per_stem) ~ herb_mean, data=bud.data)
+aictab(list(buds.height.N.LMA, buds.height.N.LMA.herb, buds.height.N.LMA.Card),
+       c("herb + Card",
+         "Card",
+         "herb"))
+```
+
+```{r}
+cAIC <- aictab(list(buds.full, buds.height, buds.herb, buds.N, buds.LMA, buds.Card, buds.height.Card, buds.height.LMA, buds.height.N, buds.height.herb, buds.height.N.Card, buds.height.N.LMA, buds.height.N.herb, buds.height.N.LMA.herb, buds.height.N.LMA.Card),
+       modnames = c("height + herb + N + LMA + Card", 
+                    "herb + N + LMA + Card",
+                    "height + N + LMA + Card",
+                    "height + herb + LMA + Card",
+                    "height + herb + N + Card",
+                    "height + herb + N + LMA",
+                    "herb + N + LMA",
+                    "herb + N + Card",
+                    "herb + LMA + Card",
+                    "N + LMA + Card",
+                    "herb + LMA",
+                    "herb + Card",
+                    "LMA + Card",
+                    "Card",
+                    "herb"
+                    ))
+cAIC
+```
+
+Let's format this puppy:
+```{r}
+ft <- flextable(cAIC) %>%
+  add_header(Modnames = "Clonal Reproduction") %>%
+  fontsize(part = "header", size = 12) %>%
+  bg(i = 1, bg = "#dedede") %>% 
+  set_header_labels(Modnames = "Model") %>% 
+  width(j = ~ Modnames, width = 2.6) %>%
+  set_formatter(
+    K = function(x) sprintf("%d", x)
+  )
+ft
+```
+
+Now save as image:
+```{r}
+# create an Rmd file ----
+rmd_name <- tempfile(fileext = ".Rmd")
+cat("```{r echo=FALSE}\nft\n```", file = rmd_name)
+
+# render as an html file ----
+html_name <- tempfile(fileext = ".html")
+rmarkdown::render(rmd_name, output_format = "html_document", output_file = html_name)
+
+# get a png from the html file with webshot ----
+webshot(html_name, zoom = 2, file = "clonalAIC.png", 
+        selector = "body > div.container-fluid.main-container > div.tabwid > table")
+```
