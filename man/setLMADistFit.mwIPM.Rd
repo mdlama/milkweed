@@ -4,8 +4,8 @@
 \alias{setLMADistFit.mwIPM}
 \title{Sets the LMA distribution.}
 \usage{
-\method{setLMADistFit}{mwIPM}(obj, compute = FALSE,
-  saveresults = FALSE, update = TRUE)
+\method{setLMADistFit}{mwIPM}(obj, compute = FALSE, saveresults = FALSE,
+  update = TRUE)
 }
 \arguments{
 \item{obj}{A mwIPM model object.}

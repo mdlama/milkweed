@@ -4,8 +4,8 @@
 \alias{setBudlingDistFit.mwIPM}
 \title{Sets the budling distribution.}
 \usage{
-\method{setBudlingDistFit}{mwIPM}(obj, compute = FALSE,
-  saveresults = FALSE, update = TRUE)
+\method{setBudlingDistFit}{mwIPM}(obj, compute = FALSE, saveresults = FALSE,
+  update = TRUE)
 }
 \arguments{
 \item{obj}{A mwIPM model object.}

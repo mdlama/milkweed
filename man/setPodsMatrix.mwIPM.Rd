@@ -4,8 +4,8 @@
 \alias{setPodsMatrix.mwIPM}
 \title{Create pods matrix.}
 \usage{
-\method{setPodsMatrix}{mwIPM}(obj, compute = FALSE,
-  saveresults = FALSE, update = TRUE, perturb = rep(0, 5))
+\method{setPodsMatrix}{mwIPM}(obj, compute = FALSE, saveresults = FALSE,
+  update = TRUE, perturb = rep(0, 5))
 }
 \arguments{
 \item{obj}{A mwIPM model object.}

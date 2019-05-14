@@ -20,7 +20,7 @@
   \item{stem_width}{width taken at the base of the stem measured in mm}
   \item{alive_june}{factor indicating whether the plant was alive in June}
   \item{surv}{factor indicating whether the plant survived to reproduce}
-  \time{fec.flower}{factor indicating whether the plant produced flowers}
+  \item{fec.flower}{factor indicating whether the plant produced flowers}
   \item{N_pods}{the number of seed pods produced}
   \item{seedling}{factor indicating seedling status}
   \item{munched}{factor indicating if the plant experienced herbivory}
