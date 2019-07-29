@@ -1196,15 +1196,11 @@ setSeedlingRecruitmentMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep
 #'
 #' @importFrom magrittr %<>%
 computeSexualKernel.mwIPM <- function(obj, update = TRUE, perturb = rep(0,2)) {
-  attach(obj$vars, warn.conflicts = FALSE)
-  attach(obj$pars, warn.conflicts = FALSE)
-  attach(obj$matrices, warn.conflicts = FALSE)
+  attach(obj$matrices, warn.conflicts = TRUE)
 
-  Ks <- (seedling.emergence[[obj$site]]+perturb[1])*(seeds.per.pod+perturb[2])*R%*%(P*G*S*obj$matrices$F)%*%H*herb_avg$dx*h_apical.next$dx*h_apical$dx
-  # image.plot(h_apical, h_apical, t(Ks), col=topo.colors(100))
+  Ks <- (obj$pars$seedling.emergence[[obj$site]]+perturb[1])*
+    (obj$pars$seeds.per.pod+perturb[2])*R%*%(P*G*S*obj$matrices$F)%*%H*obj$vars$herb_avg$dx*obj$vars$h_apical.next$dx*obj$vars$h_apical$dx
 
-  detach(obj$vars)
-  detach(obj$pars)
   detach(obj$matrices)
 
   obj$kernels$Ks <- Ks
