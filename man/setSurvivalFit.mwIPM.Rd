@@ -4,8 +4,8 @@
 \alias{setSurvivalFit.mwIPM}
 \title{Sets the survival mixed-model.}
 \usage{
-\method{setSurvivalFit}{mwIPM}(obj, compute = FALSE, saveresults = FALSE,
-  update = TRUE)
+\method{setSurvivalFit}{mwIPM}(obj, compute = FALSE,
+  saveresults = FALSE, update = TRUE)
 }
 \arguments{
 \item{obj}{A mwIPM model object.}

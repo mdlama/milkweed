@@ -4,7 +4,8 @@
 \alias{computeClonalKernel.mwIPM}
 \title{Compute clonal reproduction kernel.}
 \usage{
-\method{computeClonalKernel}{mwIPM}(obj, update = TRUE, perturb = rep(0, 4))
+\method{computeClonalKernel}{mwIPM}(obj, update = TRUE,
+  perturb = rep(0, 4))
 }
 \arguments{
 \item{obj}{A mwIPM model object.}
