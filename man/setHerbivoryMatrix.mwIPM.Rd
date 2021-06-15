@@ -4,8 +4,13 @@
 \alias{setHerbivoryMatrix.mwIPM}
 \title{Create herbivory matrix.}
 \usage{
-\method{setHerbivoryMatrix}{mwIPM}(obj, dist.herb = NA, update = TRUE,
-  perturb = rep(0, 3), distpars = FALSE)
+\method{setHerbivoryMatrix}{mwIPM}(
+  obj,
+  dist.herb = NA,
+  update = TRUE,
+  perturb = rep(0, 3),
+  distpars = FALSE
+)
 }
 \arguments{
 \item{obj}{A mwIPM model object.}

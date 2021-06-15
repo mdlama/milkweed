@@ -4,8 +4,7 @@
 \alias{setPars.mwIPM}
 \title{Sets model parameters.}
 \usage{
-\method{setPars}{mwIPM}(obj, compute = FALSE, saveresults = FALSE,
-  update = TRUE)
+\method{setPars}{mwIPM}(obj, compute = FALSE, saveresults = FALSE, update = TRUE)
 }
 \arguments{
 \item{obj}{A mwIPM model object.}

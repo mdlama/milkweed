@@ -4,8 +4,7 @@
 \alias{setSeedsPerPodConst.mwIPM}
 \title{Sets the number of seeds per pod parameter.}
 \usage{
-\method{setSeedsPerPodConst}{mwIPM}(obj, compute = FALSE,
-  saveresults = FALSE, update = TRUE)
+\method{setSeedsPerPodConst}{mwIPM}(obj, compute = FALSE, saveresults = FALSE, update = TRUE)
 }
 \arguments{
 \item{obj}{A mwIPM model object.}

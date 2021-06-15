@@ -4,8 +4,7 @@
 \alias{setSeedlingDistFit.mwIPM}
 \title{Sets the seedling distribution (normal distribution).}
 \usage{
-\method{setSeedlingDistFit}{mwIPM}(obj, compute = FALSE,
-  saveresults = FALSE, update = TRUE)
+\method{setSeedlingDistFit}{mwIPM}(obj, compute = FALSE, saveresults = FALSE, update = TRUE)
 }
 \arguments{
 \item{obj}{A mwIPM model object.}

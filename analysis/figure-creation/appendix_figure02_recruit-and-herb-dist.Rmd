@@ -25,7 +25,7 @@ N <- 1000
 bx <- seq(from = 0, to = 6, length.out = N+1)
 x <- 0.5*(bx[1:N] + bx[2:(N+1)])
 
-site_ind <- c('BLD1','BLD2','PWR','SKY','YTB','Bertha')
+site_ind <- c('BLD1','BLD2','GET','GRN','PWR','SKY','YTB','Bertha')
 plotdata <- do.call(rbind, lapply(site_ind, 
                                   function (site) {
                                     data.frame(site = site,

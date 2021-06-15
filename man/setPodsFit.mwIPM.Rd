@@ -4,8 +4,7 @@
 \alias{setPodsFit.mwIPM}
 \title{Sets the pods mixed-model.}
 \usage{
-\method{setPodsFit}{mwIPM}(obj, compute = FALSE, saveresults = FALSE,
-  update = TRUE)
+\method{setPodsFit}{mwIPM}(obj, compute = FALSE, saveresults = FALSE, update = TRUE)
 }
 \arguments{
 \item{obj}{A mwIPM model object.}

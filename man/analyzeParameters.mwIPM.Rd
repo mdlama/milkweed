@@ -4,8 +4,13 @@
 \alias{analyzeParameters.mwIPM}
 \title{Sensitivity analysis on parameters.}
 \usage{
-\method{analyzeParameters}{mwIPM}(obj, compute = FALSE,
-  saveresults = FALSE, params = "all", distpars = FALSE)
+\method{analyzeParameters}{mwIPM}(
+  obj,
+  compute = FALSE,
+  saveresults = FALSE,
+  params = "all",
+  distpars = FALSE
+)
 }
 \arguments{
 \item{obj}{A mwIPM model object.}

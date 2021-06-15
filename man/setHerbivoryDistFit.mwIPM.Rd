@@ -4,8 +4,7 @@
 \alias{setHerbivoryDistFit.mwIPM}
 \title{Sets the herbivory distribution.}
 \usage{
-\method{setHerbivoryDistFit}{mwIPM}(obj, compute = FALSE,
-  saveresults = FALSE, update = TRUE)
+\method{setHerbivoryDistFit}{mwIPM}(obj, compute = FALSE, saveresults = FALSE, update = TRUE)
 }
 \arguments{
 \item{obj}{A mwIPM model object.}

@@ -4,8 +4,7 @@
 \alias{setFloweringMatrix.mwIPM}
 \title{Create flowering matrix.}
 \usage{
-\method{setFloweringMatrix}{mwIPM}(obj, update = TRUE, perturb = rep(0,
-  4))
+\method{setFloweringMatrix}{mwIPM}(obj, update = TRUE, perturb = rep(0, 4))
 }
 \arguments{
 \item{obj}{A mwIPM model object.}

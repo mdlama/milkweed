@@ -4,8 +4,7 @@
 \alias{setGrowthMatrix.mwIPM}
 \title{Create growth matrix.}
 \usage{
-\method{setGrowthMatrix}{mwIPM}(obj, update = TRUE, perturb = rep(0,
-  5))
+\method{setGrowthMatrix}{mwIPM}(obj, update = TRUE, perturb = rep(0, 5))
 }
 \arguments{
 \item{obj}{A mwIPM model object.}

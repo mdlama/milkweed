@@ -4,8 +4,12 @@
 \alias{setSeedlingEmergenceConst.mwIPM}
 \title{Sets the seedling emergence parameter.}
 \usage{
-\method{setSeedlingEmergenceConst}{mwIPM}(obj, compute = FALSE,
-  saveresults = FALSE, update = TRUE)
+\method{setSeedlingEmergenceConst}{mwIPM}(
+  obj,
+  compute = FALSE,
+  saveresults = FALSE,
+  update = TRUE
+)
 }
 \arguments{
 \item{obj}{A mwIPM model object.}

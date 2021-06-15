@@ -1,0 +1,1358 @@
+---
+title: "Supplement - AIC Tables"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+params:
+  compute: TRUE
+output: 
+  html_document:
+    toc: true
+---
+
+<!-- Explore caching options (cache.path=mwCache, cache=params$compute) -->
+
+# Initialization
+
+```{r initialize, message=FALSE}
+library(milkweed)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(lme4)
+library(AICcmodavg)
+library(vegan)
+library(flextable)
+library(webshot)
+
+data("stemdata")
+metadata <- stemdata
+metadata$year <- factor(metadata$year)
+metadata$transect <- factor(metadata$transect)
+
+# https://stat.ethz.ch/pipermail/r-sig-mixed-models/2014q4/022870.html
+glmerCtrl <- glmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
+lmerCtrl <- lmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
+
+mwCache <- getOption("milkweed.cache")
+```
+
+# Flowering
+
+```{r flowering scaling}
+metadata_usc <- metadata %>% filter(!is.na(h_apical),
+                                    !is.na(herb_avg),
+                                    !is.na(fec.flower))
+
+metadata_sc <- metadata_usc %>% mutate_at(.vars = vars(h_apical, herb_avg),
+                                          .funs = ~ as.numeric(scale(.))) 
+
+# Get scaling parameters (really just mean and sd)
+h_apical_sc <- scale(metadata_usc$h_apical)
+herb_avg_sc <- scale(metadata_usc$herb_avg)
+```
+
+## Random Effects - Starting with Site
+
+Use nAGQ = 0 for quick approximations, but less exact form of parameter estimation.
+```{r flowering random effects with site}
+compute <- params$compute
+savefile <- "aictabs_F_RE_Site.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  # 3 terms
+  flower.re.site_haThe.year_haThe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical*herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  # 2 terms
+  flower.re.site_hePhaIhe.year_haThe <- glmer(fec.flower ~ h_apical*herb_avg + (herb_avg + h_apical:herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  flower.re.site_haPhaIhe.year_haThe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical + h_apical:herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  flower.re.site_haPhe.year_haThe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical + herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  # 1 term
+  flower.re.site_he.year_haThe <- glmer(fec.flower ~ h_apical*herb_avg + (herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  flower.re.site_ha.year_haThe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  flower.re.site_haIhe.year_haThe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical:herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  # 0 terms
+  flower.re.site_1.year_haThe <- glmer(fec.flower ~ h_apical*herb_avg + (1|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  save(flower.re.site_haThe.year_haThe,
+       flower.re.site_hePhaIhe.year_haThe,
+       flower.re.site_haPhaIhe.year_haThe,
+       flower.re.site_haPhe.year_haThe,
+       flower.re.site_he.year_haThe,
+       flower.re.site_ha.year_haThe,
+       flower.re.site_haIhe.year_haThe,
+       flower.re.site_1.year_haThe, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+```
+
+```{r flowering AIC table with site}
+aictab(list(flower.re.site_haThe.year_haThe,
+            flower.re.site_hePhaIhe.year_haThe,
+            flower.re.site_haPhaIhe.year_haThe,
+            flower.re.site_haPhe.year_haThe,
+            flower.re.site_he.year_haThe,
+            flower.re.site_ha.year_haThe,
+            flower.re.site_haIhe.year_haThe,
+            flower.re.site_1.year_haThe),
+       modnames = c("Site: height*herb", 
+                    "Site: herb + height:herb", 
+                    "Site: height + height:herb", 
+                    "Site: height + herb",
+                    "Site: herb",
+                    "Site: height",
+                    "Site: height:herb",
+                    "Site: 1"))
+```
+
+Height wins!  Let's move to year:
+```{r flowering with year}
+compute <- params$compute
+savefile <- "aictabs_F_RE_Year.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  # 2 terms
+  flower.re.site_ha.year_haPhe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  flower.re.site_ha.year_haPhaIhe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical+h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  flower.re.site_ha.year_hePhaIhe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical|site/transect) + (herb_avg+h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  # 1 term
+  flower.re.site_ha.year_he <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  flower.re.site_ha.year_ha <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  flower.re.site_ha.year_haIhe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  # 0 terms
+  flower.re.site_ha.year_1 <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical|site/transect) + (1|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  save(flower.re.site_ha.year_haThe,
+       flower.re.site_ha.year_hePhaIhe,
+       flower.re.site_ha.year_haPhaIhe,
+       flower.re.site_ha.year_haPhe,
+       flower.re.site_ha.year_he,
+       flower.re.site_ha.year_ha,
+       flower.re.site_ha.year_haIhe,
+       flower.re.site_ha.year_1, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+```
+
+```{r flowering AIC table with year}
+aictab(list(flower.re.site_ha.year_haThe,
+            flower.re.site_ha.year_hePhaIhe,
+            flower.re.site_ha.year_haPhaIhe,
+            flower.re.site_ha.year_haPhe,
+            flower.re.site_ha.year_he,
+            flower.re.site_ha.year_ha,
+            flower.re.site_ha.year_haIhe,
+            flower.re.site_ha.year_1),
+       modnames = c("Year: height*herb", 
+                    "Year: herb + height:herb", 
+                    "Year: height + height:herb", 
+                    "Year: height + herb",
+                    "Year: herb",
+                    "Year: height",
+                    "Year: height:herb",
+                    "Year: 1"))
+```
+
+```{r flowering singularity check}
+compute <- params$compute
+savefile <- "aictabs_F_Sing_1.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  flower.fe.haThe.re.site_ha.year_haThe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  rePCA(flower.fe.haThe.re.site_ha.year_haThe)
+
+  save(flower.fe.haThe.re.site_ha.year_haThe, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+```
+
+We have a singularity issue.  Looks like issue is in the year random effect.  Let's drop the interaction term.
+```{r flowering singularity adjustment}
+compute <- params$compute
+savefile <- "aictabs_F_Sing_2.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  flower.fe.haThe.re.site_ha.year_haPhe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  rePCA(flower.fe.haThe.re.site_ha.year_haPhe)
+
+  save(flower.fe.haThe.re.site_ha.year_haPhe, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+```
+
+Still have a problem, but now in site.  Let's drop height:
+```{r flowering singularity persisting}
+compute <- params$compute
+savefile <- "aictabs_f_Sing_3.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  flower.fe.haThe.re.site_1.year_haPhe <- glmer(fec.flower ~ h_apical*herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  rePCA(flower.fe.haThe.re.site_1.year_haPhe)
+  
+  save(flower.fe.haThe.re.site_1.year_haPhe, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+```
+
+## Random Effects - Starting with Year
+
+Use nAGQ = 0 for quick approximations, but less exact form of parameter estimation.
+```{r flowering random effects with year}
+compute <- params$compute
+savefile <- "aictabs_F_RE_Year_First.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  # 3 terms
+  flower.re.year_haThe.site_haThe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical*herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  # 2 terms
+  flower.re.year_hePhaIhe.site_haThe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical*herb_avg|site/transect) + (herb_avg + h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  flower.re.year_haPhaIhe.site_haThe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical*herb_avg|site/transect) + (h_apical + h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  flower.re.year_haPhe.site_haThe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical*herb_avg|site/transect) + (h_apical + herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  # 1 term
+  flower.re.year_he.site_haThe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical*herb_avg|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  flower.re.year_ha.site_haThe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical*herb_avg|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  flower.re.year_haIhe.site_haThe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical*herb_avg|site/transect) + (h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  # 0 terms
+  flower.re.year_1.site_haThe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical*herb_avg|site/transect) + (1|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  save(flower.re.year_haThe.site_haThe,
+       flower.re.year_hePhaIhe.site_haThe,
+       flower.re.year_haPhaIhe.site_haThe,
+       flower.re.year_haPhe.site_haThe,
+       flower.re.year_he.site_haThe,
+       flower.re.year_ha.site_haThe,
+       flower.re.year_haIhe.site_haThe,
+       flower.re.year_1.site_haThe, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+```
+
+```{r flowering random effects year AIC table }
+aictab(list(flower.re.year_haThe.site_haThe,
+            flower.re.year_hePhaIhe.site_haThe,
+            flower.re.year_haPhaIhe.site_haThe,
+            flower.re.year_haPhe.site_haThe,
+            flower.re.year_he.site_haThe,
+            flower.re.year_ha.site_haThe,
+            flower.re.year_haIhe.site_haThe,
+            flower.re.year_1.site_haThe),
+       modnames = c("Year: height*herb", 
+                    "Year: herb + height:herb", 
+                    "Year: height + height:herb", 
+                    "Year: height + herb",
+                    "Year: herb",
+                    "Year: height",
+                    "Year: height:herb",
+                    "Year: 1"))
+```
+
+## Fixed Effects
+
+```{r flowering fixed effects}
+compute <- params$compute
+savefile <- "aictabs_F_FE.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  # 2 terms
+  flower.fe.haPhe.re.site_1.year_haPhe <- glmer(fec.flower ~ h_apical+herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  flower.fe.haPhaIhe.re.site_1.year_haPhe <- glmer(fec.flower ~ h_apical+h_apical:herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  flower.fe.hePhaIhe.re.site_1.year_haPhe <- glmer(fec.flower ~ herb_avg+h_apical:herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  # 1 term
+  flower.fe.ha.re.site_1.year_haPhe <- glmer(fec.flower ~ h_apical + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  flower.fe.he.re.site_1.year_haPhe <- glmer(fec.flower ~ herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  flower.fe.haIhe.re.site_1.year_haPhe <- glmer(fec.flower ~ h_apical:herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  # 0 terms
+  flower.fe.1.re.site_1.year_haPhe <- glmer(fec.flower ~ 1 + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  save(flower.fe.haThe.re.site_1.year_haPhe,
+       flower.fe.hePhaIhe.re.site_1.year_haPhe,
+       flower.fe.haPhaIhe.re.site_1.year_haPhe,
+       flower.fe.haPhe.re.site_1.year_haPhe,
+       flower.fe.he.re.site_1.year_haPhe,
+       flower.fe.ha.re.site_1.year_haPhe,
+       flower.fe.haIhe.re.site_1.year_haPhe,
+       flower.fe.1.re.site_1.year_haPhe, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+```
+
+```{r flowering fixed effects AIC table}
+aictab(list(flower.fe.haThe.re.site_1.year_haPhe,
+            flower.fe.hePhaIhe.re.site_1.year_haPhe,
+            flower.fe.haPhaIhe.re.site_1.year_haPhe,
+            flower.fe.haPhe.re.site_1.year_haPhe,
+            flower.fe.he.re.site_1.year_haPhe,
+            flower.fe.ha.re.site_1.year_haPhe,
+            flower.fe.haIhe.re.site_1.year_haPhe,
+            flower.fe.1.re.site_1.year_haPhe),
+       modnames = c("Fixed: height*herb", 
+                    "Fixed: herb + height:herb", 
+                    "Fixed: height + height:herb", 
+                    "Fixed: height + herb",
+                    "Fixed: herb",
+                    "Fixed: height",
+                    "Fixed: height:herb",
+                    "Fixed: 1"))
+```
+
+Winner:
+```{r flowering winner}
+summary(flower.fe.haThe.re.site_1.year_haPhe)
+```
+
+## Create AIC Tables
+
+### Random Effect: Site
+
+Let's create the full table for publication:
+```{r flowering winner AIC table}
+f.re.site.AIC <- aictab(list(flower.re.site_haThe.year_haThe,
+            flower.re.site_hePhaIhe.year_haThe,
+            flower.re.site_haPhaIhe.year_haThe,
+            flower.re.site_haPhe.year_haThe,
+            flower.re.site_he.year_haThe,
+            flower.re.site_ha.year_haThe,
+            flower.re.site_haIhe.year_haThe,
+            flower.re.site_1.year_haThe),
+       modnames = c("Site: height*herb", 
+                    "Site: herb + height:herb", 
+                    "Site: height + height:herb", 
+                    "Site: height + herb",
+                    "Site: herb",
+                    "Site: height",
+                    "Site: height:herb",
+                    "Site: 1"))
+f.re.site.AIC
+```
+
+Let's format this puppy:
+```{r flowering AIC table formatting}
+ft <- flextable(f.re.site.AIC) %>%
+  add_header(Modnames = "Flowering: Site Random Effect") %>%
+  fontsize(part = "header", size = 12) %>%
+  set_header_labels(Modnames = "Model") %>% 
+  bg(i = 1, bg = "#dedede") %>% 
+  width(j = ~ Modnames, width = 2.6) %>%
+  set_formatter(
+    K = function(x) sprintf("%d", x)
+  )
+ft
+```
+
+Now save as image:
+```{r flowering save image}
+# create an Rmd file ----
+rmd_name <- tempfile(fileext = ".Rmd")
+cat("```{r echo=FALSE, ft.shadow=FALSE}\nft\n```", file = rmd_name)
+# render as an html file ----
+html_name <- tempfile(fileext = ".html")
+rmarkdown::render(rmd_name, output_format = "html_document", output_file = html_name)
+# get a png from the html file with webshot ----
+webshot(html_name, zoom = 2, file = "floweringRE_Site_AIC.png", 
+        selector = "body > div.container-fluid.main-container > div.tabwid > table")
+```
+
+### Random Effect: Year
+
+Let's create the full table for publication:
+```{r flowering full year AIC table}
+f.re.year.AIC <- aictab(list(flower.re.site_ha.year_haThe,
+            flower.re.site_ha.year_hePhaIhe,
+            flower.re.site_ha.year_haPhaIhe,
+            flower.re.site_ha.year_haPhe,
+            flower.re.site_ha.year_he,
+            flower.re.site_ha.year_ha,
+            flower.re.site_ha.year_haIhe,
+            flower.re.site_ha.year_1),
+       modnames = c("Year: height*herb", 
+                    "Year: herb + height:herb", 
+                    "Year: height + height:herb", 
+                    "Year: height + herb",
+                    "Year: herb",
+                    "Year: height",
+                    "Year: height:herb",
+                    "Year: 1"))
+f.re.year.AIC
+```
+
+Let's format this puppy:
+```{r flowering year AIC formatting}
+ft <- flextable(f.re.year.AIC) %>%
+  add_header(Modnames = "Flowering: Year Random Effect") %>%
+  fontsize(part = "header", size = 12) %>%
+  set_header_labels(Modnames = "Model") %>% 
+  bg(i = 1, bg = "#dedede") %>% 
+  width(j = ~ Modnames, width = 2.6) %>%
+  set_formatter(
+    K = function(x) sprintf("%d", x)
+  )
+ft
+```
+
+Now save as image:
+```{r flowering year save}
+# create an Rmd file ----
+rmd_name <- tempfile(fileext = ".Rmd")
+cat("```{r echo=FALSE, ft.shadow=FALSE}\nft\n```", file = rmd_name)
+# render as an html file ----
+html_name <- tempfile(fileext = ".html")
+rmarkdown::render(rmd_name, output_format = "html_document", output_file = html_name)
+# get a png from the html file with webshot ----
+webshot(html_name, zoom = 2, file = "floweringRE_Year_AIC.png", 
+        selector = "body > div.container-fluid.main-container > div.tabwid > table")
+```
+
+### Dealing with singularity
+
+```{r flowering singularity thingy}
+f.singularity.AIC <- aictab(list(flower.fe.haThe.re.site_ha.year_haThe,
+                                 flower.fe.haThe.re.site_ha.year_haPhe,
+                                 flower.fe.haThe.re.site_1.year_haPhe),
+                            modnames = c("(S) Site: height, Year: h_apical*height",
+                                         "(S) Site: height, Year: h_apical+height",
+                                         "(NS) Site: 1, Year: h_apical+height"))
+f.singularity.AIC
+```
+
+Let's format this puppy:
+```{r flowering format singularity table}
+ft <- flextable(f.singularity.AIC) %>%
+  add_header(Modnames = "Flowering: Singularity Adjustments") %>%
+  fontsize(part = "header", size = 12) %>%
+  set_header_labels(Modnames = "Model") %>% 
+  bg(i = 3, bg = "#dedede") %>% 
+  width(j = ~ Modnames, width = 2.6) %>%
+  set_formatter(
+    K = function(x) sprintf("%d", x)
+  )
+ft
+```
+
+Now save as image:
+```{r flowering save singularity thingy table}
+# create an Rmd file ----
+rmd_name <- tempfile(fileext = ".Rmd")
+cat("```{r echo=FALSE}\nft\n```", file = rmd_name)
+# render as an html file ----
+html_name <- tempfile(fileext = ".html")
+rmarkdown::render(rmd_name, output_format = "html_document", output_file = html_name)
+# get a png from the html file with webshot ----
+# webshot(html_name, zoom = 2, file = "floweringRE_Singularity_AIC.png", 
+#         selector = "body > div.container-fluid.main-container > div.tabwid > table")
+```
+
+### Fixed Effects
+
+Let's create the full table for publication:
+```{r flowering winner fixed effects AIC table}
+f.fe.AIC <- aictab(list(flower.fe.haThe.re.site_1.year_haPhe,
+            flower.fe.hePhaIhe.re.site_1.year_haPhe,
+            flower.fe.haPhaIhe.re.site_1.year_haPhe,
+            flower.fe.haPhe.re.site_1.year_haPhe,
+            flower.fe.he.re.site_1.year_haPhe,
+            flower.fe.ha.re.site_1.year_haPhe,
+            flower.fe.haIhe.re.site_1.year_haPhe,
+            flower.fe.1.re.site_1.year_haPhe),
+       modnames = c("Fixed: height*herb", 
+                    "Fixed: herb + height:herb", 
+                    "Fixed: height + height:herb", 
+                    "Fixed: height + herb",
+                    "Fixed: herb",
+                    "Fixed: height",
+                    "Fixed: height:herb",
+                    "Fixed: 1"))
+f.fe.AIC
+```
+
+Let's format this puppy:
+```{r f.fe.AIC formatting}
+ft <- flextable(f.fe.AIC) %>%
+  add_header(Modnames = "Flowering: Fixed Effects") %>%
+  fontsize(part = "header", size = 12) %>%
+  set_header_labels(Modnames = "Model") %>% 
+  bg(i = 2, bg = "#dedede") %>% 
+  width(j = ~ Modnames, width = 2.6) %>%
+  set_formatter(
+    K = function(x) sprintf("%d", x)
+  )
+ft
+```
+
+Now save as image:
+```{r f.fe.AIC saving}
+# create an Rmd file ----
+rmd_name <- tempfile(fileext = ".Rmd")
+cat("```{r echo=FALSE}\nft\n```", file = rmd_name)
+# render as an html file ----
+html_name <- tempfile(fileext = ".html")
+rmarkdown::render(rmd_name, output_format = "html_document", output_file = html_name)
+# get a png from the html file with webshot ----
+# webshot(html_name, zoom = 2, file = "floweringFE_AIC.png", 
+#         selector = "body > div.container-fluid.main-container > div.tabwid > table")
+```
+
+## Visualizations
+
+Create model class
+```{r}
+scaled <- list(h_apical = h_apical_sc, herb_avg = herb_avg_sc)
+flower.fit <- mwMod(list(mdl = flower.fe.haThe.re.site_1.year_haPhe, vars = c("h_apical", "herb_avg"), scaled = scaled))
+checkPars(flower.fit) # Check parameters
+```
+
+```{r}
+flower.fit$pars$scaled
+```
+
+Unscaled parameters across site:
+```{r}
+flower.fit$pars$unscaled
+```
+
+Let's plot full data.
+```{r, eval=F}
+# Create plot data for prediction curves
+plotdata <- metadata_usc %>% 
+  group_by(site) %>% 
+  summarize(mean_herb_avg = mean(herb_avg),
+            min_h_apical = min(h_apical),
+            max_h_apical = max(h_apical)) %>%
+  add_row(site = "Bertha",
+          mean_herb_avg = mean(metadata_usc$herb_avg, na.rm=T),
+          min_h_apical = min(metadata_usc$h_apical, na.rm=T),
+          max_h_apical = max(metadata_usc$h_apical, na.rm=T))
+
+# Create prediction curves
+N <- 100
+suppressWarnings( # Hiding the follow warnings: (1) Unequal factor levels: coercing to character and (2) binding character and factor vector, coercing into character vector
+  curves <- bind_rows(
+    lapply(as.vector(plotdata$site), function(site) {
+      i <- which(plotdata$site == site)
+      data.frame(
+        site = site,
+        h_apical = seq(plotdata$min_h_apical[i], plotdata$max_h_apical[i], length.out = N),
+        herb_avg = plotdata$mean_herb_avg[i],
+        fec.flower = predict(
+          flower.fit,
+          type = site,
+          newdata = data.frame(
+            h_apical = seq(plotdata$min_h_apical[i], plotdata$max_h_apical[i], length.out = N),
+            herb_avg = rep(plotdata$mean_herb_avg[i], N)
+          )
+        )
+      )
+    })
+  )
+)
+
+flower.plot <- metadata_usc %>% 
+  ggplot(aes(x = h_apical, 
+             y = fec.flower)) + 
+  geom_jitter(height = 0.1, 
+              alpha = 0.3) +
+  facet_wrap(~ site)
+
+flower.plot + 
+  geom_line(data = curves %>% filter(site != "Bertha")) + 
+  facet_wrap(~ site)
+```
+
+# Survival
+
+```{r}
+metadata_usc <- metadata %>% filter(!is.na(h_apical),
+                                    !is.na(herb_avg),
+                                    fec.flower == 1, # filtering out 0s because only the sexual pathway uses the survival function
+                                    !is.na(surv))
+
+metadata_sc <- metadata_usc %>% mutate_at(.vars = vars(h_apical, herb_avg),
+                                          .funs = ~ as.numeric(scale(.)))
+
+# Get scaling parameters (really just mean and sd)
+h_apical_sc <- scale(metadata_usc$h_apical)
+herb_avg_sc <- scale(metadata_usc$herb_avg)
+```
+
+## Random Effects
+
+Use nAGQ = 0 for quick approximations, but less exact form of parameter estimation.
+```{r}
+compute <- params$compute
+savefile <- "aictabs_S_RE_Site.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  # 3 terms
+  surv.re.site_haThe.year_haThe <- glmer(surv ~ h_apical*herb_avg + (h_apical*herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  # 2 terms
+  surv.re.site_hePhaIhe.year_haThe <- glmer(surv ~ h_apical*herb_avg + (herb_avg + h_apical:herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  surv.re.site_haPhaIhe.year_haThe <- glmer(surv ~ h_apical*herb_avg + (h_apical + h_apical:herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  surv.re.site_haPhe.year_haThe <- glmer(surv ~ h_apical*herb_avg + (h_apical + herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  # 1 term
+  surv.re.site_he.year_haThe <- glmer(surv ~ h_apical*herb_avg + (herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  surv.re.site_ha.year_haThe <- glmer(surv ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  surv.re.site_haIhe.year_haThe <- glmer(surv ~ h_apical*herb_avg + (h_apical:herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  # 0 terms
+  surv.re.site_1.year_haThe <- glmer(surv ~ h_apical*herb_avg + (1|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  save(surv.re.site_haThe.year_haThe,
+       surv.re.site_hePhaIhe.year_haThe,
+       surv.re.site_haPhaIhe.year_haThe,
+       surv.re.site_haPhe.year_haThe,
+       surv.re.site_he.year_haThe,
+       surv.re.site_ha.year_haThe,
+       surv.re.site_haIhe.year_haThe,
+       surv.re.site_1.year_haThe, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+```
+
+```{r}
+s.re.site.AIC <- aictab(list(surv.re.site_haThe.year_haThe,
+            surv.re.site_hePhaIhe.year_haThe,
+            surv.re.site_haPhaIhe.year_haThe,
+            surv.re.site_haPhe.year_haThe,
+            surv.re.site_he.year_haThe,
+            surv.re.site_ha.year_haThe,
+            surv.re.site_haIhe.year_haThe,
+            surv.re.site_1.year_haThe),
+       modnames = c("Site: height*herb", 
+                    "Site: herb + height:herb", 
+                    "Site: height + height:herb", 
+                    "Site: height + herb",
+                    "Site: herb",
+                    "Site: height",
+                    "Site: height:herb",
+                    "Site: 1"))
+s.re.site.AIC
+```
+
+Height wins.  Let's move to year:
+```{r}
+compute <- params$compute
+savefile <- "aictabs_S_RE_Year.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  # 2 terms
+  surv.re.site_ha.year_haPhe <- glmer(surv ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  surv.re.site_ha.year_haPhaIhe <- glmer(surv ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical+h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  surv.re.site_ha.year_hePhaIhe <- glmer(surv ~ h_apical*herb_avg + (h_apical|site/transect) + (herb_avg+h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  # 1 term
+  surv.re.site_ha.year_he <- glmer(surv ~ h_apical*herb_avg + (h_apical|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  surv.re.site_ha.year_ha <- glmer(surv ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  surv.re.site_ha.year_haIhe <- glmer(surv ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  # 0 terms
+  surv.re.site_ha.year_1 <- glmer(surv ~ h_apical*herb_avg + (h_apical|site/transect) + (1|year), data=metadata_sc, nAGQ=0, family=binomial())
+  
+  save(surv.re.site_ha.year_haThe,
+       surv.re.site_ha.year_hePhaIhe,
+       surv.re.site_ha.year_haPhaIhe,
+       surv.re.site_ha.year_haPhe,
+       surv.re.site_ha.year_he,
+       surv.re.site_ha.year_ha,
+       surv.re.site_ha.year_haIhe,
+       surv.re.site_ha.year_1, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+```
+
+```{r}
+s.re.year.AIC <- aictab(list(surv.re.site_ha.year_haThe,
+            surv.re.site_ha.year_hePhaIhe,
+            surv.re.site_ha.year_haPhaIhe,
+            surv.re.site_ha.year_haPhe,
+            surv.re.site_ha.year_he,
+            surv.re.site_ha.year_ha,
+            surv.re.site_ha.year_haIhe,
+            surv.re.site_ha.year_1),
+       modnames = c("Year: height*herb", 
+                    "Year: herb + height:herb", 
+                    "Year: height + height:herb", 
+                    "Year: height + herb",
+                    "Year: herb",
+                    "Year: height",
+                    "Year: height:herb",
+                    "Year: 1"))
+
+s.re.year.AIC
+```
+
+```{r}
+compute <- params$compute
+savefile <- "aictabs_S_Sing_1.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  surv.fe.haThe.re.site_ha.year_haPhe <- glmer(surv ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  rePCA(surv.fe.haThe.re.site_ha.year_haPhe)
+
+  save(surv.fe.haThe.re.site_ha.year_haPhe, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+```
+
+We have a singularity issue.  Looks like issue is in the year random effect.  Let's drop herbivory.
+```{r}
+compute <- params$compute
+savefile <- "aictabs_S_Sing_2.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  surv.fe.haThe.re.site_ha.year_ha <- glmer(surv ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  save(surv.fe.haThe.re.site_ha.year_ha, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+
+rePCA(surv.fe.haThe.re.site_ha.year_ha)
+```
+
+## Fixed Effects
+
+```{r}
+compute <- params$compute
+savefile <- "aictabs_S_FE.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  # 2 terms
+  surv.fe.haPhe.re.site_ha.year_ha <- glmer(surv ~ h_apical+herb_avg + (h_apical|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  surv.fe.haPhaIhe.re.site_ha.year_ha <- glmer(surv ~ h_apical+h_apical:herb_avg + (h_apical|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  surv.fe.hePhaIhe.re.site_ha.year_ha <- glmer(surv ~ herb_avg+h_apical:herb_avg + (h_apical|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  # 1 term
+  surv.fe.ha.re.site_ha.year_ha <- glmer(surv ~ h_apical + (h_apical|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  surv.fe.he.re.site_ha.year_ha <- glmer(surv ~ herb_avg + (h_apical|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  surv.fe.haIhe.re.site_ha.year_ha <- glmer(surv ~ h_apical:herb_avg + (h_apical|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  # 0 terms
+  surv.fe.1.re.site_ha.year_ha <- glmer(surv ~ 1 + (h_apical|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  save(surv.fe.haThe.re.site_ha.year_ha,
+       surv.fe.hePhaIhe.re.site_ha.year_ha,
+       surv.fe.haPhaIhe.re.site_ha.year_ha,
+       surv.fe.haPhe.re.site_ha.year_ha,
+       surv.fe.he.re.site_ha.year_ha,
+       surv.fe.ha.re.site_ha.year_ha,
+       surv.fe.haIhe.re.site_ha.year_ha,
+       surv.fe.1.re.site_ha.year_ha, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+```
+
+```{r}
+s.fe.AIC <- aictab(list(surv.fe.haThe.re.site_ha.year_ha,
+            surv.fe.hePhaIhe.re.site_ha.year_ha,
+            surv.fe.haPhaIhe.re.site_ha.year_ha,
+            surv.fe.haPhe.re.site_ha.year_ha,
+            surv.fe.he.re.site_ha.year_ha,
+            surv.fe.ha.re.site_ha.year_ha,
+            surv.fe.haIhe.re.site_ha.year_ha,
+            surv.fe.1.re.site_ha.year_ha),
+       modnames = c("Fixed: height*herb", 
+                    "Fixed: herb + height:herb", 
+                    "Fixed: height + height:herb", 
+                    "Fixed: height + herb",
+                    "Fixed: herb",
+                    "Fixed: height",
+                    "Fixed: height:herb",
+                    "Fixed: 1"))
+
+s.fe.AIC
+```
+
+Winner:
+```{r}
+summary(surv.fe.haPhe.re.site_ha.year_ha)
+```
+
+## Create AIC Tables
+
+### Random Effect: Site
+
+Let's format this puppy:
+```{r}
+ft <- flextable(s.re.site.AIC) %>%
+  add_header(Modnames = "Survival: Site Random Effect") %>%
+  fontsize(part = "header", size = 12) %>%
+  set_header_labels(Modnames = "Model") %>% 
+  bg(i = 1, bg = "#dedede") %>% 
+  width(j = ~ Modnames, width = 2.6) %>%
+  set_formatter(
+    K = function(x) sprintf("%d", x)
+  )
+ft
+```
+
+Now save as image:
+```{r}
+# create an Rmd file ----
+rmd_name <- tempfile(fileext = ".Rmd")
+cat("```{r echo=FALSE}\nft\n```", file = rmd_name)
+# render as an html file ----
+html_name <- tempfile(fileext = ".html")
+rmarkdown::render(rmd_name, output_format = "html_document", output_file = html_name)
+# get a png from the html file with webshot ----
+webshot(html_name, zoom = 2, file = "survivalRE_Site_AIC.png", 
+        selector = "body > div.container-fluid.main-container > div.tabwid > table")
+```
+
+### Random Effect: Year
+
+Let's format this puppy:
+```{r}
+ft <- flextable(s.re.year.AIC) %>%
+  add_header(Modnames = "Survival: Year Random Effect") %>%
+  fontsize(part = "header", size = 12) %>%
+  set_header_labels(Modnames = "Model") %>% 
+  bg(i = 1, bg = "#dedede") %>% 
+  width(j = ~ Modnames, width = 2.6) %>%
+  set_formatter(
+    K = function(x) sprintf("%d", x)
+  )
+ft
+```
+
+Now save as image:
+```{r}
+# create an Rmd file ----
+rmd_name <- tempfile(fileext = ".Rmd")
+cat("```{r echo=FALSE}\nft\n```", file = rmd_name)
+# render as an html file ----
+html_name <- tempfile(fileext = ".html")
+rmarkdown::render(rmd_name, output_format = "html_document", output_file = html_name)
+# get a png from the html file with webshot ----
+webshot(html_name, zoom = 2, file = "survivalRE_Year_AIC.png", 
+        selector = "body > div.container-fluid.main-container > div.tabwid > table")
+```
+
+### Dealing with singularity
+
+```{r}
+s.singularity.AIC <- aictab(list(surv.fe.haThe.re.site_ha.year_haPhe,
+                                 surv.fe.haThe.re.site_ha.year_ha),
+                            modnames = c("(S) Site: h_apical, Year: h_apical+height",
+                                         "(NS) Site: h_apical, Year: h_apical"))
+s.singularity.AIC
+```
+
+Let's format this puppy:
+```{r}
+ft <- flextable(s.singularity.AIC) %>%
+  add_header(Modnames = "Survival: Singularity Adjustments") %>%
+  fontsize(part = "header", size = 12) %>%
+  set_header_labels(Modnames = "Model") %>% 
+  bg(i = 2, bg = "#dedede") %>% 
+  width(j = ~ Modnames, width = 2.6) %>%
+  set_formatter(
+    K = function(x) sprintf("%d", x)
+  )
+ft
+```
+
+Now save as image:
+```{r}
+# create an Rmd file ----
+rmd_name <- tempfile(fileext = ".Rmd")
+cat("```{r echo=FALSE}\nft\n```", file = rmd_name)
+# render as an html file ----
+html_name <- tempfile(fileext = ".html")
+rmarkdown::render(rmd_name, output_format = "html_document", output_file = html_name)
+# get a png from the html file with webshot ----
+webshot(html_name, zoom = 2, file = "survivalRE_Singularity_AIC.png", 
+        selector = "body > div.container-fluid.main-container > div.tabwid > table")
+```
+
+### Fixed Effects
+
+Let's format this puppy:
+```{r}
+ft <- flextable(s.fe.AIC) %>%
+  add_header(Modnames = "Survival: Fixed Effects") %>%
+  fontsize(part = "header", size = 12) %>%
+  set_header_labels(Modnames = "Model") %>% 
+  bg(i = 5, bg = "#dedede") %>% 
+  width(j = ~ Modnames, width = 2.6) %>%
+  set_formatter(
+    K = function(x) sprintf("%d", x)
+  )
+ft
+```
+
+Now save as image:
+```{r}
+# create an Rmd file ----
+rmd_name <- tempfile(fileext = ".Rmd")
+cat("```{r echo=FALSE}\nft\n```", file = rmd_name)
+# render as an html file ----
+html_name <- tempfile(fileext = ".html")
+rmarkdown::render(rmd_name, output_format = "html_document", output_file = html_name)
+# get a png from the html file with webshot ----
+webshot(html_name, zoom = 2, file = "survivalFE_AIC.png", 
+        selector = "body > div.container-fluid.main-container > div.tabwid > table")
+```
+
+## Visualizations
+
+Create model class
+```{r}
+# Create model class
+scaled <- list(h_apical = h_apical_sc, herb_avg = herb_avg_sc)
+surv.fit <- mwMod(list(mdl = surv.fe.haPhe.re.site_ha.year_ha, vars = c("h_apical", "herb_avg"), scaled = scaled))
+checkPars(surv.fit) # Check parameters
+```
+
+```{r}
+surv.fit$pars$scaled
+```
+
+Unscaled parameters across site:
+```{r}
+surv.fit$pars$unscaled
+```
+
+(Plot later)
+
+# Growth
+
+```{r}
+# Transform data
+metadata_usc <- metadata %>% filter(!is.na(h_apical),
+                                    !is.na(h_apical.next),
+                                    !is.na(herb_avg),
+                                    fec.flower == 1, #growth is also only used in the sexual pathway
+                                    surv == 1)       #plants must survive until september to reprodcude in our model
+
+metadata_sc <- metadata_usc %>% 
+  mutate_at(.vars = vars(h_apical, h_apical.next, herb_avg),
+            .funs = ~ as.numeric(scale(.)))
+
+# Get scaling parameters (really just mean and sd)
+h_apical_sc <- scale(metadata_usc$h_apical)
+h_apical.next_sc <- scale(metadata_usc$h_apical.next)
+herb_avg_sc <- scale(metadata_usc$herb_avg)
+```
+
+As this is a bona-fide LME, we can do the method mentioned in Zuur.  First, model selection on random effects with REML.
+
+## Random Effects
+
+```{r}
+growth.re.site_haThe.year_haThe <- lmer(h_apical.next~h_apical*herb_avg + (h_apical*herb_avg|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, REML=T, control=lmerCtrl)
+summary(growth.re.site_haThe.year_haThe)
+```
+
+First drop interaction term on site.
+```{r}
+growth.re.site_haPhe.year_haThe <- lmer(h_apical.next~h_apical*herb_avg + (h_apical+herb_avg|site/transect)+(h_apical*herb_avg|year),data=metadata_sc, REML=T, control=lmerCtrl)
+summary(growth.re.site_haPhe.year_haThe)
+```
+
+Now drop herbivory on site.
+```{r}
+growth.re.site_ha.year_haThe <- lmer(h_apical.next~h_apical*herb_avg + (h_apical|site/transect)+(h_apical*herb_avg|year),data=metadata_sc, REML=T, control=lmerCtrl)
+summary(growth.re.site_ha.year_haThe)
+```
+
+Now drop interaction term on year.
+```{r}
+growth.re.site_ha.year_haPhe <- lmer(h_apical.next~h_apical*herb_avg + (h_apical|site/transect)+(h_apical+herb_avg|year),data=metadata_sc, REML=T, control=lmerCtrl)
+summary(growth.re.site_ha.year_haPhe)
+```
+
+Now drop herbivory on year.
+```{r}
+growth.re.site_ha.year_ha <- lmer(h_apical.next~h_apical*herb_avg + (h_apical|site/transect)+(h_apical|year),data=metadata_sc, REML=T, control=lmerCtrl)
+# growth.reg.mdl4=lmer(h_apical.next~h_apical*herb_avg + (h_apical|site/transect)+(herb_avg|year),data=metadata_sc, REML=T)
+summary(growth.re.site_ha.year_ha)
+```
+
+Let's check model selection with candidates.
+```{r}
+growth.re.AIC <- aictab(list(growth.re.site_haThe.year_haThe,
+            growth.re.site_haPhe.year_haThe,
+            growth.re.site_ha.year_haThe,
+            growth.re.site_ha.year_haPhe,
+            growth.re.site_ha.year_ha), 
+       modnames = c('(S) Site: herbivory*height, Year: herbivory*height', 
+                    '(S) Site: herbivory+height, Year: herbivory*height', 
+                    '(S) Site: height, Year: herbivory*height', 
+                    '(NS) Site: height, Year: herbivory+height', 
+                    '(NS) Site: height, Year: height'))
+sapply(list(growth.re.site_haThe.year_haThe,
+            growth.re.site_haPhe.year_haThe,
+            growth.re.site_ha.year_haThe,
+            growth.re.site_ha.year_haPhe,
+            growth.re.site_ha.year_ha), function(x) { isSingular(x) }, simplify = TRUE)
+```
+
+## Fixed effects
+
+```{r}
+growth.fe.haThe.site_ha.year_haPhe <- lmer(h_apical.next ~ h_apical*herb_avg + (h_apical|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, REML=F, control=lmerCtrl)
+
+# 2 terms
+growth.fe.haPhe.site_ha.year_haPhe <- lmer(h_apical.next ~ h_apical+herb_avg + (h_apical|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, REML=F, control=lmerCtrl)
+
+growth.fe.haPhaIhe.site_ha.year_haPhe <- lmer(h_apical.next ~ h_apical+h_apical:herb_avg + (h_apical|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, REML=F, control=lmerCtrl)
+
+growth.fe.hePhaIhe.site_ha.year_haPhe <- lmer(h_apical.next ~ herb_avg+h_apical:herb_avg + (h_apical|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, REML=F, control=lmerCtrl)
+
+# 1 term
+growth.fe.ha.site_ha.year_haPhe <- lmer(h_apical.next ~ h_apical + (h_apical|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, REML=F, control=lmerCtrl)
+
+growth.fe.he.site_ha.year_haPhe <- lmer(h_apical.next ~ herb_avg + (h_apical|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, REML=F, control=lmerCtrl)
+
+growth.fe.haIhe.site_ha.year_haPhe <- lmer(h_apical.next ~ h_apical:herb_avg + (h_apical|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, REML=F, control=lmerCtrl)
+
+# 0 terms
+growth.fe.1.site_ha.year_haPhe <- lmer(h_apical.next ~ 1 + (h_apical|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, REML=F, control=lmerCtrl)
+```
+
+```{r}
+growth.fe.AIC <- aictab(list(growth.fe.haThe.site_ha.year_haPhe,
+                             growth.fe.haPhe.site_ha.year_haPhe,
+                             growth.fe.haPhaIhe.site_ha.year_haPhe,
+                             growth.fe.hePhaIhe.site_ha.year_haPhe,
+                             growth.fe.ha.site_ha.year_haPhe,
+                             growth.fe.he.site_ha.year_haPhe,
+                             growth.fe.haIhe.site_ha.year_haPhe,
+                             growth.fe.1.site_ha.year_haPhe),
+                        modnames = c("Fixed: height*herb",
+                                     "Fixed: height+herb",
+                                     "Fixed: height+height:herb",
+                                     "Fixed: herb+height:herb",
+                                     "Fixed: height",
+                                     "Fixed: herb",
+                                     "Fixed: height:herb",
+                                     "Fixed: 1"))
+growth.fe.AIC
+```
+
+Winner:
+```{r}
+summary(growth.fe.haThe.site_ha.year_haPhe)
+```
+
+```{r}
+# Create model class
+scaled <- list(h_apical = h_apical_sc, herb_avg = herb_avg_sc, h_apical.next = h_apical.next_sc)
+growth.fit <- mwMod(list(mdl = growth.fe.haThe.site_ha.year_haPhe, vars = c("h_apical", "herb_avg", "h_apical.next"), scaled = scaled))
+checkPars(growth.fit) # Check parameters
+```
+
+# Pods
+
+```{r}
+metadata_usc <- metadata %>% filter(!is.na(h_apical),
+                                    !is.na(h_apical.next),
+                                    !is.na(herb_avg),
+                                    fec.flower == 1, #pods only result from the sexual pathway
+                                    surv == 1, #again, plants must survive to September
+                                    !is.na(N_pods),
+                                    h_apical.next > 50,
+                                    !(site == "YTB" & h_apical <= 50)) #necessary to compensate for an issue with some of the plants in YTB site
+
+metadata_sc <- metadata_usc %>% mutate_at(.vars = vars(h_apical, h_apical.next, herb_avg),
+                                          .funs = ~ as.numeric(scale(.)))
+
+# Get scaling parameters (really just mean and sd)
+h_apical_sc <- scale(metadata_usc$h_apical)
+h_apical.next_sc <- scale(metadata_usc$h_apical.next)
+herb_avg_sc <- scale(metadata_usc$herb_avg)
+```
+
+## Random Effects
+
+Use nAGQ = 0 for quick approximations, but less exact form of parameter estimation.
+```{r}
+compute <- params$compute
+savefile <- "aictabs_P_RE_Site.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  # 3 terms
+  pods.re.site_haThe.year_haThe <- glmer(N_pods ~ h_apical*herb_avg + (h_apical*herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  # 2 terms
+  pods.re.site_hePhaIhe.year_haThe <- glmer(N_pods ~ h_apical*herb_avg + (herb_avg + h_apical:herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_haPhaIhe.year_haThe <- glmer(N_pods ~ h_apical*herb_avg + (h_apical + h_apical:herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_haPhe.year_haThe <- glmer(N_pods ~ h_apical*herb_avg + (h_apical + herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  # 1 term
+  pods.re.site_he.year_haThe <- glmer(N_pods ~ h_apical*herb_avg + (herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_ha.year_haThe <- glmer(N_pods ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_haIhe.year_haThe <- glmer(N_pods ~ h_apical*herb_avg + (h_apical:herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  # 0 terms
+  pods.re.site_1.year_haThe <- glmer(N_pods ~ h_apical*herb_avg + (1|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  save(pods.re.site_haThe.year_haThe,
+       pods.re.site_hePhaIhe.year_haThe,
+       pods.re.site_haPhaIhe.year_haThe,
+       pods.re.site_haPhe.year_haThe,
+       pods.re.site_he.year_haThe,
+       pods.re.site_ha.year_haThe,
+       pods.re.site_haIhe.year_haThe,
+       pods.re.site_1.year_haThe, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+```
+
+```{r}
+pods.re.site.AIC <- aictab(list(pods.re.site_haThe.year_haThe,
+            pods.re.site_hePhaIhe.year_haThe,
+            pods.re.site_haPhaIhe.year_haThe,
+            pods.re.site_haPhe.year_haThe,
+            pods.re.site_he.year_haThe,
+            pods.re.site_ha.year_haThe,
+            pods.re.site_haIhe.year_haThe,
+            pods.re.site_1.year_haThe),
+       modnames = c("Site: height*herb", 
+                    "Site: herb + height:herb", 
+                    "Site: height + height:herb", 
+                    "Site: height + herb",
+                    "Site: herb",
+                    "Site: height",
+                    "Site: height:herb",
+                    "Site: 1"))
+pods.re.site.AIC
+```
+
+Height + herbivory on site wins.  Let's move on the year.
+```{r}
+compute <- params$compute
+savefile <- "aictabs_P_RE_Year.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  # 2 terms
+  pods.re.site_haPhe.year_haPhe <- glmer(N_pods ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_haPhe.year_haPhaIhe <- glmer(N_pods ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (h_apical+h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_haPhe.year_hePhaIhe <- glmer(N_pods ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (herb_avg+h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  # 1 term
+  pods.re.site_haPhe.year_he <- glmer(N_pods ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_haPhe.year_ha <- glmer(N_pods ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_haPhe.year_haIhe <- glmer(N_pods ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  # 0 terms
+  pods.re.site_haPhe.year_1 <- glmer(N_pods ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (1|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  save(pods.re.site_haPhe.year_haThe,
+       pods.re.site_haPhe.year_hePhaIhe,
+       pods.re.site_haPhe.year_haPhaIhe,
+       pods.re.site_haPhe.year_haPhe,
+       pods.re.site_haPhe.year_he,
+       pods.re.site_haPhe.year_ha,
+       pods.re.site_haPhe.year_haIhe,
+       pods.re.site_haPhe.year_1, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+```
+
+```{r}
+p.re.year.AIC <- aictab(list(pods.re.site_haPhe.year_haThe,
+            pods.re.site_haPhe.year_hePhaIhe,
+            pods.re.site_haPhe.year_haPhaIhe,
+            pods.re.site_haPhe.year_haPhe,
+            pods.re.site_haPhe.year_he,
+            pods.re.site_haPhe.year_ha,
+            pods.re.site_haPhe.year_haIhe,
+            pods.re.site_haPhe.year_1),
+       modnames = c("Year: height*herb", 
+                    "Year: herb + height:herb", 
+                    "Year: height + height:herb", 
+                    "Year: height + herb",
+                    "Year: herb",
+                    "Year: height",
+                    "Year: height:herb",
+                    "Year: 1"))
+
+p.re.year.AIC
+```
+
+Height+herbivory again wins.  Let's check singularity:
+```{r}
+compute <- params$compute
+savefile <- "aictabs_P_Sing_1.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  pods.fe.haThe.re.site_haPhe.year_haPhe <- glmer(N_pods ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  
+  save(pods.fe.haThe.re.site_haPhe.year_haPhe, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+rePCA(pods.fe.haThe.re.site_haPhe.year_haPhe)
+```
+
+Let's drop herbivory on site.
+```{r}
+compute <- params$compute
+savefile <- "aictabs_P_Sing_2.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  pods.fe.haThe.re.site_ha.year_haPhe <- glmer(N_pods ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  
+  save(pods.fe.haThe.re.site_ha.year_haPhe, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+rePCA(pods.fe.haThe.re.site_ha.year_haPhe)
+```
+
+Let's drop herbivory on site.
+```{r}
+compute <- params$compute
+savefile <- "aictabs_P_Sing_3.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  pods.fe.haThe.re.site_1.year_haPhe <- glmer(N_pods ~ h_apical*herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  
+  save(pods.fe.haThe.re.site_1.year_haPhe, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+rePCA(pods.fe.haThe.re.site_1.year_haPhe)
+```
+
+## Fixed effects
+
+```{r}
+compute <- params$compute
+savefile <- "aictabs_P_FE.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  # 2 terms
+  pods.fe.haPhe.re.site_1.year_haPhe <- glmer(N_pods ~ h_apical+herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  
+  pods.fe.haPhaIhe.re.site_1.year_haPhe <- glmer(N_pods ~ h_apical+h_apical:herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  
+  pods.fe.hePhaIhe.re.site_1.year_haPhe <- glmer(N_pods ~ herb_avg+h_apical:herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  
+  # 1 term
+  pods.fe.ha.re.site_1.year_haPhe <- glmer(N_pods ~ h_apical + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  
+  pods.fe.he.re.site_1.year_haPhe <- glmer(N_pods ~ herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  
+  pods.fe.haIhe.re.site_1.year_haPhe <- glmer(N_pods ~ h_apical:herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  
+  # 0 terms
+  pods.fe.1.re.site_1.year_haPhe <- glmer(N_pods ~ 1 + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  
+  save(pods.fe.haThe.re.site_1.year_haPhe,
+       pods.fe.hePhaIhe.re.site_1.year_haPhe,
+       pods.fe.haPhaIhe.re.site_1.year_haPhe,
+       pods.fe.haPhe.re.site_1.year_haPhe,
+       pods.fe.he.re.site_1.year_haPhe,
+       pods.fe.ha.re.site_1.year_haPhe,
+       pods.fe.haIhe.re.site_1.year_haPhe,
+       pods.fe.1.re.site_1.year_haPhe, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+```
+
+```{r}
+p.fe.AIC <- aictab(list(pods.fe.haThe.re.site_1.year_haPhe,
+            pods.fe.hePhaIhe.re.site_1.year_haPhe,
+            pods.fe.haPhaIhe.re.site_1.year_haPhe,
+            pods.fe.haPhe.re.site_1.year_haPhe,
+            pods.fe.he.re.site_1.year_haPhe,
+            pods.fe.ha.re.site_1.year_haPhe,
+            pods.fe.haIhe.re.site_1.year_haPhe,
+            pods.fe.1.re.site_1.year_haPhe),
+       modnames = c("Fixed: height*herb", 
+                    "Fixed: herb + height:herb", 
+                    "Fixed: height + height:herb", 
+                    "Fixed: height + herb",
+                    "Fixed: herb",
+                    "Fixed: height",
+                    "Fixed: height:herb",
+                    "Fixed: 1"))
+p.fe.AIC
+```
+
+Winner:
+```{r}
+summary(pods.fe.haPhe.re.site_1.year_haPhe)
+```

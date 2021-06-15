@@ -4,8 +4,7 @@
 \alias{setGrowthFit.mwIPM}
 \title{Sets the growth mixed-model.}
 \usage{
-\method{setGrowthFit}{mwIPM}(obj, compute = FALSE, saveresults = FALSE,
-  update = TRUE)
+\method{setGrowthFit}{mwIPM}(obj, compute = FALSE, saveresults = FALSE, update = TRUE)
 }
 \arguments{
 \item{obj}{A mwIPM model object.}

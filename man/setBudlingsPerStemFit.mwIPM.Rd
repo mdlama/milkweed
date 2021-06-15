@@ -4,8 +4,7 @@
 \alias{setBudlingsPerStemFit.mwIPM}
 \title{Set budlings-per-stem model.}
 \usage{
-\method{setBudlingsPerStemFit}{mwIPM}(obj, compute = FALSE,
-  saveresults = FALSE, update = TRUE)
+\method{setBudlingsPerStemFit}{mwIPM}(obj, compute = FALSE, saveresults = FALSE, update = TRUE)
 }
 \arguments{
 \item{obj}{A mwIPM model object.}

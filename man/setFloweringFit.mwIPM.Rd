@@ -4,8 +4,7 @@
 \alias{setFloweringFit.mwIPM}
 \title{Sets the flowering mixed-model.}
 \usage{
-\method{setFloweringFit}{mwIPM}(obj, compute = FALSE,
-  saveresults = FALSE, update = TRUE)
+\method{setFloweringFit}{mwIPM}(obj, compute = FALSE, saveresults = FALSE, update = TRUE)
 }
 \arguments{
 \item{obj}{A mwIPM model object.}
