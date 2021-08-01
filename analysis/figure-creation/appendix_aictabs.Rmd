@@ -23,6 +23,8 @@ library(vegan)
 library(flextable)
 library(webshot)
 
+requirePackages("DHARMa")
+
 data("stemdata")
 metadata <- stemdata
 metadata$year <- factor(metadata$year)
@@ -339,6 +341,35 @@ Winner:
 ```{r flowering winner}
 summary(flower.fe.haThe.re.site_1.year_haPhe)
 ```
+
+## Model Diagnostics
+
+Now some diagnostics (aka model validation). Creating the standard residual plots. Interpretting these plots is questionable for a non-linear model fit, so we will also imploy non-linear diagnostics next.
+```{r}
+par(mfrow=c(2,2))
+plot(fitted(flower.fe.haThe.re.site_1.year_haPhe), residuals(flower.fe.haThe.re.site_1.year_haPhe, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
+plot(metadata_sc$h_apical, residuals(flower.fe.haThe.re.site_1.year_haPhe, "deviance"), xlab="Apical height", ylab="Deviance residuals")
+plot(metadata_sc$herb_avg, residuals(flower.fe.haThe.re.site_1.year_haPhe, "deviance"), xlab="Herbivory average", ylab="Deviance residuals")
+par(mfrow=c(1,1))
+```
+
+DHARMa package diagnostics for non-linear, hierarchical, mixed models. This simulates new data from the fitted model for the predictor variable combination of each observation. Then for each observation, calculates the empirical cumulative density function for the simulated data, which describes the expected spread for an observation at the respective point in predictor space, conditional on the fitted model. The residual is defined as the value of the empirical density function at the value of the observed data (DHARMa package vignette).
+```{r}
+flower.simulationOutput <- DHARMa::simulateResiduals(fittedModel = flower.fe.haThe.re.site_1.year_haPhe, n=1000) #simulate data, n set to 1000 for high precision
+```
+
+```{r}
+# DHARMa diagnostic plot, then plots of residuals against the predictor variables independently, we want flat horizontal lines at 0.25, 0.5, and 0.75 in a perfect world.
+DHARMa::plotSimulatedResiduals(flower.simulationOutput)
+DHARMa::plotResiduals(metadata_sc$h_apical, flower.simulationOutput$scaledResiduals)
+DHARMa::plotResiduals(metadata_sc$herb_avg, flower.simulationOutput$scaledResiduals)
+```
+
+```{r}
+# tests to see if the residuals fit the expected distribution
+DHARMa::testUniformity(flower.simulationOutput)
+```
+Plots look great! Looks like the final model is a good fit. The Uniformity Test is probably failing since we have such a large sample size and it is not a particularly strong test. It does have a relatively large p-value compared to some other decent fits we've seen.
 
 ## Create AIC Tables
 
@@ -830,6 +861,60 @@ Winner:
 summary(surv.fe.haPhe.re.site_ha.year_ha)
 ```
 
+## Model Validation and Diagnostics
+
+Now some diagnostics (aka model validation). Creating standard residual plots.
+```{r}
+par(mfrow=c(2,2))
+plot(fitted(surv.fe.haPhe.re.site_ha.year_ha), residuals(surv.fe.haPhe.re.site_ha.year_ha, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
+plot(metadata_sc$h_apical, residuals(surv.fe.haPhe.re.site_ha.year_ha, "deviance"), xlab="Apical height", ylab="Deviance residuals")
+plot(metadata_sc$herb_avg, residuals(surv.fe.haPhe.re.site_ha.year_ha, "deviance"), xlab="Herbivory average", ylab="Deviance residuals")
+par(mfrow=c(1,1))
+```
+
+DHARMa Diagnostics. Same process as above. 
+```{r}
+surv.simulationOutput = DHARMa::simulateResiduals(fittedModel = surv.fe.haPhe.re.site_ha.year_ha, n=1000)
+```
+
+```{r}
+DHARMa::plotSimulatedResiduals(surv.simulationOutput)
+DHARMa::plotResiduals(metadata_sc$h_apical, surv.simulationOutput$scaledResiduals)
+DHARMa::plotResiduals(metadata_sc$herb_avg, surv.simulationOutput$scaledResiduals)
+```
+
+Here we do not pass the Uniformity test, although the p-value is notably large.
+```{r}
+DHARMa::testUniformity(surv.simulationOutput)
+```
+
+## Model Validation and Diagnostics
+
+Now some diagnostics (aka model validation).
+```{r}
+par(mfrow=c(2,2))
+plot(fitted(growth.fe.haThe.site_ha.year_haPhe), residuals(growth.fe.haThe.site_ha.year_haPhe, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
+plot(metadata_sc$h_apical, residuals(growth.fe.haThe.site_ha.year_haPhe, "deviance"), xlab="Apical height", ylab="Deviance residuals")
+plot(metadata_sc$herb_avg, residuals(growth.fe.haThe.site_ha.year_haPhe, "deviance"), xlab="Herbivory average", ylab="Deviance residuals")
+par(mfrow=c(1,1))
+```
+
+DHARMa Diagnostics
+```{r}
+growth.simulationOutput = DHARMa::simulateResiduals(fittedModel = growth.fe.haThe.site_ha.year_haPhe, n=1000)
+```
+
+```{r}
+DHARMa::plotSimulatedResiduals(growth.simulationOutput)
+DHARMa::plotResiduals(metadata_sc$h_apical, growth.simulationOutput$scaledResiduals)
+DHARMa::plotResiduals(metadata_sc$herb_avg, growth.simulationOutput$scaledResiduals)
+```
+
+Low p-value again may be due to large sample. Plots look ok if you exclude the tails and concentrate on where most of the data is centered, however the shape could be improved.
+```{r}
+DHARMa::testUniformity(growth.simulationOutput)
+```
+
 ## Create AIC Tables
 
 ### Random Effect: Site
@@ -985,16 +1070,19 @@ metadata_usc <- metadata %>% filter(!is.na(h_apical),
                                     !is.na(h_apical.next),
                                     !is.na(herb_avg),
                                     fec.flower == 1, #growth is also only used in the sexual pathway
-                                    surv == 1)       #plants must survive until september to reprodcude in our model
-
-metadata_sc <- metadata_usc %>% 
-  mutate_at(.vars = vars(h_apical, h_apical.next, herb_avg),
-            .funs = ~ as.numeric(scale(.)))
+                                    surv == 1) %>%   #plants must survive until september to reprodcude in our model
+  mutate(log_herb_avg = log(0.01 + herb_avg), arcsin_herb_avg = asin(sqrt(herb_avg/6)), h_apical_sq = h_apical*h_apical)
+                                        
+metadata_sc <- metadata_usc %>% mutate_at(.vars = vars(h_apical, h_apical.next, herb_avg, log_herb_avg, arcsin_herb_avg, h_apical_sq),
+                                          .funs = funs(as.numeric(scale(.))))
 
 # Get scaling parameters (really just mean and sd)
 h_apical_sc <- scale(metadata_usc$h_apical)
 h_apical.next_sc <- scale(metadata_usc$h_apical.next)
 herb_avg_sc <- scale(metadata_usc$herb_avg)
+log_herb_avg_sc = scale(metadata_usc$log_herb_avg)
+arcsin_herb_avg_sc = scale(metadata_usc$arcsin_herb_avg)
+h_apical_sq_sc = scale(metadata_usc$h_apical_sq)
 ```
 
 As this is a bona-fide LME, we can do the method mentioned in Zuur.  First, model selection on random effects with REML.
@@ -1031,23 +1119,31 @@ growth.re.site_ha.year_ha <- lmer(h_apical.next~h_apical*herb_avg + (h_apical|si
 summary(growth.re.site_ha.year_ha)
 ```
 
+```{r}
+growth.re.transect_ha.year_haPhe <- lmer(h_apical.next~h_apical*herb_avg + (h_apical|transect)+(h_apical+herb_avg|year),data=metadata_sc, REML=T, control=lmerCtrl)
+```
+
 Let's check model selection with candidates.
 ```{r}
 growth.re.AIC <- aictab(list(growth.re.site_haThe.year_haThe,
             growth.re.site_haPhe.year_haThe,
             growth.re.site_ha.year_haThe,
             growth.re.site_ha.year_haPhe,
-            growth.re.site_ha.year_ha), 
+            growth.re.site_ha.year_ha,
+            growth.re.transect_ha.year_haPhe),
        modnames = c('(S) Site: herbivory*height, Year: herbivory*height', 
                     '(S) Site: herbivory+height, Year: herbivory*height', 
                     '(S) Site: height, Year: herbivory*height', 
                     '(NS) Site: height, Year: herbivory+height', 
-                    '(NS) Site: height, Year: height'))
+                    '(NS) Site: height, Year: height',
+                    '(NS) Transect: height, Year: height+herbivory'))
 sapply(list(growth.re.site_haThe.year_haThe,
             growth.re.site_haPhe.year_haThe,
             growth.re.site_ha.year_haThe,
             growth.re.site_ha.year_haPhe,
-            growth.re.site_ha.year_ha), function(x) { isSingular(x) }, simplify = TRUE)
+            growth.re.site_ha.year_ha,
+            growth.re.transect_ha.year_haPhe), function(x) { isSingular(x) }, simplify = TRUE)
+growth.re.AIC
 ```
 
 ## Fixed effects
@@ -1097,6 +1193,76 @@ Winner:
 ```{r}
 summary(growth.fe.haThe.site_ha.year_haPhe)
 ```
+## Model Validation and Diagnostics
+Now some diagnostics (aka model validation).
+```{r}
+par(mfrow=c(2,2))
+plot(fitted(growth.fe.haThe.site_ha.year_haPhe), residuals(growth.fe.haThe.site_ha.year_haPhe, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
+plot(metadata_sc$h_apical, residuals(growth.fe.haThe.site_ha.year_haPhe, "deviance"), xlab="Apical height", ylab="Deviance residuals")
+plot(metadata_sc$herb_avg, residuals(growth.fe.haThe.site_ha.year_haPhe, "deviance"), xlab="Herbivory average", ylab="Deviance residuals")
+par(mfrow=c(1,1))
+```
+
+DHARMa Diagnostics
+```{r}
+growth.simulationOutput = DHARMa::simulateResiduals(fittedModel = growth.fe.haThe.site_ha.year_haPhe, n=1000)
+```
+
+```{r}
+DHARMa::plotSimulatedResiduals(growth.simulationOutput)
+DHARMa::plotResiduals(metadata_sc$h_apical, growth.simulationOutput$scaledResiduals)
+DHARMa::plotResiduals(metadata_sc$herb_avg, growth.simulationOutput$scaledResiduals)
+```
+
+Low p-value again may be due to large sample. Plots look ok if you exclude the tails and concentrate on where most of the data is centered, however the shape could be improved.
+```{r}
+DHARMa::testUniformity(growth.simulationOutput)
+```
+
+### Herb_avg transform
+Let's try transforming herb_avg and putting that into the existing model structure. Going with log and an arcsine transform on the herbivory average scaled to be 0<herb_avg<1. 
+```{r}
+growth.fe.haThe.site_ha.year_haPhe.log = lmer(h_apical.next ~ h_apical*log_herb_avg + (h_apical|site/transect)+(h_apical*log_herb_avg|year), data=metadata_sc, REML=F)
+summary(growth.fe.haThe.site_ha.year_haPhe.log)
+growth.fe.haThe.site_ha.year_haPhe.arcsin = lmer(h_apical.next ~ h_apical*arcsin_herb_avg + (h_apical|site/transect)+(h_apical*arcsin_herb_avg|year), data=metadata_sc, REML=F)
+summary(growth.fe.haThe.site_ha.year_haPhe.arcsin)
+
+#both transformations produce a much lower AIC, with log coming out on top
+aictab(list(growth.fe.haThe.site_ha.year_haPhe, growth.fe.haThe.site_ha.year_haPhe.log, growth.fe.haThe.site_ha.year_haPhe.arcsin), modnames = c('growth.fe.haThe.site_ha.year_haPhe', 'growth.fe.haThe.site_ha.year_haPhe.log', 'growth.fe.haThe.site_ha.year_haPhe.arcsin'))
+```
+
+Both have MUCH lower AICc than the final model, so let's see what model validation says.
+```{r}
+par(mfrow=c(2,2))
+plot(fitted(growth.fe.haThe.site_ha.year_haPhe.log), residuals(growth.fe.haThe.site_ha.year_haPhe.log, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
+plot(metadata_sc$h_apical, residuals(growth.fe.haThe.site_ha.year_haPhe.log, "deviance"), xlab="Apical height", ylab="Deviance residuals")
+plot(metadata_sc$herb_avg, residuals(growth.fe.haThe.site_ha.year_haPhe.log, "deviance"), xlab="log(Herbivory average)", ylab="Deviance residuals")
+par(mfrow=c(1,1))
+
+par(mfrow=c(2,2))
+plot(fitted(growth.fe.haThe.site_ha.year_haPhe.arcsin), residuals(growth.fe.haThe.site_ha.year_haPhe.arcsin, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
+plot(metadata_sc$h_apical, residuals(growth.fe.haThe.site_ha.year_haPhe.arcsin, "deviance"), xlab="Apical height", ylab="Deviance residuals")
+plot(metadata_sc$herb_avg, residuals(growth.fe.haThe.site_ha.year_haPhe.arcsin, "deviance"), xlab="arcsin(sqrt(Herbivory average))", ylab="Deviance residuals")
+par(mfrow=c(1,1))
+```
+None of these residual plots look any better, so we will see what DHARMa says.
+```{r}
+growth.simulationOutput.log = DHARMa::simulateResiduals(fittedModel = growth.fe.haThe.site_ha.year_haPhe.log, n=1000)
+growth.simulationOutput.arcsin = DHARMa::simulateResiduals(fittedModel = growth.fe.haThe.site_ha.year_haPhe.arcsin, n=1000)
+```
+
+```{r}
+DHARMa::plotSimulatedResiduals(growth.simulationOutput.log)
+DHARMa::plotResiduals(metadata_sc$h_apical, growth.simulationOutput.log$scaledResiduals)
+DHARMa::plotResiduals(metadata_sc$log_herb_avg, growth.simulationOutput.log$scaledResiduals)
+
+DHARMa::plotSimulatedResiduals(growth.simulationOutput.arcsin)
+DHARMa::plotResiduals(metadata_sc$h_apical, growth.simulationOutput.arcsin$scaledResiduals)
+DHARMa::plotResiduals(metadata_sc$arcsin_herb_avg, growth.simulationOutput.arcsin$scaledResiduals)
+
+DHARMa::testUniformity(growth.simulationOutput.log)
+DHARMa::testUniformity(growth.simulationOutput.arcsin)
+```
 
 ```{r}
 # Create model class
@@ -1126,7 +1292,19 @@ h_apical.next_sc <- scale(metadata_usc$h_apical.next)
 herb_avg_sc <- scale(metadata_usc$herb_avg)
 ```
 
-## Random Effects
+### June vs. September Height as a Predictor
+First, do full model. In this case, we will compare to see if height in June or September is a better predictor.
+```{r}
+pods.reg.full_sept = glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next*herb_avg|site/transect)+(h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+
+pods.reg.full_june = glmer(N_pods ~ h_apical*herb_avg + (h_apical*herb_avg|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+
+aictab(list(pods.reg.full_june, pods.reg.full_sept), modnames = c('June', 'September'))
+summary(pods.reg.full_sept)
+```
+
+### Random Effects
+September wins, so we will continue to use this in our model instead of height in June (h_apical). Now onto selection for random effects. We can try and drop the herb_avg term in the site/transect random effect first due to small variation.
 
 Use nAGQ = 0 for quick approximations, but less exact form of parameter estimation.
 ```{r}
@@ -1135,24 +1313,24 @@ savefile <- "aictabs_P_RE_Site.RData"
 
 if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
   # 3 terms
-  pods.re.site_haThe.year_haThe <- glmer(N_pods ~ h_apical*herb_avg + (h_apical*herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  pods.re.site_haThe.year_haThe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next*herb_avg|site/transect) + (h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
   
   # 2 terms
-  pods.re.site_hePhaIhe.year_haThe <- glmer(N_pods ~ h_apical*herb_avg + (herb_avg + h_apical:herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  pods.re.site_hePhaIhe.year_haThe <- glmer(N_pods ~ h_apical.next*herb_avg + (herb_avg + h_apical.next:herb_avg|site/transect) + (h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
   
-  pods.re.site_haPhaIhe.year_haThe <- glmer(N_pods ~ h_apical*herb_avg + (h_apical + h_apical:herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  pods.re.site_haPhaIhe.year_haThe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next + h_apical.next:herb_avg|site/transect) + (h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
   
-  pods.re.site_haPhe.year_haThe <- glmer(N_pods ~ h_apical*herb_avg + (h_apical + herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  pods.re.site_haPhe.year_haThe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next + herb_avg|site/transect) + (h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
   
   # 1 term
-  pods.re.site_he.year_haThe <- glmer(N_pods ~ h_apical*herb_avg + (herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  pods.re.site_he.year_haThe <- glmer(N_pods ~ h_apical.next*herb_avg + (herb_avg|site/transect) + (h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
   
-  pods.re.site_ha.year_haThe <- glmer(N_pods ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  pods.re.site_ha.year_haThe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect) + (h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
   
-  pods.re.site_haIhe.year_haThe <- glmer(N_pods ~ h_apical*herb_avg + (h_apical:herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  pods.re.site_haIhe.year_haThe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next:herb_avg|site/transect) + (h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
   
   # 0 terms
-  pods.re.site_1.year_haThe <- glmer(N_pods ~ h_apical*herb_avg + (1|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  pods.re.site_1.year_haThe <- glmer(N_pods ~ h_apical.next*herb_avg + (1|site/transect) + (h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
   
   save(pods.re.site_haThe.year_haThe,
        pods.re.site_hePhaIhe.year_haThe,
@@ -1188,37 +1366,37 @@ pods.re.site.AIC <- aictab(list(pods.re.site_haThe.year_haThe,
 pods.re.site.AIC
 ```
 
-Height + herbivory on site wins.  Let's move on the year.
+Height on site wins.  Let's move on the year.
 ```{r}
 compute <- params$compute
 savefile <- "aictabs_P_RE_Year.RData"
 
 if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
   # 2 terms
-  pods.re.site_haPhe.year_haPhe <- glmer(N_pods ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  pods.re.site_ha.year_haPhe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect) + (h_apical.next+herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
   
-  pods.re.site_haPhe.year_haPhaIhe <- glmer(N_pods ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (h_apical+h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  pods.re.site_ha.year_haPhaIhe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect) + (h_apical.next+h_apical.next:herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
   
-  pods.re.site_haPhe.year_hePhaIhe <- glmer(N_pods ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (herb_avg+h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  pods.re.site_ha.year_hePhaIhe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect) + (herb_avg+h_apical.next:herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
   
   # 1 term
-  pods.re.site_haPhe.year_he <- glmer(N_pods ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  pods.re.site_ha.year_he <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
   
-  pods.re.site_haPhe.year_ha <- glmer(N_pods ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  pods.re.site_ha.year_ha <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect) + (h_apical.next|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
   
-  pods.re.site_haPhe.year_haIhe <- glmer(N_pods ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  pods.re.site_ha.year_haIhe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect) + (h_apical.next:herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
   
   # 0 terms
-  pods.re.site_haPhe.year_1 <- glmer(N_pods ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (1|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  pods.re.site_ha.year_1 <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect) + (1|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
   
-  save(pods.re.site_haPhe.year_haThe,
-       pods.re.site_haPhe.year_hePhaIhe,
-       pods.re.site_haPhe.year_haPhaIhe,
-       pods.re.site_haPhe.year_haPhe,
-       pods.re.site_haPhe.year_he,
-       pods.re.site_haPhe.year_ha,
-       pods.re.site_haPhe.year_haIhe,
-       pods.re.site_haPhe.year_1, 
+  save(pods.re.site_ha.year_haThe,
+       pods.re.site_ha.year_hePhaIhe,
+       pods.re.site_ha.year_haPhaIhe,
+       pods.re.site_ha.year_haPhe,
+       pods.re.site_ha.year_he,
+       pods.re.site_ha.year_ha,
+       pods.re.site_ha.year_haIhe,
+       pods.re.site_ha.year_1, 
        file=file.path(mwCache,savefile))
 } else {
   load(file.path(mwCache,savefile))
@@ -1227,13 +1405,13 @@ if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
 
 ```{r}
 p.re.year.AIC <- aictab(list(pods.re.site_haPhe.year_haThe,
-            pods.re.site_haPhe.year_hePhaIhe,
-            pods.re.site_haPhe.year_haPhaIhe,
-            pods.re.site_haPhe.year_haPhe,
-            pods.re.site_haPhe.year_he,
-            pods.re.site_haPhe.year_ha,
-            pods.re.site_haPhe.year_haIhe,
-            pods.re.site_haPhe.year_1),
+            pods.re.site_ha.year_hePhaIhe,
+            pods.re.site_ha.year_haPhaIhe,
+            pods.re.site_ha.year_haPhe,
+            pods.re.site_ha.year_he,
+            pods.re.site_ha.year_ha,
+            pods.re.site_ha.year_haIhe,
+            pods.re.site_ha.year_1),
        modnames = c("Year: height*herb", 
                     "Year: herb + height:herb", 
                     "Year: height + height:herb", 
@@ -1246,53 +1424,40 @@ p.re.year.AIC <- aictab(list(pods.re.site_haPhe.year_haThe,
 p.re.year.AIC
 ```
 
-Height+herbivory again wins.  Let's check singularity:
+Herbivory + height:herb wins.  Let's check singularity:
 ```{r}
 compute <- params$compute
 savefile <- "aictabs_P_Sing_1.RData"
 
 if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
-  pods.fe.haThe.re.site_haPhe.year_haPhe <- glmer(N_pods ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  pods.fe.haThe.re.site_ha.year_hePhaIhe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect) + (herb_avg+h_apical.next:herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'))
   
-  save(pods.fe.haThe.re.site_haPhe.year_haPhe, 
+  save(pods.fe.haThe.re.site_ha.year_hePhaIhe, 
        file=file.path(mwCache,savefile))
 } else {
   load(file.path(mwCache,savefile))
 }
-rePCA(pods.fe.haThe.re.site_haPhe.year_haPhe)
+rePCA(pods.fe.haThe.re.site_ha.year_hePhaIhe)
 ```
 
-Let's drop herbivory on site.
+Because the model failed to converge, it looks singular. Let's try dropping the variable in site.
+
 ```{r}
 compute <- params$compute
 savefile <- "aictabs_P_Sing_2.RData"
 
 if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
-  pods.fe.haThe.re.site_ha.year_haPhe <- glmer(N_pods ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  pods.fe.haThe.re.site_1.year_hePhaIhe <- glmer(N_pods ~ h_apical.next*herb_avg + (1|site/transect) + (herb_avg+h_apical.next:herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'))
   
-  save(pods.fe.haThe.re.site_ha.year_haPhe, 
+  save(pods.fe.haThe.re.site_1.year_hePhaIhe, 
        file=file.path(mwCache,savefile))
 } else {
   load(file.path(mwCache,savefile))
 }
-rePCA(pods.fe.haThe.re.site_ha.year_haPhe)
+rePCA(pods.fe.haThe.re.site_1.year_hePhaIhe)
 ```
 
-Let's drop herbivory on site.
-```{r}
-compute <- params$compute
-savefile <- "aictabs_P_Sing_3.RData"
-
-if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
-  pods.fe.haThe.re.site_1.year_haPhe <- glmer(N_pods ~ h_apical*herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
-  
-  save(pods.fe.haThe.re.site_1.year_haPhe, 
-       file=file.path(mwCache,savefile))
-} else {
-  load(file.path(mwCache,savefile))
-}
-rePCA(pods.fe.haThe.re.site_1.year_haPhe)
-```
+This fixed the singularity in our model!
 
 ## Fixed effects
 
@@ -1302,30 +1467,30 @@ savefile <- "aictabs_P_FE.RData"
 
 if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
   # 2 terms
-  pods.fe.haPhe.re.site_1.year_haPhe <- glmer(N_pods ~ h_apical+herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  pods.fe.haPhe.re.site_1.year_hePhaIhe <- glmer(N_pods ~ h_apical.next+herb_avg + (1|site/transect) + (herb_avg+h_apical.next|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
   
-  pods.fe.haPhaIhe.re.site_1.year_haPhe <- glmer(N_pods ~ h_apical+h_apical:herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  pods.fe.haPhaIhe.re.site_1.year_hePhaIhe <- glmer(N_pods ~ h_apical.next+h_apical.next:herb_avg + (1|site/transect) + (herb_avg+h_apical.next|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
   
-  pods.fe.hePhaIhe.re.site_1.year_haPhe <- glmer(N_pods ~ herb_avg+h_apical:herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  pods.fe.hePhaIhe.re.site_1.year_hePhaIhe <- glmer(N_pods ~ herb_avg+h_apical.next:herb_avg + (1|site/transect) + (herb_avg+h_apical.next|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
   
   # 1 term
-  pods.fe.ha.re.site_1.year_haPhe <- glmer(N_pods ~ h_apical + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  pods.fe.ha.re.site_1.year_hePhaIhe <- glmer(N_pods ~ h_apical.next + (1|site/transect) + (herb_avg+h_apical.next|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
   
-  pods.fe.he.re.site_1.year_haPhe <- glmer(N_pods ~ herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  pods.fe.he.re.site_1.year_hePhaIhe <- glmer(N_pods ~ herb_avg + (1|site/transect) + (herb_avg+h_apical.next|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
   
-  pods.fe.haIhe.re.site_1.year_haPhe <- glmer(N_pods ~ h_apical:herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  pods.fe.haIhe.re.site_1.year_hePhaIhe <- glmer(N_pods ~ h_apical.next:herb_avg + (1|site/transect) + (herb_avg+h_apical.next|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
   
   # 0 terms
-  pods.fe.1.re.site_1.year_haPhe <- glmer(N_pods ~ 1 + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  pods.fe.1.re.site_1.year_hePhaIhe <- glmer(N_pods ~ 1 + (1|site/transect) + (herb_avg+h_apical.next|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
   
-  save(pods.fe.haThe.re.site_1.year_haPhe,
-       pods.fe.hePhaIhe.re.site_1.year_haPhe,
-       pods.fe.haPhaIhe.re.site_1.year_haPhe,
-       pods.fe.haPhe.re.site_1.year_haPhe,
-       pods.fe.he.re.site_1.year_haPhe,
-       pods.fe.ha.re.site_1.year_haPhe,
-       pods.fe.haIhe.re.site_1.year_haPhe,
-       pods.fe.1.re.site_1.year_haPhe, 
+  save(pods.fe.haThe.re.site_1.year_hePhaIhe,
+       pods.fe.hePhaIhe.re.site_1.year_hePhaIhe,
+       pods.fe.haPhaIhe.re.site_1.year_hePhaIhe,
+       pods.fe.haPhe.re.site_1.year_hePhaIhe,
+       pods.fe.he.re.site_1.year_hePhaIhe,
+       pods.fe.ha.re.site_1.year_hePhaIhe,
+       pods.fe.haIhe.re.site_1.year_hePhaIhe,
+       pods.fe.1.re.site_1.year_hePhaIhe, 
        file=file.path(mwCache,savefile))
 } else {
   load(file.path(mwCache,savefile))
@@ -1333,14 +1498,14 @@ if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
 ```
 
 ```{r}
-p.fe.AIC <- aictab(list(pods.fe.haThe.re.site_1.year_haPhe,
-            pods.fe.hePhaIhe.re.site_1.year_haPhe,
-            pods.fe.haPhaIhe.re.site_1.year_haPhe,
-            pods.fe.haPhe.re.site_1.year_haPhe,
-            pods.fe.he.re.site_1.year_haPhe,
-            pods.fe.ha.re.site_1.year_haPhe,
-            pods.fe.haIhe.re.site_1.year_haPhe,
-            pods.fe.1.re.site_1.year_haPhe),
+p.fe.AIC <- aictab(list(pods.fe.haThe.re.site_1.year_hePhaIhe,
+            pods.fe.hePhaIhe.re.site_1.year_hePhaIhe,
+            pods.fe.haPhaIhe.re.site_1.year_hePhaIhe,
+            pods.fe.haPhe.re.site_1.year_hePhaIhe,
+            pods.fe.he.re.site_1.year_hePhaIhe,
+            pods.fe.ha.re.site_1.year_hePhaIhe,
+            pods.fe.haIhe.re.site_1.year_hePhaIhe,
+            pods.fe.1.re.site_1.year_hePhaIhe),
        modnames = c("Fixed: height*herb", 
                     "Fixed: herb + height:herb", 
                     "Fixed: height + height:herb", 
@@ -1354,5 +1519,25 @@ p.fe.AIC
 
 Winner:
 ```{r}
-summary(pods.fe.haPhe.re.site_1.year_haPhe)
+summary(pods.fe.haThe.re.site_1.year_hePhaIhe)
+```
+
+## Model Validation and Diagnostics
+```{r}
+par(mfrow=c(2,2))
+plot(fitted(pods.fe.haThe.re.site_1.year_hePhaIhe), residuals(pods.fe.haThe.re.site_1.year_hePhaIhe, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
+plot(metadata_sc$h_apical, residuals(pods.fe.haThe.re.site_1.year_hePhaIhe, "deviance"), xlab="Apical height", ylab="Deviance residuals")
+plot(metadata_sc$herb_avg, residuals(pods.fe.haThe.re.site_1.year_hePhaIhe, "deviance"), xlab="Herbivory average", ylab="Deviance residuals")
+par(mfrow=c(1,1))
+```
+
+DHARMa Diagnostics
+```{r}
+pods.simulationOutput = DHARMa::simulateResiduals(fittedModel = pods.fe.haThe.re.site_1.year_hePhaIhe, n=1000)
+```
+
+```{r}
+DHARMa::plotSimulatedResiduals(pods.simulationOutput)
+DHARMa::plotResiduals(metadata_sc$h_apical, pods.simulationOutput$scaledResiduals)
+DHARMa::plotResiduals(metadata_sc$herb_avg, pods.simulationOutput$scaledResiduals)
 ```
