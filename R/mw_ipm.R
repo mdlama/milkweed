@@ -499,7 +499,7 @@ setFloweringFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, upd
                                               .funs = funs(as.numeric(scale(.))))
 
     cat("Computing flowering fit...")
-    flower.mdl <- lme4::glmer(fec.flower ~ h_apical + herb_avg - 1 + (herb_avg|site/transect)+(h_apical*herb_avg|year),
+    flower.mdl <- lme4::glmer(fec.flower ~ h_apical*herb_avg + (1|site/transect)+(h_apical+herb_avg|year),
                               data=metadata_sc,
                               nAGQ=1,
                               family=binomial(),
@@ -549,7 +549,7 @@ setSurvivalFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, upda
                                               .funs = funs(as.numeric(scale(.))))
 
     cat("Computing survival fit...")
-    surv.mdl <- lme4::glmer(surv ~ herb_avg + (h_apical|site/transect) + (h_apical+herb_avg|year),
+    surv.mdl <- lme4::glmer(surv ~ h_apical + herb_avg + (h_apical|site/transect) + (h_apical|year),
                             data=metadata_sc,
                             family=binomial(),
                             nAGQ=1,
@@ -602,12 +602,9 @@ setGrowthFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update
 
 
     cat("Computing growth fit...")
-    # growth.mdl <- lme4::lmer(h_apical.next ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical*herb_avg|year),
-    #                          data=metadata_sc,
-    #                          REML=T)
-    growth.mdl <- lme4::lmer(h_apical.next ~ h_apical + herb_avg + (h_apical|site/transect) + (h_apical*herb_avg|year),
-                             data=metadata_sc,
-                             REML=T)
+     growth.mdl <- lme4::lmer(h_apical.next ~ h_apical*herb_avg + (1|site/transect) + (h_apical|year),
+                              data=metadata_sc,
+                              REML=T)
     cat("done!\n")
 
     growth.fit <- mwMod(list(mdl = growth.mdl,
@@ -656,7 +653,7 @@ setPodsFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update =
                                               .funs = funs(as.numeric(scale(.))))
 
     cat("Computing pods fit...")
-    pods.mdl <- lme4::glmer(N_pods ~ h_apical.next + herb_avg - 1 + (h_apical.next|site/transect) + (h_apical.next*herb_avg|year),
+    pods.mdl <- lme4::glmer(N_pods ~ h_apical.next + (h_apical.next|site/transect) + (herb_avg|year),
                             data=metadata_sc,
                             nAGQ=1,
                             family=poisson(link = "log"),
@@ -1235,6 +1232,7 @@ computeClonalKernel.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
                                                         stats::coef(budlings.per.stem.fit$fit),
                                                         perturb[1:2])
   } else {
+
     mean.buds.per.stem <- t(budlings.per.stem.fit$predict(herb_avg$x,
                                                           stats::coef(budlings.per.stem.fit$fit),
                                                           perturb[1:2])) %*%
