@@ -108,7 +108,7 @@ max <- data.frame(h_apical = x,
                   Herbivory = "max")
 
 mycurves <- rbind(min, avg, max) 
-mycurves$Herbivory <- as.factor(mycurves$Herbivory)
+mycurves$Herbivory <- factor(mycurves$Herbivory, levels = c("min", "avg", "max"))
 
 p2 <- ggplot(mycurves, aes(x = h_apical, 
                            y = prob.flower, 
