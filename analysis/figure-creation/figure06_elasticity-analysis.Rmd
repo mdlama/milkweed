@@ -24,7 +24,7 @@ mwCache <- getOption("milkweed.cache")
 # Analysis
 
 ## Bootstrap elasticities
-```{r}
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
 compute <- FALSE
 
 if (!file.exists(file.path(mwCache,"figure6.RData")) | (compute)) {
@@ -46,17 +46,17 @@ if (!file.exists(file.path(mwCache,"figure6.RData")) | (compute)) {
 ```
 
 ## Spread elasticity over kernel for herbivory parameters
-```{r}
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
 ipm %<>% analyzeStandard() %>% analyzeParameters(distpars = FALSE)
 res <- ipm$analysis$parameters %>% 
-    filter(type == "Herbivory") %>% 
+    filter(type == "Pods") %>% 
     select(pars, elasticity)
 
-herbivory_func <- function(x) {
-  as.vector((ipm %>% setHerbivoryMatrix(perturb = x, distpars = FALSE))$kernels$K)
+pods_func <- function(x) {
+  as.vector((ipm %>% setPodsMatrix(perturb = x))$kernels$K)
 }
 
-J <- numDeriv::jacobian(herbivory_func, rep(0,3))
+J <- numDeriv::jacobian(pods_func, rep(0,4))
 
 # Loops!?  We don't need no stinkin loops...
 S1 <- ipm$analysis$standard$sens*matrix(J[,1], nrow=ipm$N)*ipm$vars$h_apical$dx # pmunch

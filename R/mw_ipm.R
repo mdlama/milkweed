@@ -1086,6 +1086,7 @@ setGrowthMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,5)) {
 #' @param perturb Parameter perturbation vector for sensitivity analysis.
 #'
 #' @return A mwIPM model object.
+#' @export
 #'
 #' @importFrom magrittr %<>%
 setPodsMatrix.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
