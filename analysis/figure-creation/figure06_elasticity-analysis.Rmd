@@ -25,19 +25,29 @@ mwCache <- getOption("milkweed.cache")
 
 ## Bootstrap elasticities
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-compute <- FALSE
+compute <- TRUE
+parallel <- FALSE
 
 if (!file.exists(file.path(mwCache,"figure6.RData")) | (compute)) {
-  numcl <- detectCores()-1
-  registerDoParallel(cores = numcl)
-  results <- tbl_df(foreach(i=1:20, .combine=bind_rows) %dopar% {
-    library(milkweed)
-    library(dplyr)
-    '%<>%' <- magrittr::'%<>%'
-    ipm %<>% bootIPM() %>% analyzeParameters(distpars = FALSE)
-    thisone <- ipm$analysis$parameters %>% select(type, name, elasticity)
-    thisone
-  })
+  if (parallel) {
+    numcl <- detectCores()-1
+    registerDoParallel(cores = numcl)
+    results <- tbl_df(foreach(i=1:20, .combine=bind_rows) %dopar% {
+      library(milkweed)
+      library(dplyr)
+      '%<>%' <- magrittr::'%<>%'
+      ipm %<>% bootIPM() %>% analyzeParameters(distpars = FALSE)
+      thisone <- ipm$analysis$parameters %>% select(type, name, elasticity)
+      thisone
+    })
+  } else {
+    results <- tibble()
+    for (i in 1:20) {
+      ipm %<>% bootIPM() %>% analyzeParameters(distpars = FALSE)
+      thisone <- ipm$analysis$parameters %>% select(type, name, elasticity)
+      results <- bind_rows(results, thisone)
+    }
+  }
   
   save(results, file=file.path(mwCache,"figure6.RData"))
 } else {
