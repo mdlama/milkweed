@@ -66,21 +66,19 @@ pods_func <- function(x) {
   as.vector((ipm %>% setPodsMatrix(perturb = x))$kernels$K)
 }
 
+# Need 4 to handle all variables (even though only 2 with non-zero parameter values)
 J <- numDeriv::jacobian(pods_func, rep(0,4))
 
 # Loops!?  We don't need no stinkin loops...
-S1 <- ipm$analysis$standard$sens*matrix(J[,1], nrow=ipm$N)*ipm$vars$h_apical$dx # pmunch
-S2 <- ipm$analysis$standard$sens*matrix(J[,2], nrow=ipm$N)*ipm$vars$h_apical$dx # mean
-S3 <- ipm$analysis$standard$sens*matrix(J[,3], nrow=ipm$N)*ipm$vars$h_apical$dx # sd
+S1 <- ipm$analysis$standard$sens*matrix(J[,1], nrow=ipm$N)*ipm$vars$h_apical$dx # Intercept
+S2 <- ipm$analysis$standard$sens*matrix(J[,2], nrow=ipm$N)*ipm$vars$h_apical$dx # h_apical.next
 
 E1 <- ipm$analysis$standard$elas*(matrix(J[,1], nrow=ipm$N)/(ipm$kernels$K/res$pars[1]))*ipm$vars$h_apical$dx
 E2 <- ipm$analysis$standard$elas*(matrix(J[,2], nrow=ipm$N)/(ipm$kernels$K/res$pars[2]))*ipm$vars$h_apical$dx
-E3 <- ipm$analysis$standard$elas*(matrix(J[,3], nrow=ipm$N)/(ipm$kernels$K/res$pars[3]))*ipm$vars$h_apical$dx
 
 # Sanity check - sum of Ei should equal calculated elasticities
 abs(sum(sum(E1)) - res$elasticity[1])
 abs(sum(sum(E2)) - res$elasticity[2])
-abs(sum(sum(E3)) - res$elasticity[3])
 ```
 
 # Plotting
@@ -116,8 +114,7 @@ newlabelorder <- c("Clonal-a",
                    "Flowering-h_apical", 
                    "Flowering-herb_avg", 
                    "Pods-(Intercept)", 
-                   "Pods-h_apical", 
-                   "Pods-herb_avg", 
+                   "Pods-h_apical.next", 
                    "Seedlings-mean", 
                    "Seedlings-sd", 
                    "Sexual-seedling.emergence", 

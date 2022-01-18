@@ -1487,9 +1487,9 @@ analyzeParameters.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, p
                           pars = obj$pars$pods.fit$pars$unscaled[obj$site,],
                           type = as.character("Pods"),
                           name = c("(Intercept)",
-                                   "h_apical",
+                                   "h_apical.next",
                                    "herb_avg",
-                                   "h_apical:herb_avg")
+                                   "h_apical.next:herb_avg")
         )
         )
       )
