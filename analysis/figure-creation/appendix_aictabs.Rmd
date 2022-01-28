@@ -1167,6 +1167,7 @@ growth.fe.haIhe.site_ha.year_haPhe <- lmer(h_apical.next ~ h_apical:herb_avg + (
 
 # 0 terms
 growth.fe.1.site_ha.year_haPhe <- lmer(h_apical.next ~ 1 + (h_apical|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, REML=F, control=lmerCtrl)
+
 ```
 
 ```{r}
@@ -1467,21 +1468,21 @@ savefile <- "aictabs_P_FE.RData"
 
 if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
   # 2 terms
-  pods.fe.haPhe.re.site_1.year_hePhaIhe <- glmer(N_pods ~ h_apical.next+herb_avg + (1|site/transect) + (herb_avg+h_apical.next|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  pods.fe.haPhe.re.site_1.year_hePhaIhe <- glmer(N_pods ~ h_apical.next+herb_avg + (1|site/transect) + (herb_avg+h_apical.next:herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
   
-  pods.fe.haPhaIhe.re.site_1.year_hePhaIhe <- glmer(N_pods ~ h_apical.next+h_apical.next:herb_avg + (1|site/transect) + (herb_avg+h_apical.next|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  pods.fe.haPhaIhe.re.site_1.year_hePhaIhe <- glmer(N_pods ~ h_apical.next+h_apical.next:herb_avg + (1|site/transect) + (herb_avg+h_apical.next:herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
   
-  pods.fe.hePhaIhe.re.site_1.year_hePhaIhe <- glmer(N_pods ~ herb_avg+h_apical.next:herb_avg + (1|site/transect) + (herb_avg+h_apical.next|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  pods.fe.hePhaIhe.re.site_1.year_hePhaIhe <- glmer(N_pods ~ herb_avg+h_apical.next:herb_avg + (1|site/transect) + (herb_avg+h_apical.next:herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
   
   # 1 term
-  pods.fe.ha.re.site_1.year_hePhaIhe <- glmer(N_pods ~ h_apical.next + (1|site/transect) + (herb_avg+h_apical.next|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  pods.fe.ha.re.site_1.year_hePhaIhe <- glmer(N_pods ~ h_apical.next + (1|site/transect) + (herb_avg+h_apical.next:herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
   
-  pods.fe.he.re.site_1.year_hePhaIhe <- glmer(N_pods ~ herb_avg + (1|site/transect) + (herb_avg+h_apical.next|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  pods.fe.he.re.site_1.year_hePhaIhe <- glmer(N_pods ~ herb_avg + (1|site/transect) + (herb_avg+h_apical.next:herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
   
-  pods.fe.haIhe.re.site_1.year_hePhaIhe <- glmer(N_pods ~ h_apical.next:herb_avg + (1|site/transect) + (herb_avg+h_apical.next|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  pods.fe.haIhe.re.site_1.year_hePhaIhe <- glmer(N_pods ~ h_apical.next:herb_avg + (1|site/transect) + (herb_avg+h_apical.next:herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
   
   # 0 terms
-  pods.fe.1.re.site_1.year_hePhaIhe <- glmer(N_pods ~ 1 + (1|site/transect) + (herb_avg+h_apical.next|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  pods.fe.1.re.site_1.year_hePhaIhe <- glmer(N_pods ~ 1 + (1|site/transect) + (herb_avg+h_apical.next:herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
   
   save(pods.fe.haThe.re.site_1.year_hePhaIhe,
        pods.fe.hePhaIhe.re.site_1.year_hePhaIhe,
@@ -1517,15 +1518,17 @@ p.fe.AIC <- aictab(list(pods.fe.haThe.re.site_1.year_hePhaIhe,
 p.fe.AIC
 ```
 
+Height and herbivory is within two AIC points of the winning model, so we will use that one.
+
 Winner:
 ```{r}
-summary(pods.fe.haThe.re.site_1.year_hePhaIhe)
+summary(pods.fe.haPhe.re.site_1.year_hePhaIhe)
 ```
 
 ## Model Validation and Diagnostics
 ```{r}
 par(mfrow=c(2,2))
-plot(fitted(pods.fe.haThe.re.site_1.year_hePhaIhe), residuals(pods.fe.haThe.re.site_1.year_hePhaIhe, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
+plot(fitted(pods.fe.haPhe.re.site_1.year_hePhaIhe), residuals(pods.fe.haPhe.re.site_1.year_hePhaIhe, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
 plot(metadata_sc$h_apical, residuals(pods.fe.haThe.re.site_1.year_hePhaIhe, "deviance"), xlab="Apical height", ylab="Deviance residuals")
 plot(metadata_sc$herb_avg, residuals(pods.fe.haThe.re.site_1.year_hePhaIhe, "deviance"), xlab="Herbivory average", ylab="Deviance residuals")
 par(mfrow=c(1,1))
@@ -1533,7 +1536,7 @@ par(mfrow=c(1,1))
 
 DHARMa Diagnostics
 ```{r}
-pods.simulationOutput = DHARMa::simulateResiduals(fittedModel = pods.fe.haThe.re.site_1.year_hePhaIhe, n=1000)
+pods.simulationOutput = DHARMa::simulateResiduals(fittedModel = pods.fe.haPhe.re.site_1.year_hePhaIhe, n=1000)
 ```
 
 ```{r}
