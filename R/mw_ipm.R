@@ -653,7 +653,7 @@ setPodsFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update =
                                               .funs = funs(as.numeric(scale(.))))
 
     cat("Computing pods fit...")
-    pods.mdl <- lme4::glmer(N_pods ~ h_apical.next+herb_avg + (1|site/transect) + (herb_avg + h_apical.next:herb_avg|year),
+    pods.mdl <- lme4::glmer(N_pods ~ h_apical.next+herb_avg + (1|site/transect) + (h_apical.next:herb_avg + herb_avg|year),
                             data=metadata_sc,
                             nAGQ=1,
                             family=poisson(link = "log"),
@@ -1222,30 +1222,22 @@ computeClonalKernel.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   ## Budling Recruitment (same as Kc)
   # perturb = c(budlings.per.stem, budlings)
 
-  attach(obj$vars, warn.conflicts = FALSE)
-  attach(obj$pars, warn.conflicts = FALSE)
-  attach(obj$matrices, warn.conflicts = FALSE)
-
   if (obj$mdlargs$input == 'meanonly') {
-    mean.herb_avg <- sum(dist.herb*herb_avg$x)*herb_avg$dx
-    mean.buds.per.stem <- budlings.per.stem.fit$predict(mean.herb_avg,
-                                                        stats::coef(budlings.per.stem.fit$fit),
-                                                        perturb[1:2])
-  } else {
+    mean.herb_avg <- sum(obj$pars$dist.herb*obj$vars$herb_avg$x)*obj$vars$herb_avg$dx
+    mean.buds.per.stem <- obj$pars$budlings.per.stem.fit$predict(mean.herb_avg,
+                                                                                                                                  stats::coef(obj$pars$budlings.per.stem.fit$fit),
+                                                                                                                                  perturb[1:2])
+    } else {
 
-    mean.buds.per.stem <- t(budlings.per.stem.fit$predict(herb_avg$x,
-                                                          stats::coef(budlings.per.stem.fit$fit),
-                                                          perturb[1:2])) %*%
-      t(t(H[1+(0:(obj$N-1))*obj$N,1]))*herb_avg$dx
+    mean.buds.per.stem <- t(obj$pars$budlings.per.stem.fit$predict(obj$vars$herb_avg$x,
+                                                                   stats::coef(obj$pars$budlings.per.stem.fit$fit),
+                                                                   perturb[1:2])) %*%
+      t(t(obj$matrices$H[1+(0:(obj$N-1))*obj$N,1]))*obj$vars$herb_avg$dx
   }
 
-  Kc <- t(t(mean.buds.per.stem*budling.fit[[obj$site]]$predict(h_apical$b,
-                                                               budling.fit[[obj$site]]$fit$estimate,
-                                                               perturb[3:4])))%*%t(rep(1,obj$N))*h_apical$dx
-
-  detach(obj$vars)
-  detach(obj$pars)
-  detach(obj$matrices)
+  Kc <- t(t(mean.buds.per.stem*obj$pars$budling.fit[[obj$site]]$predict(obj$vars$h_apical$b,
+                                                                        obj$pars$budling.fit[[obj$site]]$fit$estimate,
+                                                                        perturb[3:4])))%*%t(rep(1,obj$N))*obj$vars$h_apical$dx
 
   obj$kernels$Kc <- Kc
 
@@ -1325,30 +1317,22 @@ setSite.mwIPM <- function(obj, site = "Bertha", compute = FALSE) {
 #' @examples
 #' ipm %<>% computeMPM()
 computeMPM.mwIPM <- function(obj) {
-  attach(obj$vars, warn.conflicts = FALSE)
-  attach(obj$pars, warn.conflicts = FALSE)
-  attach(obj$matrices, warn.conflicts = FALSE)
-
   if (obj$mdlargs$input == 'meanonly') {
-    mean.herb_avg <- sum(dist.herb*herb_avg$x)*herb_avg$dx
-    mean.buds.per.stem <- budlings.per.stem.fit$predict(mean.herb_avg,
-                                                        stats::coef(budlings.per.stem.fit$fit))
+    mean.herb_avg <- sum(obj$pars$dist.herb*obj$vars$herb_avg$x)*obj$vars$herb_avg$dx
+    mean.buds.per.stem <- obj$pars$budlings.per.stem.fit$predict(mean.herb_avg,
+                                                                 stats::coef(obj$pars$budlings.per.stem.fit$fit))
   } else {
-    mean.buds.per.stem <- t(budlings.per.stem.fit$predict(herb_avg$x,
-                                                          stats::coef(budlings.per.stem.fit$fit))) %*%
-      t(t(H[1+(0:(obj$N-1))*obj$N,1]))*herb_avg$dx
+    mean.buds.per.stem <- t(obj$pars$budlings.per.stem.fit$predict(obj$vars$herb_avg$x,
+                                                                   stats::coef(obj$pars$budlings.per.stem.fit$fit))) %*%
+      t(t(obj$matrices$H[1+(0:(obj$N-1))*obj$N,1]))*obj$vars$herb_avg$dx
   }
 
-  Kss <- seedling.emergence[[obj$site]]*seeds.per.pod*(P*G*S*obj$matrices$F)%*%H*herb_avg$dx*h_apical.next$dx*h_apical$dx
-  alpha <- sum(Kss%*%t(t(seedling.fit$predict(h_apical$b, seedling.fit$fit$estimate))))
-  beta <- sum(Kss%*%t(t(budling.fit[[obj$site]]$predict(h_apical$b,
-                                                        budling.fit[[obj$site]]$fit$estimate))))
+  Kss <- obj$pars$seedling.emergence[[obj$site]]*obj$pars$seeds.per.pod*(obj$matrices$P*obj$matrices$G*obj$matrices$S*obj$matrices$F)%*%obj$matrices$H*obj$vars$herb_avg$dx*obj$vars$h_apical.next$dx*obj$vars$h_apical$dx
+  alpha <- sum(Kss%*%t(t(obj$pars$seedling.fit$predict(obj$vars$h_apical$b, obj$pars$seedling.fit$fit$estimate))))
+  beta <- sum(Kss%*%t(t(obj$pars$budling.fit[[obj$site]]$predict(obj$vars$h_apical$b,
+                                                        obj$pars$budling.fit[[obj$site]]$fit$estimate))))
   pems <- mean.buds.per.stem
   pemb <- mean.buds.per.stem
-
-  detach(obj$vars)
-  detach(obj$pars)
-  detach(obj$matrices)
 
   obj$MPM <- matrix(c(alpha, beta, pems, pemb), nrow = 2, byrow=TRUE)
 
