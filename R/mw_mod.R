@@ -46,12 +46,16 @@ predict.mwMod <- function(obj, newdata, type="Bertha", perturb=rep(0,4)) {
 #'
 #' @return List of scaled and unscaled parameters.
 calcPars <- function(mdl, scaled, vars) {
-  num_sites <- length(c("Bertha", levels(stemdata$site)))
+  sites <- rownames(coef(mdl)$site)
+  years <- rownames(coef(mdl)$year)
+  num_sites <- length(sites)
+  num_years <- length(years)
+  num_pars <- 1+num_sites+num_years # Don't forget Bertha!
   growth <- (class(mdl) == "lmerMod")
   pars <- list(scaled=NA, unscaled=NA)
-  pars$scaled <- matrix(rep(0,num_sites*4), byrow=TRUE, nrow=num_sites)
+  pars$scaled <- matrix(rep(0,num_pars*4), byrow=TRUE, nrow=num_pars)
   colnames(pars$scaled) <- c("(Intercept)", vars[1], vars[2], paste0(vars[1], ":", vars[2]))
-  rownames(pars$scaled) <- c("Bertha", levels(stemdata$site))
+  rownames(pars$scaled) <- c("Bertha", sites, years)
 
   # Assign values for Bertha
   assignme <- rownames(coef(summary(mdl)))
@@ -62,7 +66,13 @@ calcPars <- function(mdl, scaled, vars) {
   # Assign values for sites
   for (i in 1:ncol(coef(mdl)$site)) {
     varexp <- colnames(coef(mdl)$site)[i]
-    pars$scaled[2:num_sites,varexp] <- coef(mdl)$site[,varexp]
+    pars$scaled[2:(1+num_sites),varexp] <- coef(mdl)$site[,varexp]
+  }
+
+  # Assign values for years
+  for (i in 1:ncol(coef(mdl)$year)) {
+    varexp <- colnames(coef(mdl)$year)[i]
+    pars$scaled[(1+num_sites+1):num_pars,varexp] <- coef(mdl)$year[,varexp]
   }
 
   mur <- 0
@@ -71,10 +81,11 @@ calcPars <- function(mdl, scaled, vars) {
     mur <- attributes(scaled$h_apical.next)$'scaled:center'
     sdr <- attributes(scaled$h_apical.next)$'scaled:scale'
 
-    pars$sd <- rep(0,num_sites)
+    pars$sd <- rep(0,num_pars)
     names(pars$sd) <- rownames(pars$scaled)
     pars$sd['Bertha'] <- sdr*sd(mdl@frame$h_apical.next - predict(mdl, type="response", re.form=NA))
-    pars$sd[2:num_sites] <- sdr*sd(mdl@frame$h_apical.next - predict(mdl, type="response", re.form=~(1|site)))
+    pars$sd[2:(1+num_sites)] <- sdr*sd(mdl@frame$h_apical.next - predict(mdl, type="response", re.form=~(1|site)))
+    pars$sd[(1+num_sites+1):num_pars] <- sdr*sd(mdl@frame$h_apical.next - predict(mdl, type="response", re.form=~(1|year)))
   }
   mux <- c(0,0)
   sdx <- c(0,0)
@@ -89,7 +100,7 @@ calcPars <- function(mdl, scaled, vars) {
           c(0,         1,         0,     -1*mux[2]),
           c(0,         0,         1,     -1*mux[1]),
           c(0,         0,         0,            1)) +
-    cbind(rep(mur, num_sites), matrix(rep(0, 3*num_sites), nrow=num_sites))
+    cbind(rep(mur, num_pars), matrix(rep(0, 3*num_pars), nrow=num_pars))
   colnames(pars$unscaled) <- c("(Intercept)", vars[1], vars[2], paste0(vars[1], ":", vars[2]))
 
   return(pars)
@@ -102,6 +113,9 @@ calcPars <- function(mdl, scaled, vars) {
 #'
 #' @export
 checkPars <- function(obj) {
+  sites <- rownames(coef(obj$mdl)$site)
+  years <- rownames(coef(obj$mdl)$year)
+
   growth <- (class(obj$mdl) == "lmerMod")
   mux <- c(0,0)
   sdx <- c(0,0)
@@ -127,7 +141,8 @@ checkPars <- function(obj) {
   cat(sprintf("Bertha error: %g\n", E))
 
   # Now for sites
-  sites <- rownames(obj$pars$unscaled)[-1]
+  num_sites <- length(sites)
+  sites <- rownames(obj$pars$unscaled)[2:(1+num_sites)]
   # Get random effect terms
   terms <- sapply(lme4::findbars(formula(obj$mdl)), deparse)
   # Get location of site random effect (space is necessary in front)
@@ -144,4 +159,24 @@ checkPars <- function(obj) {
     E[i] <- max(abs(estresp-fitresp[I]))
   }
   cat(sprintf("Max site errors: %g\n", max(E)))
+
+  # Now for years
+  num_years <- length(years)
+  sites <- rownames(obj$pars$unscaled)[(1+num_sites+1):(1+num_sites+num_years)]
+  # Get random effect terms
+  terms <- sapply(lme4::findbars(formula(obj$mdl)), deparse)
+  # Get location of site random effect (space is necessary in front)
+  I <- which(grepl(" year", terms))
+  # Reformulate with ~
+  re.form <- reformulate(paste0("(", terms[I], ")"))
+  fitresp <- mur + sdr*predict(obj$mdl, type="response", re.form=re.form)
+  E <- rep(0, length(years)-1)
+  for (i in 1:length(years)) {
+    iyear <- years[i]
+    I <- which(obj$mdl@frame$year == iyear)
+    newyeardata <- newdata[I,]
+    estresp <- predict(obj, newdata=newyeardata, type=iyear)
+    E[i] <- max(abs(estresp-fitresp[I]))
+  }
+  cat(sprintf("Max year errors: %g\n", max(E)))
 }
