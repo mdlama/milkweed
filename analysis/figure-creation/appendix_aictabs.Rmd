@@ -402,7 +402,7 @@ ft <- flextable(f.re.site.AIC) %>%
   add_header(Modnames = "Flowering: Site Random Effect") %>%
   fontsize(part = "header", size = 12) %>%
   set_header_labels(Modnames = "Model") %>% 
-  bg(i = 1, bg = "#dedede") %>% 
+  bg(i = 5, bg = "#dedede") %>% 
   width(j = ~ Modnames, width = 2.6) %>%
   set_formatter(
     K = function(x) sprintf("%d", x)
@@ -452,7 +452,7 @@ ft <- flextable(f.re.year.AIC) %>%
   add_header(Modnames = "Flowering: Year Random Effect") %>%
   fontsize(part = "header", size = 12) %>%
   set_header_labels(Modnames = "Model") %>% 
-  bg(i = 1, bg = "#dedede") %>% 
+  bg(i = 3, bg = "#dedede") %>% 
   width(j = ~ Modnames, width = 2.6) %>%
   set_formatter(
     K = function(x) sprintf("%d", x)
@@ -888,33 +888,6 @@ Here we do not pass the Uniformity test, although the p-value is notably large.
 DHARMa::testUniformity(surv.simulationOutput)
 ```
 
-## Model Validation and Diagnostics
-
-Now some diagnostics (aka model validation).
-```{r}
-par(mfrow=c(2,2))
-plot(fitted(growth.fe.haThe.site_ha.year_haPhe), residuals(growth.fe.haThe.site_ha.year_haPhe, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
-plot(metadata_sc$h_apical, residuals(growth.fe.haThe.site_ha.year_haPhe, "deviance"), xlab="Apical height", ylab="Deviance residuals")
-plot(metadata_sc$herb_avg, residuals(growth.fe.haThe.site_ha.year_haPhe, "deviance"), xlab="Herbivory average", ylab="Deviance residuals")
-par(mfrow=c(1,1))
-```
-
-DHARMa Diagnostics
-```{r}
-growth.simulationOutput = DHARMa::simulateResiduals(fittedModel = growth.fe.haThe.site_ha.year_haPhe, n=1000)
-```
-
-```{r}
-DHARMa::plotSimulatedResiduals(growth.simulationOutput)
-DHARMa::plotResiduals(metadata_sc$h_apical, growth.simulationOutput$scaledResiduals)
-DHARMa::plotResiduals(metadata_sc$herb_avg, growth.simulationOutput$scaledResiduals)
-```
-
-Low p-value again may be due to large sample. Plots look ok if you exclude the tails and concentrate on where most of the data is centered, however the shape could be improved.
-```{r}
-DHARMa::testUniformity(growth.simulationOutput)
-```
-
 ## Create AIC Tables
 
 ### Random Effect: Site
@@ -942,8 +915,8 @@ cat("```{r echo=FALSE}\nft\n```", file = rmd_name)
 html_name <- tempfile(fileext = ".html")
 rmarkdown::render(rmd_name, output_format = "html_document", output_file = html_name)
 # get a png from the html file with webshot ----
-webshot(html_name, zoom = 2, file = "survivalRE_Site_AIC.png", 
-        selector = "body > div.container-fluid.main-container > div.tabwid > table")
+# webshot(html_name, zoom = 2, file = "survivalRE_Site_AIC.png", 
+#         selector = "body > div.container-fluid.main-container > div.tabwid > table")
 ```
 
 ### Random Effect: Year
@@ -971,8 +944,8 @@ cat("```{r echo=FALSE}\nft\n```", file = rmd_name)
 html_name <- tempfile(fileext = ".html")
 rmarkdown::render(rmd_name, output_format = "html_document", output_file = html_name)
 # get a png from the html file with webshot ----
-webshot(html_name, zoom = 2, file = "survivalRE_Year_AIC.png", 
-        selector = "body > div.container-fluid.main-container > div.tabwid > table")
+# webshot(html_name, zoom = 2, file = "survivalRE_Year_AIC.png", 
+#         selector = "body > div.container-fluid.main-container > div.tabwid > table")
 ```
 
 ### Dealing with singularity
@@ -1008,8 +981,8 @@ cat("```{r echo=FALSE}\nft\n```", file = rmd_name)
 html_name <- tempfile(fileext = ".html")
 rmarkdown::render(rmd_name, output_format = "html_document", output_file = html_name)
 # get a png from the html file with webshot ----
-webshot(html_name, zoom = 2, file = "survivalRE_Singularity_AIC.png", 
-        selector = "body > div.container-fluid.main-container > div.tabwid > table")
+# webshot(html_name, zoom = 2, file = "survivalRE_Singularity_AIC.png", 
+#         selector = "body > div.container-fluid.main-container > div.tabwid > table")
 ```
 
 ### Fixed Effects
@@ -1037,8 +1010,8 @@ cat("```{r echo=FALSE}\nft\n```", file = rmd_name)
 html_name <- tempfile(fileext = ".html")
 rmarkdown::render(rmd_name, output_format = "html_document", output_file = html_name)
 # get a png from the html file with webshot ----
-webshot(html_name, zoom = 2, file = "survivalFE_AIC.png", 
-        selector = "body > div.container-fluid.main-container > div.tabwid > table")
+# webshot(html_name, zoom = 2, file = "survivalFE_AIC.png", 
+#         selector = "body > div.container-fluid.main-container > div.tabwid > table")
 ```
 
 ## Visualizations
