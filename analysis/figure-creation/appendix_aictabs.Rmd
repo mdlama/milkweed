@@ -175,14 +175,13 @@ savefile <- "aictabs_F_Sing_1.RData"
 
 if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
   flower.fe.haThe.re.site_ha.year_haThe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
-  
-  rePCA(flower.fe.haThe.re.site_ha.year_haThe)
 
   save(flower.fe.haThe.re.site_ha.year_haThe, 
        file=file.path(mwCache,savefile))
 } else {
   load(file.path(mwCache,savefile))
 }
+rePCA(flower.fe.haThe.re.site_ha.year_haThe)
 ```
 
 We have a singularity issue.  Looks like issue is in the year random effect.  Let's drop the interaction term.
@@ -192,14 +191,13 @@ savefile <- "aictabs_F_Sing_2.RData"
 
 if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
   flower.fe.haThe.re.site_ha.year_haPhe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
-  
-  rePCA(flower.fe.haThe.re.site_ha.year_haPhe)
 
   save(flower.fe.haThe.re.site_ha.year_haPhe, 
        file=file.path(mwCache,savefile))
 } else {
   load(file.path(mwCache,savefile))
 }
+rePCA(flower.fe.haThe.re.site_ha.year_haPhe)
 ```
 
 Still have a problem, but now in site.  Let's drop height:
@@ -210,13 +208,12 @@ savefile <- "aictabs_f_Sing_3.RData"
 if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
   flower.fe.haThe.re.site_1.year_haPhe <- glmer(fec.flower ~ h_apical*herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
   
-  rePCA(flower.fe.haThe.re.site_1.year_haPhe)
-  
   save(flower.fe.haThe.re.site_1.year_haPhe, 
        file=file.path(mwCache,savefile))
 } else {
   load(file.path(mwCache,savefile))
 }
+rePCA(flower.fe.haThe.re.site_1.year_haPhe)
 ```
 
 ## Random Effects - Starting with Year
@@ -770,14 +767,13 @@ savefile <- "aictabs_S_Sing_1.RData"
 
 if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
   surv.fe.haThe.re.site_ha.year_haPhe <- glmer(surv ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
-  
-  rePCA(surv.fe.haThe.re.site_ha.year_haPhe)
 
   save(surv.fe.haThe.re.site_ha.year_haPhe, 
        file=file.path(mwCache,savefile))
 } else {
   load(file.path(mwCache,savefile))
 }
+rePCA(surv.fe.haThe.re.site_ha.year_haPhe)
 ```
 
 We have a singularity issue.  Looks like issue is in the year random effect.  Let's drop herbivory.
@@ -927,7 +923,7 @@ ft <- flextable(s.re.year.AIC) %>%
   add_header(Modnames = "Survival: Year Random Effect") %>%
   fontsize(part = "header", size = 12) %>%
   set_header_labels(Modnames = "Model") %>% 
-  bg(i = 1, bg = "#dedede") %>% 
+  bg(i = 2, bg = "#dedede") %>% 
   width(j = ~ Modnames, width = 2.6) %>%
   set_formatter(
     K = function(x) sprintf("%d", x)
