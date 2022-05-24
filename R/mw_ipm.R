@@ -160,7 +160,7 @@ options(milkweed.cache = mwCache) # Store this for outside use in vignettes
 #' ipm <- mwIPM()
 mwIPM <- function(x = list()) {
   x$all_sites = levels(stemdata$site)
-  x$all_years = sort(unique(stemdata$year))
+  x$all_years = as.character(sort(unique(stemdata$year)))
   x$all_models = c("Bertha", x$all_sites, x$all_years)
   if (all(names(x) != "N")) {
     x$N = 50
