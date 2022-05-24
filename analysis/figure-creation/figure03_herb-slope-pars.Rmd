@@ -1,5 +1,5 @@
 ---
-title: "Figure 3: Herbivory slope parameters across site"
+title: "Figure 3: Herbivory slope parameters across year"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
   html_document:
@@ -27,7 +27,7 @@ Random effect error bar reference:  https://stackoverflow.com/questions/13847936
 # Note that sea_scaled is zero when there is no interaction term.
 # Key: **h = herbivory; **a = apical height
 
-sitenames <- ipm$all_sites[-1]
+years <- ipm$all_years
 mydata <- tbl_df(data.frame())
 ```
 
@@ -39,13 +39,13 @@ mydata <- tbl_df(data.frame())
 attach(ipm$pars)
 
 # Get se from random effect
-re <- lme4::ranef(surv.fit$mdl, condVar = TRUE, whichel = "site")[[1]]
+re <- lme4::ranef(surv.fit$mdl, condVar = TRUE, whichel = "year")[[1]]
 pv <- attr(re, "postVar")
 if (any(colnames(re) == "herb_avg")) {
   ind <- which(colnames(re) == "herb_avg")
   se <- sqrt(pv[ind,ind,])  # Index corresponds to slope parameter of interest
 } else {
-  se <- rep(0,length(sitenames))
+  se <- rep(0,length(years))
 }
 
 # Get h_apical for survival
@@ -76,8 +76,8 @@ if (any(rownames(summary(surv.fit$mdl)$coefficients) == "h_apical:herb_avg")) {
 ci <- ci - cis # Implement adjustment
 
 mydata <- bind_rows(mydata, data.frame(rate = "Survival Probability",
-                                       site = sitenames, 
-                                       slope = surv.fit$pars$unscaled[-1,"herb_avg"] + qsadj["50%"],
+                                       year = years, 
+                                       slope = surv.fit$pars$unscaled[years,"herb_avg"] + qsadj["50%"],
                                        ci = ci))
 detach(ipm$pars)
 ```
@@ -87,13 +87,13 @@ detach(ipm$pars)
 attach(ipm$pars)
 
 # Get se from random effect
-re <- lme4::ranef(flower.fit$mdl, condVar = TRUE, whichel = "site")[[1]]
+re <- lme4::ranef(flower.fit$mdl, condVar = TRUE, whichel = "year")[[1]]
 pv <- attr(re, "postVar")
 if (any(colnames(re) == "herb_avg")) {
   ind <- which(colnames(re) == "herb_avg")
   se <- sqrt(pv[ind,ind,])  # Index corresponds to slope parameter of interest
 } else {
-  se <- rep(0,length(sitenames))
+  se <- rep(0,length(years))
 }
 
 h_apical <- ipm$data %>% 
@@ -122,8 +122,8 @@ if (any(rownames(summary(flower.fit$mdl)$coefficients) == "h_apical:herb_avg")) 
 ci <- ci - cif # Implement adjustment
 
 mydata <- bind_rows(mydata, data.frame(rate = "Flowering Probability",
-                                       site = sitenames,
-                                       slope = flower.fit$pars$unscaled[-1,"herb_avg"] + qfadj["50%"],
+                                       year = years,
+                                       slope = flower.fit$pars$unscaled[years,"herb_avg"] + qfadj["50%"],
                                        ci = ci))
 detach(ipm$pars)
 ```
@@ -133,13 +133,13 @@ detach(ipm$pars)
 attach(ipm$pars)
 
 # Get se from random effect
-re <- lme4::ranef(growth.fit$mdl, condVar = TRUE, whichel = "site")[[1]]
+re <- lme4::ranef(growth.fit$mdl, condVar = TRUE, whichel = "year")[[1]]
 pv <- attr(re, "postVar")
 if (any(colnames(re) == "herb_avg")) {
   ind <- which(colnames(re) == "herb_avg")
   se <- sqrt(pv[ind,ind,])  # Index corresponds to slope parameter of interest
 } else {
-  se <- rep(0,length(sitenames))
+  se <- rep(0,length(years))
 }
 
 h_apical <- ipm$data %>% 
@@ -170,8 +170,8 @@ if (any(rownames(summary(growth.fit$mdl)$coefficients) == "h_apical:herb_avg")) 
 ci <- ci - cig # Implement adjustment
 
 mydata <- bind_rows(mydata, data.frame(rate = "Growth",
-                                       site = sitenames, 
-                                       slope = growth.fit$pars$unscaled[-1,"herb_avg"] + qgadj["50%"],
+                                       year = years, 
+                                       slope = growth.fit$pars$unscaled[years,"herb_avg"] + qgadj["50%"],
                                        ci = ci))
 detach(ipm$pars)
 ```
@@ -181,13 +181,13 @@ detach(ipm$pars)
 attach(ipm$pars)
 
 # Get se from random effect
-re <- lme4::ranef(pods.fit$mdl, condVar = TRUE, whichel = "site")[[1]]
+re <- lme4::ranef(pods.fit$mdl, condVar = TRUE, whichel = "year")[[1]]
 pv <- attr(re, "postVar")
 if (any(colnames(re) == "herb_avg")) {
   ind <- which(colnames(re) == "herb_avg")
   se <- sqrt(pv[ind,ind,])  # Index corresponds to slope parameter of interest
 } else {
-  se <- rep(0,length(sitenames))
+  se <- rep(0,length(years))
 }
 
 h_apical.next <- ipm$data %>% 
@@ -218,8 +218,8 @@ if (any(rownames(summary(pods.fit$mdl)$coefficients) == "h_apical.next:herb_avg"
 }
 
 mydata <- bind_rows(mydata, data.frame(rate = "Pod Production",
-                                       site = sitenames, 
-                                       slope = pods.fit$pars$unscaled[-1,"herb_avg"] + qpadj["50%"],
+                                       year = years, 
+                                       slope = pods.fit$pars$unscaled[years,"herb_avg"] + qpadj["50%"],
                                        ci = ci))
 detach(ipm$pars)
 ```
@@ -268,7 +268,7 @@ title.size <- 10
 type = "Flowering Probability"
 pf <- mydata %>% filter(rate == type) %>%
            ggplot(aes(x = slope, 
-                      y = site)) + 
+                      y = year)) + 
            geom_point() +
            geom_errorbarh(aes(xmin = slope - ci, 
                               xmax = slope + ci), 
@@ -276,7 +276,7 @@ pf <- mydata %>% filter(rate == type) %>%
            geom_vline(data=filter(rdata, rate == type), 
                       aes(xintercept = rslope), 
                       linetype=2) + 
-           scale_x_continuous(limits = c(-1, 1)) +
+           scale_x_continuous(limits = c(-2, 2)) +
            theme_bw() +
            ggtitle(paste("(a)", type)) +
            theme(plot.title = element_text(family = "Trebuchet MS", 
@@ -305,7 +305,7 @@ pf
 type = "Growth"
 pg <- mydata %>% filter(rate == type) %>%
            ggplot(aes(x = slope, 
-                      y = site)) + 
+                      y = year)) + 
            geom_point() +
            geom_errorbarh(aes(xmin = slope - ci, 
                               xmax = slope + ci), 
@@ -313,7 +313,7 @@ pg <- mydata %>% filter(rate == type) %>%
            geom_vline(data=filter(rdata, rate == type), 
                       aes(xintercept = rslope), 
                       linetype = 2) + 
-           scale_x_continuous(limits = c(-2, 2)) + 
+           scale_x_continuous(limits = c(-15, 15)) + 
            theme_bw() +
            ggtitle(paste("(b)", type)) +
            theme(plot.title = element_text(family = "Trebuchet MS", 
@@ -344,7 +344,7 @@ pg
 type = "Survival Probability"
 ps <- mydata %>% filter(rate == type) %>%
            ggplot(aes(x = slope, 
-                      y = site)) + 
+                      y = year)) + 
            geom_point() +
            geom_errorbarh(aes(xmin = slope - ci, 
                               xmax = slope + ci), 
@@ -383,7 +383,7 @@ ps
 type = "Pod Production"
 pp <- mydata %>% filter(rate == type) %>%
            ggplot(aes(x = slope, 
-                      y = site)) + 
+                      y = year)) + 
            geom_point() +
            geom_errorbarh(aes(xmin = slope - ci, 
                               xmax = slope + ci), 
@@ -391,7 +391,7 @@ pp <- mydata %>% filter(rate == type) %>%
            geom_vline(data=filter(rdata, rate == type), 
                       aes(xintercept = rslope), 
                       linetype = 2) + 
-           scale_x_continuous(limits = c(-1.0, 1.0)) +
+           scale_x_continuous(limits = c(-2.0, 2.0)) +
            theme_bw() +
            ggtitle(paste("(c)", type)) +
            theme(plot.title = element_text(family = "Trebuchet MS", 
@@ -418,7 +418,7 @@ pp
 ## All together now
 ```{r}
 pall <- gridExtra::grid.arrange(pf, pg, pp, ps, 
-                     left="Site", 
+                     left="Year", 
                      bottom=grid::textGrob(latex2exp::TeX('$\\beta_{z_{\\omega}}$')))
 ggsave("Figure3_HerbSlopePars.png", width=6, device = "png", pall)
 ```
