@@ -40,8 +40,8 @@ plotdata <- data.frame(herb_avg = ipm$vars$herb_avg$x[minind:maxind],
 # Bootstrap data with individual clonal herbivory
 Bootstrap the data to get 95% confidence ellipses for average herbivory and lambda over each site.
 ```{r}
-compute <- FALSE
-parallel <- FALSE
+compute <- TRUE
+parallel <- TRUE
 
 if (!file.exists(file.path(mwCache,"figure5a.RData")) | (compute)) {
   coreProcess <- function(ipm, sites) {
@@ -51,7 +51,7 @@ if (!file.exists(file.path(mwCache,"figure5a.RData")) | (compute)) {
       summarize(herb_avg = mean(herb_avg, na.rm=T), 
                 growth_rate = NA,
                 disttype = "pointmass")
-    thisone$growth_rate <- sapply(sites[-1], function (x) {ipm %>% setSite(x) %>% analyzeGrowthRate()})
+    thisone$growth_rate <- sapply(sites, function (x) {ipm %>% setModel(x) %>% analyzeGrowthRate()})
     return(thisone)
   }
   
@@ -114,7 +114,7 @@ p <- p + geom_point(aes(x = herb_avg,
 # Change theme, scale, and labels
 p <- p + theme_bw() +
          scale_x_continuous(limits = c(0.0, 1.5)) + 
-         scale_y_continuous(limits = c(0.5, 1.5)) + 
+         scale_y_continuous(limits = c(0.5, 1.75)) + 
          xlab("Herbivory severity") +
          ylab(expression(paste("Population growth rate (", lambda, ")"))) + 
          labs(color = "Sites") + 
@@ -130,4 +130,97 @@ p
 Save figure.
 ```{r}
 ggsave("Figure5_PopGrowthVsHerb.png", height=4, width=6, device = "png", p)
+```
+
+# Bootstrap data with individual clonal herbivory (year)
+Bootstrap the data to get 95% confidence ellipses for average herbivory and lambda over each site.
+```{r}
+compute <- TRUE
+parallel <- TRUE
+
+years <- ipm$all_years
+
+if (!file.exists(file.path(mwCache,"figure5a_years.RData")) | (compute)) {
+  coreProcess <- function(ipm, years) {
+    ipm %<>% bootIPM()
+    thisone <- ipm$data %>% 
+      group_by(year) %>% 
+      summarize(herb_avg = mean(herb_avg, na.rm=T), 
+                growth_rate = NA,
+                disttype = "pointmass")
+    thisone$growth_rate <- sapply(years, function (x) {ipm %>% setModel(x) %>% analyzeGrowthRate()})
+    return(thisone)
+  }
+  
+  if (parallel) {
+    numcl <- detectCores()-1
+    registerDoParallel(cores = numcl)
+    results <- tbl_df(foreach(i=1:20, .combine=bind_rows) %dopar% {
+      library(milkweed)
+      library(dplyr)
+      library(ggplot2)
+      coreProcess(ipm, years)
+    })
+  } else {
+    results <- do.call(rbind, lapply(1:20, function (x) {coreProcess(ipm, years)}))
+  }
+  
+  save(plotdata, results, file=file.path(mwCache,"figure5a_years.RData"))
+} else {
+  load(file.path(mwCache,"figure5a_years.RData"))
+}
+```
+
+# Plot with only individual clonal herbivory
+
+```{r}
+
+# results <- results %>% mutate(log_growth_rate = log(growth_rate))
+
+plotdata %>% filter(disttype == "pointmass") -> plotdata2
+
+# Bertha growth rate vs point-mass herbivory scores
+p <- plotdata2 %>% ggplot(aes(x = herb_avg,
+                             y = growth_rate)) +
+                  geom_line() + 
+                  geom_hline(aes(yintercept = 1.0), 
+                             linetype = 3)
+
+results <- results %>% mutate(year = as.factor(year))
+avg_results <- results %>% group_by(year) %>% summarize(herb_avg = mean(herb_avg), growth_rate = mean(growth_rate))
+
+# Site-specific bootstrapped data points with 95% confidence ellipse
+p <- p + geom_point(aes(x = herb_avg, 
+                        y = growth_rate, 
+                        color = year), 
+                    size = 0.1,
+                    alpha = 0.5,
+                    data=results) + 
+         geom_point(aes(x = herb_avg,
+                        y = growth_rate,
+                        color = year),
+                    size = 3,
+                    shape = 3,
+                    data=avg_results) +
+         stat_ellipse(aes(x = herb_avg, 
+                          y = growth_rate, 
+                          color = year),
+                      alpha = 0.8,
+                      size = 0.5,
+                      data = results)
+
+# Change theme, scale, and labels
+p <- p + theme_bw() +
+         scale_x_continuous(limits = c(0.0, 1.5)) + 
+         scale_y_continuous(limits = c(0.5, 1.25)) + 
+         xlab("Herbivory severity") +
+         ylab(expression(paste("Population growth rate (", lambda, ")"))) + 
+         labs(color = "Year") + 
+         theme(legend.background = element_rect(fill="lightgrey",
+                                                size=0.1,
+                                                linetype="solid"),
+               legend.key.size = unit(0.18, "in"),
+               legend.position = c(0.885, 0.78))
+
+p
 ```
