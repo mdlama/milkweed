@@ -40,7 +40,10 @@ mwCache <- getOption("milkweed.cache")
 ```{r flowering scaling}
 metadata_usc <- metadata %>% filter(!is.na(h_apical),
                                     !is.na(herb_avg),
-                                    !is.na(fec.flower))
+                                    !is.na(fec.flower),
+                                    !(year %in% c('2017')),
+                                    !(site %in% c('GET', 'GRN'))
+                                    )
 
 metadata_sc <- metadata_usc %>% mutate_at(.vars = vars(h_apical, herb_avg),
                                           .funs = ~ as.numeric(scale(.))) 
@@ -113,7 +116,7 @@ aictab(list(flower.re.site_haThe.year_haThe,
                     "Site: 1"))
 ```
 
-Now do year with height|site and height+height:herb|site.
+Now do year with height|site 
 
 ```{r}
 compute <- params$compute
@@ -154,44 +157,7 @@ if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
 }
 ```
 
-```{r}
-compute <- params$compute
-savefile <- "aictabs_F_RE_Site_Year_2.RData"
 
-if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
-  # 3 terms
-  flower.re.site_haPhaIhe.year_haThe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical+h_apical:herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  # 2 terms
-  flower.re.site_haPhaIhe.year_hePhaIhe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical+h_apical:herb_avg|site/transect) + (h_apical:herb_avg + herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  flower.re.site_haPhaIhe.year_haPhaIhe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical+h_apical:herb_avg|site/transect) + (h_apical+h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  flower.re.site_haPhaIhe.year_haPhe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical+h_apical:herb_avg|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  # 1 term
-  flower.re.site_haPhaIhe.year_he <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical+h_apical:herb_avg|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  flower.re.site_haPhaIhe.year_ha <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical+h_apical:herb_avg|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  flower.re.site_haPhaIhe.year_haIhe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical+h_apical:herb_avg|site/transect) + (h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  # 0 terms
-  flower.re.site_haPhaIhe.year_1 <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical+h_apical:herb_avg|site/transect) + (1|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  save(flower.re.site_haPhaIhe.year_haThe,
-       flower.re.site_haPhaIhe.year_hePhaIhe,
-       flower.re.site_haPhaIhe.year_haPhaIhe,
-       flower.re.site_haPhaIhe.year_haPhe,
-       flower.re.site_haPhaIhe.year_he,
-       flower.re.site_haPhaIhe.year_ha,
-       flower.re.site_haPhaIhe.year_haIhe,
-       flower.re.site_haPhaIhe.year_1, 
-       file=file.path(mwCache,savefile))
-} else {
-  load(file.path(mwCache,savefile))
-}
-```
 
 ```{r}
 aictab(list(flower.re.site_ha.year_haThe,
@@ -201,15 +167,7 @@ aictab(list(flower.re.site_ha.year_haThe,
        flower.re.site_ha.year_he,
        flower.re.site_ha.year_ha,
        flower.re.site_ha.year_haIhe,
-       flower.re.site_ha.year_1,
-       flower.re.site_haPhaIhe.year_haThe,
-       flower.re.site_haPhaIhe.year_hePhaIhe,
-       flower.re.site_haPhaIhe.year_haPhaIhe,
-       flower.re.site_haPhaIhe.year_haPhe,
-       flower.re.site_haPhaIhe.year_he,
-       flower.re.site_haPhaIhe.year_ha,
-       flower.re.site_haPhaIhe.year_haIhe,
-       flower.re.site_haPhaIhe.year_1),
+       flower.re.site_ha.year_1),
        modnames = c("Site: height, Year: height*herb", 
                     "Site: height, Year: herb + height:herb", 
                     "Site: height, Year: height + height:herb", 
@@ -217,20 +175,12 @@ aictab(list(flower.re.site_ha.year_haThe,
                     "Site: height, Year: herb",
                     "Site: height, Year: height",
                     "Site: height, Year: height",
-                    "Site: height, Year: 1",
-                    "Site: height+height:herb, Year: height*herb", 
-                    "Site: height+height:herb, Year: herb + height:herb", 
-                    "Site: height+height:herb, Year: height + height:herb", 
-                    "Site: height+height:herb, Year: height + herb",
-                    "Site: height+height:herb, Year: herb",
-                    "Site: height+height:herb, Year: height",
-                    "Site: height+height:herb, Year: height:herb",
-                    "Site: height+height:herb, Year: 1"))
+                    "Site: height, Year: 1"))
 ```
 
-Winners:
+Winner:
 Site: height, Year: height*herb
-Site: height+height:herb, Year: height*herb
+
 
 ## Starting with year
 
@@ -410,60 +360,273 @@ aictab(list(flower.re.site_haThe.year_haPhaIhe,
 
 Winners: 
 Site: height, Year: height*herb
-Site: height + height:herb, Year: height*herb
 
-## Winners for both
+
+## Winner for both
 
 Site: height, Year: height*herb
-Site: height + height:herb, Year: height*herb
 
 ### Singularity check
 
-Start with more complex model.
 
 ```{r}
 compute <- params$compute
 savefile <- "aictabs_F_Sing_1.RData"
 
 if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
-  flower.fe.haThe.re.site_haPhaIhe.year_haThe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical+h_apical:herb_avg|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  flower.fe.haThe.re.site_ha.year_haThe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
 
-  save(flower.fe.haThe.re.site_haPhaIhe.year_haThe, 
+  save(flower.fe.haThe.re.site_ha.year_haThe, 
        file=file.path(mwCache,savefile))
 } else {
   load(file.path(mwCache,savefile))
 }
-rePCA(flower.fe.haThe.re.site_haPhaIhe.year_haThe)
+rePCA(flower.fe.haThe.re.site_ha.year_haThe)
 ```
 
-Remove year interaction term.
+Both site and year have parameter outputs as 0s. Let's first try dropping height on site.
+
 ```{r}
 compute <- params$compute
 savefile <- "aictabs_F_Sing_2.RData"
 
 if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
-  flower.fe.haThe.re.site_haPhaIhe.year_haPhe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical+h_apical:herb_avg|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  flower.fe.haThe.re.site_1.year_haThe <- glmer(fec.flower ~ h_apical*herb_avg + (1|site/transect) + (h_apical*herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
 
-  save(flower.fe.haThe.re.site_haPhaIhe.year_haPhe, 
+  save(flower.fe.haThe.re.site_1.year_haThe, 
        file=file.path(mwCache,savefile))
 } else {
   load(file.path(mwCache,savefile))
 }
-rePCA(flower.fe.haThe.re.site_haPhaIhe.year_haPhe)
+rePCA(flower.fe.haThe.re.site_1.year_haThe)
 ```
 
-Remove herb_avg from year.
+Still singular. Let's try reducing the interaction term on year.
+
 ```{r}
 compute <- params$compute
 savefile <- "aictabs_F_Sing_3.RData"
 
 if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
-  flower.fe.haThe.re.site_haPhaIhe.year_ha <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical+h_apical:herb_avg|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  flower.fe.haThe.re.site_1.year_haPhe <- glmer(fec.flower ~ h_apical*herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
 
-  save(flower.fe.haThe.re.site_haPhaIhe.year_ha, 
+  save(flower.fe.haThe.re.site_1.year_haPhe, 
        file=file.path(mwCache,savefile))
 } else {
   load(file.path(mwCache,savefile))
 }
-rePCA(flower.fe.haThe.re.site_haPhaIhe.year_ha)
+rePCA(flower.fe.haThe.re.site_1.year_haPhe)
+```
+
+Let's drop herbivory.
+
+```{r}
+compute <- params$compute
+savefile <- "aictabs_F_Sing_4.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  flower.fe.haThe.re.site_1.year_ha <- glmer(fec.flower ~ h_apical*herb_avg + (1|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+
+  save(flower.fe.haThe.re.site_1.year_ha, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+rePCA(flower.fe.haThe.re.site_1.year_ha)
+```
+What if we started by dropping the interaction term instead?
+
+```{r}
+compute <- params$compute
+savefile <- "aictabs_F_Sing_5.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  flower.fe.haThe.re.site_ha.year_haPhe <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+
+  save(flower.fe.haThe.re.site_ha.year_haPhe, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+rePCA(flower.fe.haThe.re.site_ha.year_haPhe)
+```
+Now drop herbivory on year.
+
+```{r}
+compute <- params$compute
+savefile <- "aictabs_F_Sing_6.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  flower.fe.haThe.re.site_ha.year_ha <- glmer(fec.flower ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+
+  save(flower.fe.haThe.re.site_ha.year_ha, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+rePCA(flower.fe.haThe.re.site_ha.year_ha)
+```
+
+
+Would have to drop height on site, same result as before. In either case...
+
+Winner:
+site: 1, year: height
+
+# Fixed Effects
+
+```{r flowering fixed effects}
+compute <- params$compute
+savefile <- "aictabs_F_FE.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  # 2 terms
+  flower.fe.haPhe.re.site_1.year_ha <- glmer(fec.flower ~ h_apical+herb_avg + (1|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  flower.fe.haPhaIhe.re.site_1.year_ha <- glmer(fec.flower ~ h_apical+h_apical:herb_avg + (1|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  flower.fe.hePhaIhe.re.site_1.year_ha <- glmer(fec.flower ~ herb_avg+h_apical:herb_avg + (1|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  # 1 term
+  flower.fe.ha.re.site_1.year_ha <- glmer(fec.flower ~ h_apical + (1|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  flower.fe.he.re.site_1.year_ha <- glmer(fec.flower ~ herb_avg + (1|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  flower.fe.haIhe.re.site_1.year_ha <- glmer(fec.flower ~ h_apical:herb_avg + (1|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  # 0 terms
+  flower.fe.1.re.site_1.year_ha <- glmer(fec.flower ~ 1 + (1|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  
+  save(flower.fe.haThe.re.site_1.year_ha,
+       flower.fe.hePhaIhe.re.site_1.year_ha,
+       flower.fe.haPhaIhe.re.site_1.year_ha,
+       flower.fe.haPhe.re.site_1.year_ha,
+       flower.fe.he.re.site_1.year_ha,
+       flower.fe.ha.re.site_1.year_ha,
+       flower.fe.haIhe.re.site_1.year_ha,
+       flower.fe.1.re.site_1.year_ha, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+```
+
+```{r flowering fixed effects AIC table}
+aictab(list(flower.fe.haThe.re.site_1.year_ha,
+       flower.fe.hePhaIhe.re.site_1.year_ha,
+       flower.fe.haPhaIhe.re.site_1.year_ha,
+       flower.fe.haPhe.re.site_1.year_ha,
+       flower.fe.he.re.site_1.year_ha,
+       flower.fe.ha.re.site_1.year_ha,
+       flower.fe.haIhe.re.site_1.year_ha,
+       flower.fe.1.re.site_1.year_ha),
+       modnames = c("Fixed: height*herb", 
+                    "Fixed: herb + height:herb", 
+                    "Fixed: height + height:herb", 
+                    "Fixed: height + herb",
+                    "Fixed: herb",
+                    "Fixed: height",
+                    "Fixed: height:herb",
+                    "Fixed: 1"))
+```
+Winner: 
+```{r flowering winner}
+summary(flower.fe.haThe.re.site_1.year_ha)
+```
+
+## Model Diagnostics
+
+Now some diagnostics (aka model validation). Creating the standard residual plots. Interpretting these plots is questionable for a non-linear model fit, so we will also imploy non-linear diagnostics next.
+```{r}
+par(mfrow=c(2,2))
+plot(fitted(flower.fe.haThe.re.site_1.year_ha), residuals(flower.fe.haThe.re.site_1.year_ha, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
+plot(metadata_sc$h_apical, residuals(flower.fe.haThe.re.site_1.year_ha, "deviance"), xlab="Apical height", ylab="Deviance residuals")
+plot(metadata_sc$herb_avg, residuals(flower.fe.haThe.re.site_1.year_ha, "deviance"), xlab="Herbivory average", ylab="Deviance residuals")
+par(mfrow=c(1,1))
+```
+
+DHARMa package diagnostics for non-linear, hierarchical, mixed models. This simulates new data from the fitted model for the predictor variable combination of each observation. Then for each observation, calculates the empirical cumulative density function for the simulated data, which describes the expected spread for an observation at the respective point in predictor space, conditional on the fitted model. The residual is defined as the value of the empirical density function at the value of the observed data (DHARMa package vignette).
+```{r}
+flower.simulationOutput <- DHARMa::simulateResiduals(fittedModel = flower.fe.haThe.re.site_1.year_ha, n=1000) #simulate data, n set to 1000 for high precision
+```
+
+```{r}
+# DHARMa diagnostic plot, then plots of residuals against the predictor variables independently, we want flat horizontal lines at 0.25, 0.5, and 0.75 in a perfect world.
+DHARMa::plotSimulatedResiduals(flower.simulationOutput)
+DHARMa::plotResiduals(metadata_sc$h_apical, flower.simulationOutput$scaledResiduals)
+DHARMa::plotResiduals(metadata_sc$herb_avg, flower.simulationOutput$scaledResiduals)
+```
+```{r}
+# tests to see if the residuals fit the expected distribution
+DHARMa::testUniformity(flower.simulationOutput)
+```
+
+Plots look great! Looks like the final model is a good fit. The Uniformity Test is probably failing since we have such a large sample size and it is not a particularly strong test.
+
+AIC Plots
+
+## Visualizations
+
+Create model class
+```{r}
+scaled <- list(h_apical = h_apical_sc, herb_avg = herb_avg_sc)
+flower.fit <- mwMod(list(mdl = flower.fe.haThe.re.site_1.year_ha, vars = c("h_apical", "herb_avg"), scaled = scaled))
+checkPars(flower.fit) # Check parameters
+```
+
+```{r}
+flower.fit$pars$scaled
+```
+
+Unscaled parameters across site:
+```{r}
+flower.fit$pars$unscaled
+```
+
+Let's plot full data.
+```{r, eval=F}
+# Create plot data for prediction curves
+plotdata <- metadata_usc %>% 
+  group_by(site) %>% 
+  summarize(mean_herb_avg = mean(herb_avg),
+            min_h_apical = min(h_apical),
+            max_h_apical = max(h_apical)) %>%
+  add_row(site = "Bertha",
+          mean_herb_avg = mean(metadata_usc$herb_avg, na.rm=T),
+          min_h_apical = min(metadata_usc$h_apical, na.rm=T),
+          max_h_apical = max(metadata_usc$h_apical, na.rm=T))
+
+# Create prediction curves
+N <- 100
+suppressWarnings( # Hiding the follow warnings: (1) Unequal factor levels: coercing to character and (2) binding character and factor vector, coercing into character vector
+  curves <- bind_rows(
+    lapply(as.vector(plotdata$site), function(site) {
+      i <- which(plotdata$site == site)
+      data.frame(
+        site = site,
+        h_apical = seq(plotdata$min_h_apical[i], plotdata$max_h_apical[i], length.out = N),
+        herb_avg = plotdata$mean_herb_avg[i],
+        fec.flower = predict(
+          flower.fit,
+          type = site,
+          newdata = data.frame(
+            h_apical = seq(plotdata$min_h_apical[i], plotdata$max_h_apical[i], length.out = N),
+            herb_avg = rep(plotdata$mean_herb_avg[i], N)
+          )
+        )
+      )
+    })
+  )
+)
+
+flower.plot <- metadata_usc %>% 
+  ggplot(aes(x = h_apical, 
+             y = fec.flower)) + 
+  geom_jitter(height = 0.1, 
+              alpha = 0.3) +
+  facet_wrap(~ site)
+
+flower.plot + 
+  geom_line(data = curves %>% filter(site != "Bertha")) + 
+  facet_wrap(~ site)
 ```
