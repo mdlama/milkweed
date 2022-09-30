@@ -527,8 +527,12 @@ setFloweringFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, upd
                                               .funs = funs(as.numeric(scale(.))))
 
     cat("Computing flowering fit...")
+<<<<<<< HEAD
     # flower.mdl <- lme4::glmer(fec.flower ~ h_apical*herb_avg + (1|site/transect)+(h_apical+herb_avg|year),
     flower.mdl <- lme4::glmer(fec.flower ~ h_apical*herb_avg + (1|site/transect)+(h_apical|year),
+=======
+    flower.mdl <- lme4::glmer(fec.flower ~ h_apical*herb_avg + (1|site/transect)+(h_apical+herb_avg|year),
+>>>>>>> 3531d7c6ec967107f2b789140d68d146f8ff7973
                               data=metadata_sc,
                               nAGQ=1,
                               family=binomial(),
@@ -578,8 +582,12 @@ setSurvivalFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, upda
                                               .funs = funs(as.numeric(scale(.))))
 
     cat("Computing survival fit...")
+<<<<<<< HEAD
     # surv.mdl <- lme4::glmer(surv ~ h_apical + herb_avg + (h_apical|site/transect) + (h_apical|year),
     surv.mdl <- lme4::glmer(surv ~ herb_avg + (1|site/transect) + (h_apical+herb_avg|year),
+=======
+    surv.mdl <- lme4::glmer(surv ~ h_apical + herb_avg + (h_apical|site/transect) + (h_apical|year),
+>>>>>>> 3531d7c6ec967107f2b789140d68d146f8ff7973
                             data=metadata_sc,
                             family=binomial(),
                             nAGQ=1,
@@ -632,10 +640,16 @@ setGrowthFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update
 
 
     cat("Computing growth fit...")
+<<<<<<< HEAD
     # growth.mdl <- lme4::lmer(h_apical.next ~ h_apical*herb_avg+(h_apical|site/transect) + (h_apical+herb_avg|year),
     growth.mdl <- lme4::lmer(h_apical.next ~ h_apical*herb_avg + (h_apical|site/transect) + (herb_avg|year),
                              data=metadata_sc,
                              REML=T)
+=======
+     growth.mdl <- lme4::lmer(h_apical.next ~ h_apical*herb_avg+(h_apical|site/transect) + (h_apical+herb_avg|year),
+                              data=metadata_sc,
+                              REML=T)
+>>>>>>> 3531d7c6ec967107f2b789140d68d146f8ff7973
     cat("done!\n")
 
     growth.fit <- mwMod(list(mdl = growth.mdl,
@@ -684,8 +698,12 @@ setPodsFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update =
                                               .funs = funs(as.numeric(scale(.))))
 
     cat("Computing pods fit...")
+<<<<<<< HEAD
     # pods.mdl <- lme4::glmer(N_pods ~ h_apical.next+herb_avg + (1|site/transect) + (h_apical.next + herb_avg|year),
     pods.mdl <- lme4::glmer(N_pods ~ h_apical.next*herb_avg + (1|site/transect) + (h_apical.next|year),
+=======
+    pods.mdl <- lme4::glmer(N_pods ~ h_apical.next+herb_avg + (1|site/transect) + (h_apical.next:herb_avg + herb_avg|year),
+>>>>>>> 3531d7c6ec967107f2b789140d68d146f8ff7973
                             data=metadata_sc,
                             nAGQ=1,
                             family=poisson(link = "log"),
@@ -1279,6 +1297,7 @@ computeClonalKernel.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
                                                                                                                                   stats::coef(obj$pars$budlings.per.stem.fit$fit),
                                                                                                                                   perturb[1:2])
     } else {
+<<<<<<< HEAD
 
     mean.buds.per.stem <- t(obj$pars$budlings.per.stem.fit$predict(obj$vars$herb_avg$x,
                                                                    stats::coef(obj$pars$budlings.per.stem.fit$fit),
@@ -1288,6 +1307,17 @@ computeClonalKernel.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
 
   Kc <- t(t(mean.buds.per.stem*obj$pars$budling.fit[[obj$model]]$predict(obj$vars$h_apical$b,
                                                                         obj$pars$budling.fit[[obj$model]]$fit$estimate,
+=======
+
+    mean.buds.per.stem <- t(obj$pars$budlings.per.stem.fit$predict(obj$vars$herb_avg$x,
+                                                                   stats::coef(obj$pars$budlings.per.stem.fit$fit),
+                                                                   perturb[1:2])) %*%
+      t(t(obj$matrices$H[1+(0:(obj$N-1))*obj$N,1]))*obj$vars$herb_avg$dx
+  }
+
+  Kc <- t(t(mean.buds.per.stem*obj$pars$budling.fit[[obj$site]]$predict(obj$vars$h_apical$b,
+                                                                        obj$pars$budling.fit[[obj$site]]$fit$estimate,
+>>>>>>> 3531d7c6ec967107f2b789140d68d146f8ff7973
                                                                         perturb[3:4])))%*%t(rep(1,obj$N))*obj$vars$h_apical$dx
 
   obj$kernels$Kc <- Kc
@@ -1378,10 +1408,17 @@ computeMPM.mwIPM <- function(obj) {
       t(t(obj$matrices$H[1+(0:(obj$N-1))*obj$N,1]))*obj$vars$herb_avg$dx
   }
 
+<<<<<<< HEAD
   Kss <- obj$pars$seedling.emergence[[obj$model]]*obj$pars$seeds.per.pod*(obj$matrices$P*obj$matrices$G*obj$matrices$S*obj$matrices$F)%*%obj$matrices$H*obj$vars$herb_avg$dx*obj$vars$h_apical.next$dx*obj$vars$h_apical$dx
   alpha <- sum(Kss%*%t(t(obj$pars$seedling.fit$predict(obj$vars$h_apical$b, obj$pars$seedling.fit$fit$estimate))))
   beta <- sum(Kss%*%t(t(obj$pars$budling.fit[[obj$model]]$predict(obj$vars$h_apical$b,
                                                         obj$pars$budling.fit[[obj$model]]$fit$estimate))))
+=======
+  Kss <- obj$pars$seedling.emergence[[obj$site]]*obj$pars$seeds.per.pod*(obj$matrices$P*obj$matrices$G*obj$matrices$S*obj$matrices$F)%*%obj$matrices$H*obj$vars$herb_avg$dx*obj$vars$h_apical.next$dx*obj$vars$h_apical$dx
+  alpha <- sum(Kss%*%t(t(obj$pars$seedling.fit$predict(obj$vars$h_apical$b, obj$pars$seedling.fit$fit$estimate))))
+  beta <- sum(Kss%*%t(t(obj$pars$budling.fit[[obj$site]]$predict(obj$vars$h_apical$b,
+                                                        obj$pars$budling.fit[[obj$site]]$fit$estimate))))
+>>>>>>> 3531d7c6ec967107f2b789140d68d146f8ff7973
   pems <- mean.buds.per.stem
   pemb <- mean.buds.per.stem
 

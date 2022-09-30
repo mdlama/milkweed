@@ -884,6 +884,36 @@ Here we do not pass the Uniformity test, although the p-value is notably large.
 DHARMa::testUniformity(surv.simulationOutput)
 ```
 
+<<<<<<< HEAD
+=======
+## Model Validation and Diagnostics
+
+Now some diagnostics (aka model validation).
+```{r}
+par(mfrow=c(2,2))
+plot(fitted(growth.fe.haThe.site_ha.year_haPhe), residuals(growth.fe.haThe.site_ha.year_haPhe, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
+plot(metadata_sc$h_apical, residuals(growth.fe.haThe.site_ha.year_haPhe, "deviance"), xlab="Apical height", ylab="Deviance residuals")
+plot(metadata_sc$herb_avg, residuals(growth.fe.haThe.site_ha.year_haPhe, "deviance"), xlab="Herbivory average", ylab="Deviance residuals")
+par(mfrow=c(1,1))
+```
+
+DHARMa Diagnostics
+```{r}
+growth.simulationOutput = DHARMa::simulateResiduals(fittedModel = growth.fe.haThe.site_ha.year_haPhe, n=1000)
+```
+
+```{r}
+DHARMa::plotSimulatedResiduals(growth.simulationOutput)
+DHARMa::plotResiduals(metadata_sc$h_apical, growth.simulationOutput$scaledResiduals)
+DHARMa::plotResiduals(metadata_sc$herb_avg, growth.simulationOutput$scaledResiduals)
+```
+
+Low p-value again may be due to large sample. Plots look ok if you exclude the tails and concentrate on where most of the data is centered, however the shape could be improved.
+```{r}
+DHARMa::testUniformity(growth.simulationOutput)
+```
+
+>>>>>>> 3531d7c6ec967107f2b789140d68d146f8ff7973
 ## Create AIC Tables
 
 ### Random Effect: Site
