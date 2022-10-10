@@ -266,11 +266,11 @@ mwIPM <- function(x = list()) {
 #' ipm %<>% bootIPM()
 bootIPM.mwIPM <- function (obj) {
   obj$data <- obj$data_orig %>% group_by(site, year) %>%
-                                sample_frac(replace=TRUE) %>%
-                                ungroup()
+    sample_frac(replace=TRUE) %>%
+    ungroup()
   obj %<>% setPars(compute = TRUE, update = FALSE) %>%
-           setModel(compute = TRUE) %>%
-           computeMPM()
+    setModel(compute = TRUE) %>%
+    computeMPM()
 
   return(obj)
 }
@@ -289,7 +289,7 @@ setVars.mwIPM <- function (obj) {
   N <- obj$N
 
   data <- obj$data %>% summarize(max_h_apical = max(h_apical, na.rm=T),
-                             max_h_apical.next = max(h_apical.next, na.rm=T))
+                                 max_h_apical.next = max(h_apical.next, na.rm=T))
 
   # h_apical
   h_apical <- list(min = 0,
@@ -335,41 +335,41 @@ setPars.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update = TR
   obj <- obj %>% setSeedsPerPodConst(compute = compute,
                                      saveresults = saveresults,
                                      update = FALSE) %>%
-                 setSeedlingEmergenceConst(compute = compute,
-                                           saveresults = saveresults,
-                                           update = FALSE) %>%
-                 setBudlingsPerStemFit(compute = compute,
-                                       saveresults = saveresults,
-                                       update = FALSE) %>%
-                 setFloweringFit(compute = compute,
-                                 saveresults = saveresults,
-                                 update = FALSE) %>%
-                 setSurvivalFit(compute = compute,
-                                saveresults = saveresults,
-                                update = FALSE) %>%
-                 setGrowthFit(compute = compute,
+    setSeedlingEmergenceConst(compute = compute,
                               saveresults = saveresults,
                               update = FALSE) %>%
-                 setPodsFit(compute = compute,
-                            saveresults = saveresults,
-                            update = FALSE) %>%
-                 setSeedlingDistFit(compute = compute,
-                                    saveresults = saveresults,
-                                    update = FALSE) %>%
-                 setBudlingDistFit(compute = compute,
-                                   saveresults = saveresults,
-                                   update = FALSE) %>%
-                 setHerbivoryDistFit(compute = compute,
-                                     saveresults = saveresults,
-                                     update = FALSE)
+    setBudlingsPerStemFit(compute = compute,
+                          saveresults = saveresults,
+                          update = FALSE) %>%
+    setFloweringFit(compute = compute,
+                    saveresults = saveresults,
+                    update = FALSE) %>%
+    setSurvivalFit(compute = compute,
+                   saveresults = saveresults,
+                   update = FALSE) %>%
+    setGrowthFit(compute = compute,
+                 saveresults = saveresults,
+                 update = FALSE) %>%
+    setPodsFit(compute = compute,
+               saveresults = saveresults,
+               update = FALSE) %>%
+    setSeedlingDistFit(compute = compute,
+                       saveresults = saveresults,
+                       update = FALSE) %>%
+    setBudlingDistFit(compute = compute,
+                      saveresults = saveresults,
+                      update = FALSE) %>%
+    setHerbivoryDistFit(compute = compute,
+                        saveresults = saveresults,
+                        update = FALSE)
 
   if (update) {
     obj <- obj %>% setFloweringMatrix() %>%
-                   setSurvivalMatrix() %>%
-                   setGrowthMatrix() %>%
-                   setPodsMatrix() %>%
-                   setHerbivoryMatrix(update=FALSE) %>%
-                   setSeedlingRecruitmentMatrix()
+      setSurvivalMatrix() %>%
+      setGrowthMatrix() %>%
+      setPodsMatrix() %>%
+      setHerbivoryMatrix(update=FALSE) %>%
+      setSeedlingRecruitmentMatrix()
   }
 
   return(obj)
@@ -440,16 +440,16 @@ setSeedlingEmergenceConst.mwIPM <- function(obj, compute = FALSE, saveresults = 
 
     # Sites - really need to map this one
     data_gp <- obj$data %>% group_by(year, site) %>%
-                            summarize(N_seedlings = sum(seedling, na.rm=T),
-                                      N_seeds = seeds.per.pod*sum(N_pods, na.rm=T))
+      summarize(N_seedlings = sum(seedling, na.rm=T),
+                N_seeds = seeds.per.pod*sum(N_pods, na.rm=T))
 
     data13_14 <- data_gp %>% filter(year %in% 2013:2014) %>%
-                             group_by(site) %>%
-                             summarize(emergence = last(N_seedlings)/first(N_seeds))
+      group_by(site) %>%
+      summarize(emergence = last(N_seedlings)/first(N_seeds))
 
     data14_15 <- data_gp %>% filter(year %in% 2014:2015) %>%
-                             group_by(site) %>%
-                             summarize(emergence = last(N_seedlings)/first(N_seeds))
+      group_by(site) %>%
+      summarize(emergence = last(N_seedlings)/first(N_seeds))
 
     data15_16 <- data_gp %>% filter(year %in% 2015:2016) %>%
       group_by(site) %>%
@@ -527,12 +527,8 @@ setFloweringFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, upd
                                               .funs = funs(as.numeric(scale(.))))
 
     cat("Computing flowering fit...")
-<<<<<<< HEAD
     # flower.mdl <- lme4::glmer(fec.flower ~ h_apical*herb_avg + (1|site/transect)+(h_apical+herb_avg|year),
     flower.mdl <- lme4::glmer(fec.flower ~ h_apical*herb_avg + (1|site/transect)+(h_apical|year),
-=======
-    flower.mdl <- lme4::glmer(fec.flower ~ h_apical*herb_avg + (1|site/transect)+(h_apical+herb_avg|year),
->>>>>>> 3531d7c6ec967107f2b789140d68d146f8ff7973
                               data=metadata_sc,
                               nAGQ=1,
                               family=binomial(),
@@ -582,12 +578,8 @@ setSurvivalFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, upda
                                               .funs = funs(as.numeric(scale(.))))
 
     cat("Computing survival fit...")
-<<<<<<< HEAD
     # surv.mdl <- lme4::glmer(surv ~ h_apical + herb_avg + (h_apical|site/transect) + (h_apical|year),
-    surv.mdl <- lme4::glmer(surv ~ herb_avg + (1|site/transect) + (h_apical+herb_avg|year),
-=======
-    surv.mdl <- lme4::glmer(surv ~ h_apical + herb_avg + (h_apical|site/transect) + (h_apical|year),
->>>>>>> 3531d7c6ec967107f2b789140d68d146f8ff7973
+    surv.mdl <- lme4::glmer(surv ~ h_apical + herb_avg + (1|site/transect) + (h_apical+herb_avg|year),
                             data=metadata_sc,
                             family=binomial(),
                             nAGQ=1,
@@ -640,16 +632,10 @@ setGrowthFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update
 
 
     cat("Computing growth fit...")
-<<<<<<< HEAD
     # growth.mdl <- lme4::lmer(h_apical.next ~ h_apical*herb_avg+(h_apical|site/transect) + (h_apical+herb_avg|year),
-    growth.mdl <- lme4::lmer(h_apical.next ~ h_apical*herb_avg + (h_apical|site/transect) + (herb_avg|year),
+    growth.mdl <- lme4::lmer(h_apical.next ~ h_apical + h_apical:herb_avg + (1|site/transect) + (herb_avg|year),
                              data=metadata_sc,
                              REML=T)
-=======
-     growth.mdl <- lme4::lmer(h_apical.next ~ h_apical*herb_avg+(h_apical|site/transect) + (h_apical+herb_avg|year),
-                              data=metadata_sc,
-                              REML=T)
->>>>>>> 3531d7c6ec967107f2b789140d68d146f8ff7973
     cat("done!\n")
 
     growth.fit <- mwMod(list(mdl = growth.mdl,
@@ -698,12 +684,8 @@ setPodsFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, update =
                                               .funs = funs(as.numeric(scale(.))))
 
     cat("Computing pods fit...")
-<<<<<<< HEAD
     # pods.mdl <- lme4::glmer(N_pods ~ h_apical.next+herb_avg + (1|site/transect) + (h_apical.next + herb_avg|year),
-    pods.mdl <- lme4::glmer(N_pods ~ h_apical.next*herb_avg + (1|site/transect) + (h_apical.next|year),
-=======
-    pods.mdl <- lme4::glmer(N_pods ~ h_apical.next+herb_avg + (1|site/transect) + (h_apical.next:herb_avg + herb_avg|year),
->>>>>>> 3531d7c6ec967107f2b789140d68d146f8ff7973
+    pods.mdl <- lme4::glmer(N_pods ~ h_apical.next*herb_avg + (1|site/transect) + (h_apical.next:herb_avg|year),
                             data=metadata_sc,
                             nAGQ=1,
                             family=poisson(link = "log"),
@@ -755,17 +737,17 @@ setSeedlingDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE, 
     seedling.fit[[1]] <- f1
 
     seedling.fit[[2]] <- function(x, pars, perturb = rep(0,2)) {
-           pars <- perturbTrans(pars, perturb)
-           N <- length(x)
-           dx <- x[2]-x[1]
-           y <- rep(0, N-1)
-           for (j in 1:(N-1)) {
-             y[j] = pnorm(x[j+1], pars[1], pars[2]) - pnorm(x[j], pars[1], pars[2])
-           }
-           y[1] <- y[1] + pnorm(x[1], pars[1], pars[2])
-           y[N-1] <- y[N-1] + pnorm(x[N], pars[1], pars[2], lower.tail = FALSE)
-           y <- y/dx
-         }
+      pars <- perturbTrans(pars, perturb)
+      N <- length(x)
+      dx <- x[2]-x[1]
+      y <- rep(0, N-1)
+      for (j in 1:(N-1)) {
+        y[j] = pnorm(x[j+1], pars[1], pars[2]) - pnorm(x[j], pars[1], pars[2])
+      }
+      y[1] <- y[1] + pnorm(x[1], pars[1], pars[2])
+      y[N-1] <- y[N-1] + pnorm(x[N], pars[1], pars[2], lower.tail = FALSE)
+      y <- y/dx
+    }
     names(seedling.fit) <- c("fit", "predict")
 
     if (saveresults) {
@@ -920,7 +902,7 @@ setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE,
       munched.fit[[i]][[2]] <- pmunch
       munched.fit[[i]][[3]] <-
         eval(parse(text = paste0(functext,
-          sprintf("N <- length(x)
+                                 sprintf("N <- length(x)
                    dx <- x[2]-x[1]
                    y <- rep(0, N-1)
                    for (j in 1:(N-1)) {
@@ -934,11 +916,11 @@ setHerbivoryDistFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALSE,
                    }
                    y <- y/dx
                  }",
-                 munched.fit[[i]][[1]]$distname,
-                 munched.fit[[i]][[1]]$distname,
-                 munched.fit[[i]][[1]]$distname,
-                 munched.fit[[i]][[1]]$distname
-                 )
+                                         munched.fit[[i]][[1]]$distname,
+                                         munched.fit[[i]][[1]]$distname,
+                                         munched.fit[[i]][[1]]$distname,
+                                         munched.fit[[i]][[1]]$distname
+                                 )
         )))
       names(munched.fit[[i]]) <- c("fit", "pmunch", "predict")
     }
@@ -1199,10 +1181,10 @@ setHerbivoryMatrix.mwIPM <- function(obj, dist.herb = NA, update = TRUE, perturb
   N <- obj$N
   if (any(is.na(dist.herb))) {
     dist.herb <- obj$pars$munched.fit[[obj$model]]$predict(obj$vars$herb_avg$b,
-                                                          c(obj$pars$munched.fit[[obj$model]]$pmunch,
-                                                            obj$pars$munched.fit[[obj$model]]$fit$estimate),
-                                                          perturb,
-                                                          distpars = distpars)
+                                                           c(obj$pars$munched.fit[[obj$model]]$pmunch,
+                                                             obj$pars$munched.fit[[obj$model]]$fit$estimate),
+                                                           perturb,
+                                                           distpars = distpars)
   }
 
   H = matrix(rep(0,N^3), nrow = N^2)
@@ -1217,8 +1199,8 @@ setHerbivoryMatrix.mwIPM <- function(obj, dist.herb = NA, update = TRUE, perturb
 
   if (update) {
     obj %<>% computeSexualKernel(update = FALSE) %>%
-             computeClonalKernel(update = FALSE) %>%
-             computeFullKernel()
+      computeClonalKernel(update = FALSE) %>%
+      computeFullKernel()
   }
 
   return(obj)
@@ -1294,10 +1276,9 @@ computeClonalKernel.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   if (obj$mdlargs$input == 'meanonly') {
     mean.herb_avg <- sum(obj$pars$dist.herb*obj$vars$herb_avg$x)*obj$vars$herb_avg$dx
     mean.buds.per.stem <- obj$pars$budlings.per.stem.fit$predict(mean.herb_avg,
-                                                                                                                                  stats::coef(obj$pars$budlings.per.stem.fit$fit),
-                                                                                                                                  perturb[1:2])
-    } else {
-<<<<<<< HEAD
+                                                                 stats::coef(obj$pars$budlings.per.stem.fit$fit),
+                                                                 perturb[1:2])
+  } else {
 
     mean.buds.per.stem <- t(obj$pars$budlings.per.stem.fit$predict(obj$vars$herb_avg$x,
                                                                    stats::coef(obj$pars$budlings.per.stem.fit$fit),
@@ -1306,19 +1287,8 @@ computeClonalKernel.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
   }
 
   Kc <- t(t(mean.buds.per.stem*obj$pars$budling.fit[[obj$model]]$predict(obj$vars$h_apical$b,
-                                                                        obj$pars$budling.fit[[obj$model]]$fit$estimate,
-=======
-
-    mean.buds.per.stem <- t(obj$pars$budlings.per.stem.fit$predict(obj$vars$herb_avg$x,
-                                                                   stats::coef(obj$pars$budlings.per.stem.fit$fit),
-                                                                   perturb[1:2])) %*%
-      t(t(obj$matrices$H[1+(0:(obj$N-1))*obj$N,1]))*obj$vars$herb_avg$dx
-  }
-
-  Kc <- t(t(mean.buds.per.stem*obj$pars$budling.fit[[obj$site]]$predict(obj$vars$h_apical$b,
-                                                                        obj$pars$budling.fit[[obj$site]]$fit$estimate,
->>>>>>> 3531d7c6ec967107f2b789140d68d146f8ff7973
-                                                                        perturb[3:4])))%*%t(rep(1,obj$N))*obj$vars$h_apical$dx
+                                                                         obj$pars$budling.fit[[obj$model]]$fit$estimate,
+                                                                         perturb[3:4])))%*%t(rep(1,obj$N))*obj$vars$h_apical$dx
 
   obj$kernels$Kc <- Kc
 
@@ -1408,17 +1378,10 @@ computeMPM.mwIPM <- function(obj) {
       t(t(obj$matrices$H[1+(0:(obj$N-1))*obj$N,1]))*obj$vars$herb_avg$dx
   }
 
-<<<<<<< HEAD
   Kss <- obj$pars$seedling.emergence[[obj$model]]*obj$pars$seeds.per.pod*(obj$matrices$P*obj$matrices$G*obj$matrices$S*obj$matrices$F)%*%obj$matrices$H*obj$vars$herb_avg$dx*obj$vars$h_apical.next$dx*obj$vars$h_apical$dx
   alpha <- sum(Kss%*%t(t(obj$pars$seedling.fit$predict(obj$vars$h_apical$b, obj$pars$seedling.fit$fit$estimate))))
   beta <- sum(Kss%*%t(t(obj$pars$budling.fit[[obj$model]]$predict(obj$vars$h_apical$b,
-                                                        obj$pars$budling.fit[[obj$model]]$fit$estimate))))
-=======
-  Kss <- obj$pars$seedling.emergence[[obj$site]]*obj$pars$seeds.per.pod*(obj$matrices$P*obj$matrices$G*obj$matrices$S*obj$matrices$F)%*%obj$matrices$H*obj$vars$herb_avg$dx*obj$vars$h_apical.next$dx*obj$vars$h_apical$dx
-  alpha <- sum(Kss%*%t(t(obj$pars$seedling.fit$predict(obj$vars$h_apical$b, obj$pars$seedling.fit$fit$estimate))))
-  beta <- sum(Kss%*%t(t(obj$pars$budling.fit[[obj$site]]$predict(obj$vars$h_apical$b,
-                                                        obj$pars$budling.fit[[obj$site]]$fit$estimate))))
->>>>>>> 3531d7c6ec967107f2b789140d68d146f8ff7973
+                                                                  obj$pars$budling.fit[[obj$model]]$fit$estimate))))
   pems <- mean.buds.per.stem
   pemb <- mean.buds.per.stem
 
@@ -1704,10 +1667,10 @@ renderFloweringFit.mwIPM <- function(obj) {
   herb_ex <- data.frame(yintercept = c(0, mean(obj$data$herb_avg, na.rm=T), 6))
 
   imgt <- imgt + geom_hline(aes(yintercept = yintercept),
-                          data = herb_ex,
-                          linetype = c(1, 2, 5),
-                          col = RColorBrewer::brewer.pal(5, "YlOrRd")[2:4],
-                          size=1)
+                            data = herb_ex,
+                            linetype = c(1, 2, 5),
+                            col = RColorBrewer::brewer.pal(5, "YlOrRd")[2:4],
+                            size=1)
 
   # Move over a bit to match panel (b) below
   imgt <- imgt +
