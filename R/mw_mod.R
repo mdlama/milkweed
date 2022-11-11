@@ -84,12 +84,9 @@ calcPars <- function(mdl, scaled, vars) {
     pars$sd <- rep(0,num_pars)
     names(pars$sd) <- rownames(pars$scaled)
     pars$sd['Bertha'] <- sdr*sd(mdl@frame$h_apical.next - predict(mdl, type="response", re.form=NA))
-<<<<<<< HEAD
+
     pars$sd[2:(1+num_sites)] <- sdr*sd(mdl@frame$h_apical.next - predict(mdl, type="response", re.form=~(1|site)))
     pars$sd[(1+num_sites+1):num_pars] <- sdr*sd(mdl@frame$h_apical.next - predict(mdl, type="response", re.form=~(1|year)))
-=======
-    pars$sd[2:num_sites] <- sdr*sd(mdl@frame$h_apical.next - predict(mdl, type="response", re.form=~(1|site)))
->>>>>>> 3531d7c6ec967107f2b789140d68d146f8ff7973
   }
   mux <- c(0,0)
   sdx <- c(0,0)

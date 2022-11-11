@@ -12,7 +12,7 @@ library(dplyr)
 library(ggplot2)
 requirePackages(c("plot3D", "RColorBrewer", "gtable", "grid", "gridExtra"))
 '%$%' <- magrittr::'%$%'
-ipm <- mwIPM()
+ipm <- mwIPM(list(compute = TRUE))
 ```
 
 Let's prepare the data we will use for all vital rates.

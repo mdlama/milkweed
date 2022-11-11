@@ -16,7 +16,7 @@ requirePackages("doParallel")
 library(doParallel) # Normally, I don't load suggested packages, but this one requires and loads parallel, foreach, and iterators,
                     #   so, you know, it's easier this way.
 '%<>%' <- magrittr::'%<>%'
-ipm <- mwIPM()
+ipm <- mwIPM(list(compute = TRUE))
 mwCache <- getOption("milkweed.cache")
 ```
 
@@ -41,7 +41,7 @@ plotdata <- data.frame(herb_avg = ipm$vars$herb_avg$x[minind:maxind],
 Bootstrap the data to get 95% confidence ellipses for average herbivory and lambda over each site.
 ```{r}
 compute <- TRUE
-parallel <- TRUE
+parallel <- FALSE
 
 if (!file.exists(file.path(mwCache,"figure5a.RData")) | (compute)) {
   coreProcess <- function(ipm, sites) {

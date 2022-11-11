@@ -12,7 +12,7 @@ library(dplyr)
 library(ggplot2)
 requirePackages(c("grid", "gridExtra","latex2exp"))
 '%$%' <- magrittr::'%$%'
-ipm <- mwIPM()
+ipm <- mwIPM(list(compute = TRUE))
 ```
 
 Random effect error bar reference:  https://stackoverflow.com/questions/13847936/in-r-plotting-random-effects-from-lmer-lme4-package-using-qqmath-or-dotplot
@@ -352,7 +352,7 @@ ps <- mydata %>% filter(rate == type) %>%
            geom_vline(data=filter(rdata, rate == type), 
                       aes(xintercept = rslope), 
                       linetype = 2) + 
-           scale_x_continuous(limits = c(-2, 2)) +
+           scale_x_continuous(limits = c(-3.0, 3.0)) +
            theme_bw() +
            ggtitle(paste("(d)", type)) +
            theme(plot.title = element_text(family = "Trebuchet MS", 
@@ -391,7 +391,7 @@ pp <- mydata %>% filter(rate == type) %>%
            geom_vline(data=filter(rdata, rate == type), 
                       aes(xintercept = rslope), 
                       linetype = 2) + 
-           scale_x_continuous(limits = c(-2.0, 2.0)) +
+           scale_x_continuous(limits = c(-3.0, 3.0)) +
            theme_bw() +
            ggtitle(paste("(c)", type)) +
            theme(plot.title = element_text(family = "Trebuchet MS", 

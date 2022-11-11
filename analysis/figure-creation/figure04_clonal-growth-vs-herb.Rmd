@@ -10,7 +10,7 @@ output:
 library(milkweed)
 library(dplyr)
 library(ggplot2)
-ipm <- mwIPM()
+ipm <- mwIPM(list(compute = TRUE))
 fit <- ipm$pars$budlings.per.stem.fit$fit
 ```
 
@@ -49,6 +49,9 @@ plotdata <- data.frame(herb_avg = xpts,
                        upr = ypts$fit[,"upr"],
                        site = NA)
 
+summary(budlings.per.stem.fit$fit)
+
+
 p <- p + geom_line(data = plotdata, 
                    color = "black", 
                    linetype = "solid") +
@@ -72,6 +75,8 @@ p <- p + theme_bw() +
 p
 detach(ipm$pars)
 ```
+
+
 
 Save figure.
 
