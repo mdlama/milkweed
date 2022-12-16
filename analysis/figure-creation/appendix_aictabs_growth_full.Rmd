@@ -1,0 +1,170 @@
+---
+title: "Supplement - AIC Tables - Growth Full"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+params:
+  compute: TRUE
+output: 
+  html_document:
+    toc: true
+---
+<!-- Explore caching options (cache.path=mwCache, cache=params$compute) -->
+
+# Initialization
+
+```{r initialize, message=FALSE}
+library(milkweed)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(lme4)
+library(AICcmodavg)
+library(vegan)
+library(flextable)
+library(webshot)
+
+requirePackages("DHARMa")
+
+data("stemdata")
+metadata <- stemdata
+metadata$year <- factor(metadata$year)
+metadata$transect <- factor(metadata$transect)
+
+# https://stat.ethz.ch/pipermail/r-sig-mixed-models/2014q4/022870.html
+glmerCtrl <- glmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
+lmerCtrl <- lmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
+
+mwCache <- getOption("milkweed.cache")
+```
+
+```{r}
+# Transform data
+metadata_usc <- metadata %>% filter(!is.na(h_apical),
+                                    !is.na(h_apical.next),
+                                    !is.na(herb_avg),
+                                    fec.flower == 1, #growth is also only used in the sexual pathway
+                                    surv == 1 #plants must survive until september to reproduce in our model
+                                    ) %>%   
+  mutate(log_herb_avg = log(0.01 + herb_avg), arcsin_herb_avg = asin(sqrt(herb_avg/6)), h_apical_sq = h_apical*h_apical)
+                                        
+metadata_sc <- metadata_usc %>% mutate_at(.vars = vars(h_apical, h_apical.next, herb_avg, log_herb_avg, arcsin_herb_avg, h_apical_sq),
+                                          .funs = funs(as.numeric(scale(.))))
+
+# Get scaling parameters (really just mean and sd)
+h_apical_sc <- scale(metadata_usc$h_apical)
+h_apical.next_sc <- scale(metadata_usc$h_apical.next)
+herb_avg_sc <- scale(metadata_usc$herb_avg)
+log_herb_avg_sc = scale(metadata_usc$log_herb_avg)
+arcsin_herb_avg_sc = scale(metadata_usc$arcsin_herb_avg)
+h_apical_sq_sc = scale(metadata_usc$h_apical_sq)
+```
+
+As this is a bona-fide LME, we can do the method mentioned in Zuur.  First, model selection on random effects with REML.
+
+## Random Effects
+
+```{r}
+growth.re.site_haThe.year_haThe <- lmer(h_apical.next~h_apical*herb_avg + (h_apical*herb_avg|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, REML=T, control=lmerCtrl)
+summary(growth.re.site_haThe.year_haThe)
+```
+
+First drop interaction term on site.
+```{r}
+growth.re.site_haPhe.year_haThe <- lmer(h_apical.next~h_apical*herb_avg + (h_apical+herb_avg|site/transect)+(h_apical*herb_avg|year),data=metadata_sc, REML=T, control=lmerCtrl)
+summary(growth.re.site_haPhe.year_haThe)
+```
+
+Now drop herbivory on site.
+```{r}
+growth.re.site_ha.year_haThe <- lmer(h_apical.next~h_apical*herb_avg + (h_apical|site/transect)+(h_apical*herb_avg|year),data=metadata_sc, REML=T, control=lmerCtrl)
+summary(growth.re.site_ha.year_haThe)
+```
+
+Now drop interaction term on year.
+```{r}
+growth.re.site_ha.year_haPhe <- lmer(h_apical.next~h_apical*herb_avg + (h_apical|site/transect)+(h_apical+herb_avg|year),data=metadata_sc, REML=T, control=lmerCtrl)
+summary(growth.re.site_ha.year_haPhe)
+```
+
+Non singular model. Try dropping herbivory but keeping the interaction term on year instead.
+
+```{r}
+growth.re.site_ha.year_haPhaIhe <- lmer(h_apical.next~h_apical*herb_avg + (h_apical|site/transect)+(h_apical+h_apical:herb_avg|year),data=metadata_sc, REML=T, control=lmerCtrl)
+summary(growth.re.site_ha.year_he)
+```
+
+Let's use height + herbivory.
+
+## Fixed effects
+
+```{r}
+growth.fe.haThe.site_ha.year_haPhe <- lmer(h_apical.next ~ h_apical*herb_avg + (h_apical|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, REML=F, control=lmerCtrl)
+
+# 2 terms
+growth.fe.haPhe.site_ha.year_haPhe <- lmer(h_apical.next ~ h_apical+herb_avg + (h_apical|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, REML=F, control=lmerCtrl)
+
+growth.fe.haPhaIhe.site_ha.year_haPhe <- lmer(h_apical.next ~ h_apical+h_apical:herb_avg + (h_apical|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, REML=F, control=lmerCtrl)
+
+growth.fe.hePhaIhe.site_ha.year_haPhe <- lmer(h_apical.next ~ h_apical:herb_avg + herb_avg + (h_apical|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, REML=F, control=lmerCtrl)
+
+# 1 term
+growth.fe.ha.site_ha.year_haPhe <- lmer(h_apical.next ~ h_apical + (h_apical|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, REML=F, control=lmerCtrl)
+
+growth.fe.he.site_ha.year_haPhe <- lmer(h_apical.next ~ herb_avg + (h_apical|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, REML=F, control=lmerCtrl)
+
+growth.fe.haIhe.site_ha.year_haPhe <- lmer(h_apical.next ~ h_apical:herb_avg + (h_apical|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, REML=F, control=lmerCtrl)
+
+# 0 terms
+growth.fe.1.site_ha.year_haPhe <- lmer(h_apical.next ~ 1 + (h_apical|site/transect)+(h_apical+herb_avg|year), data=metadata_sc, REML=F, control=lmerCtrl)
+
+```
+
+```{r}
+growth.fe.AIC <- aictab(list(growth.fe.haThe.site_ha.year_haPhe,
+                             growth.fe.haPhe.site_ha.year_haPhe,
+                             growth.fe.haPhaIhe.site_ha.year_haPhe,
+                             growth.fe.hePhaIhe.site_ha.year_haPhe,
+                             growth.fe.ha.site_ha.year_haPhe,
+                             growth.fe.he.site_ha.year_haPhe,
+                             growth.fe.haIhe.site_ha.year_haPhe,
+                             growth.fe.1.site_ha.year_haPhe),
+                        modnames = c("Fixed: height*herb",
+                                     "Fixed: height+herb",
+                                     "Fixed: height+height:herb",
+                                     "Fixed: herb+height:herb",
+                                     "Fixed: height",
+                                     "Fixed: herb",
+                                     "Fixed: height:herb",
+                                     "Fixed: 1"))
+growth.fe.AIC
+```
+
+Winner:
+```{r}
+summary(growth.fe.haThe.site_ha.year_haPhe)
+```
+
+## Model Validation and Diagnostics
+Now some diagnostics (aka model validation).
+```{r}
+par(mfrow=c(2,2))
+plot(fitted(growth.fe.haThe.site_ha.year_haPhe), residuals(growth.fe.haThe.site_ha.year_haPhe, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
+plot(metadata_sc$h_apical, residuals(growth.fe.haThe.site_ha.year_haPhe, "deviance"), xlab="Apical height", ylab="Deviance residuals")
+plot(metadata_sc$herb_avg, residuals(growth.fe.haThe.site_ha.year_haPhe, "deviance"), xlab="Herbivory average", ylab="Deviance residuals")
+par(mfrow=c(1,1))
+```
+
+DHARMa Diagnostics
+```{r}
+growth.simulationOutput = DHARMa::simulateResiduals(fittedModel = growth.fe.haThe.site_ha.year_haPhe, n=1000)
+```
+
+```{r}
+DHARMa::plotSimulatedResiduals(growth.simulationOutput)
+DHARMa::plotResiduals(metadata_sc$h_apical, growth.simulationOutput$scaledResiduals)
+DHARMa::plotResiduals(metadata_sc$herb_avg, growth.simulationOutput$scaledResiduals)
+```
+
+Low p-value again may be due to large sample. Plots look ok if you exclude the tails and concentrate on where most of the data is centered, however the shape could be improved.
+```{r}
+DHARMa::testUniformity(growth.simulationOutput)
+```

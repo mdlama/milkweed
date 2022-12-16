@@ -136,7 +136,7 @@ ggsave("Figure5_PopGrowthVsHerb.png", height=4, width=6, device = "png", p)
 Bootstrap the data to get 95% confidence ellipses for average herbivory and lambda over each site.
 ```{r}
 compute <- TRUE
-parallel <- TRUE
+parallel <- FALSE
 
 years <- ipm$all_years
 
@@ -223,4 +223,7 @@ p <- p + theme_bw() +
                legend.position = c(0.885, 0.78))
 
 p
+```
+```{r}
+ggsave("Figure5pt2_PopGrowthVsHerb.png", height=4, width=6, device = "png", p)
 ```

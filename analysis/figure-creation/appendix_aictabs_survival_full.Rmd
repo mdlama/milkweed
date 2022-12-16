@@ -40,9 +40,7 @@ mwCache <- getOption("milkweed.cache")
 metadata_usc <- metadata %>% filter(!is.na(h_apical),
                                     !is.na(herb_avg),
                                     !is.na(surv),
-                                    fec.flower == 1,
-                                    !(year %in% c('2017')),
-                                    !(site %in% c('GET', 'GRN'))
+                                    fec.flower == 1
                                     )
 
 metadata_sc <- metadata_usc %>% mutate_at(.vars = vars(h_apical, herb_avg),
@@ -58,7 +56,7 @@ herb_avg_sc <- scale(metadata_usc$herb_avg)
 Use nAGQ = 0 for quick approximations, but less exact form of parameter estimation.
 ```{r}
 compute <- params$compute
-savefile <- "aictabs_S_RE_Site.RData"
+savefile <- "aictabs_SF_RE_Site.RData"
 
 if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
   # 3 terms
@@ -115,11 +113,11 @@ s.re.site.AIC <- aictab(list(surv.re.site_haThe.year_haThe,
 s.re.site.AIC
 ```
 
-Height, herbivory, and no parameter are all winners, so we will proceed with all three in that order.
+Height and height + herbivory are the winners.
 
 ```{r}
 compute <- params$compute
-savefile <- "aictabs_S_RE_Site_Year_1.RData"
+savefile <- "aictabs_SF_RE_Site_Year_1.RData"
 
 if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
   # 2 terms
@@ -153,81 +151,45 @@ if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
 }
 ```
 
-Now herbivory
+Now height+herb
 
 ```{r}
 compute <- params$compute
-savefile <- "aictabs_S_RE_Site_Year_2.RData"
+savefile <- "aictabs_SF_RE_Site_Year_2.RData"
 
 if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
   # 2 terms
-  surv.re.site_he.year_haPhe <- glmer(surv ~ h_apical*herb_avg + (herb_avg|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  surv.re.site_haPhe.year_haPhe <- glmer(surv ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
   
-  surv.re.site_he.year_haPhaIhe <- glmer(surv ~ h_apical*herb_avg + (herb_avg|site/transect) + (h_apical+h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  surv.re.site_haPhe.year_haPhaIhe <- glmer(surv ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (h_apical+h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
   
-  surv.re.site_he.year_hePhaIhe <- glmer(surv ~ h_apical*herb_avg + (herb_avg|site/transect) + (h_apical:herb_avg + herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  surv.re.site_haPhe.year_hePhaIhe <- glmer(surv ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (h_apical:herb_avg + herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
   
   # 1 term
-  surv.re.site_he.year_he <- glmer(surv ~ h_apical*herb_avg + (herb_avg|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  surv.re.site_haPhe.year_he <- glmer(surv ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
   
-  surv.re.site_he.year_ha <- glmer(surv ~ h_apical*herb_avg + (herb_avg|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=0, family=binomial())
+  surv.re.site_haPhe.year_ha <- glmer(surv ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=0, family=binomial())
   
-  surv.re.site_he.year_haIhe <- glmer(surv ~ h_apical*herb_avg + (herb_avg|site/transect) + (h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
+  surv.re.site_haPhe.year_haIhe <- glmer(surv ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
   
   # 0 terms
-  surv.re.site_he.year_1 <- glmer(surv ~ h_apical*herb_avg + (herb_avg|site/transect) + (1|year), data=metadata_sc, nAGQ=0, family=binomial())
+  surv.re.site_haPhe.year_1 <- glmer(surv ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (1|year), data=metadata_sc, nAGQ=0, family=binomial())
   
-  save(surv.re.site_he.year_haThe,
-       surv.re.site_he.year_hePhaIhe,
-       surv.re.site_he.year_haPhaIhe,
-       surv.re.site_he.year_haPhe,
-       surv.re.site_he.year_he,
-       surv.re.site_he.year_ha,
-       surv.re.site_he.year_haIhe,
-       surv.re.site_he.year_1, 
+  save(surv.re.site_haPhe.year_haThe,
+       surv.re.site_haPhe.year_hePhaIhe,
+       surv.re.site_haPhe.year_haPhaIhe,
+       surv.re.site_haPhe.year_haPhe,
+       surv.re.site_haPhe.year_he,
+       surv.re.site_haPhe.year_ha,
+       surv.re.site_haPhe.year_haIhe,
+       surv.re.site_haPhe.year_1, 
        file=file.path(mwCache,savefile))
 } else {
   load(file.path(mwCache,savefile))
 }
 ```
 
-Now intercept
 
-```{r}
-compute <- params$compute
-savefile <- "aictabs_S_RE_Site_Year_3.RData"
-
-if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
-  # 2 terms
-  surv.re.site_1.year_haPhe <- glmer(surv ~ h_apical*herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  surv.re.site_1.year_haPhaIhe <- glmer(surv ~ h_apical*herb_avg + (1|site/transect) + (h_apical+h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  surv.re.site_1.year_hePhaIhe <- glmer(surv ~ h_apical*herb_avg + (1|site/transect) + (h_apical:herb_avg + herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  # 1 term
-  surv.re.site_1.year_he <- glmer(surv ~ h_apical*herb_avg + (1|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  surv.re.site_1.year_ha <- glmer(surv ~ h_apical*herb_avg + (1|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  surv.re.site_1.year_haIhe <- glmer(surv ~ h_apical*herb_avg + (1|site/transect) + (h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  # 0 terms
-  surv.re.site_1.year_1 <- glmer(surv ~ h_apical*herb_avg + (1|site/transect) + (1|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  save(surv.re.site_1.year_haThe,
-       surv.re.site_1.year_hePhaIhe,
-       surv.re.site_1.year_haPhaIhe,
-       surv.re.site_1.year_haPhe,
-       surv.re.site_1.year_he,
-       surv.re.site_1.year_ha,
-       surv.re.site_1.year_haIhe,
-       surv.re.site_1.year_1, 
-       file=file.path(mwCache,savefile))
-} else {
-  load(file.path(mwCache,savefile))
-}
-```
 
 ```{r}
 aictab(list(surv.re.site_ha.year_haThe,
@@ -238,22 +200,14 @@ aictab(list(surv.re.site_ha.year_haThe,
        surv.re.site_ha.year_ha,
        surv.re.site_ha.year_haIhe,
        surv.re.site_ha.year_1,
-       surv.re.site_he.year_haThe,
-       surv.re.site_he.year_hePhaIhe,
-       surv.re.site_he.year_haPhaIhe,
-       surv.re.site_he.year_haPhe,
-       surv.re.site_he.year_he,
-       surv.re.site_he.year_ha,
-       surv.re.site_he.year_haIhe,
-       surv.re.site_he.year_1,
-       surv.re.site_1.year_haThe,
-       surv.re.site_1.year_hePhaIhe,
-       surv.re.site_1.year_haPhaIhe,
-       surv.re.site_1.year_haPhe,
-       surv.re.site_1.year_he,
-       surv.re.site_1.year_ha,
-       surv.re.site_1.year_haIhe,
-       surv.re.site_1.year_1),
+       surv.re.site_haPhe.year_haThe,
+       surv.re.site_haPhe.year_hePhaIhe,
+       surv.re.site_haPhe.year_haPhaIhe,
+       surv.re.site_haPhe.year_haPhe,
+       surv.re.site_haPhe.year_he,
+       surv.re.site_haPhe.year_ha,
+       surv.re.site_haPhe.year_haIhe,
+       surv.re.site_haPhe.year_1),
        modnames = c("Site: height, Year: height*herb", 
                     "Site: height, Year: herb + height:herb", 
                     "Site: height, Year: height + height:herb", 
@@ -262,34 +216,26 @@ aictab(list(surv.re.site_ha.year_haThe,
                     "Site: height, Year: height",
                     "Site: height, Year: height:herb",
                     "Site: height, Year: 1",
-                    "Site: herbivory, Year: height*herb", 
-                    "Site: herbivory, Year: herb + height:herb", 
-                    "Site: herbivory, Year: height + height:herb", 
-                    "Site: herbivory, Year: height + herb",
-                    "Site: herbivory, Year: herb",
-                    "Site: herbivory, Year: height",
-                    "Site: herbivory, Year: height:herb",
-                    "Site: herbivory, Year: 1",
-                    "Site: 1, Year: height*herb", 
-                    "Site: 1, Year: herb + height:herb", 
-                    "Site: 1, Year: height + height:herb", 
-                    "Site: 1, Year: height + herb",
-                    "Site: 1, Year: herb",
-                    "Site: 1, Year: height",
-                    "Site: 1, Year: height:herb",
-                    "Site: 1, Year: 1"))
+                    "Site: height+herbivory, Year: height*herb", 
+                    "Site: height+herbivory, Year: herb + height:herb", 
+                    "Site: height+herbivory, Year: height + height:herb", 
+                    "Site: height+herbivory, Year: height + herb",
+                    "Site: height+herbivory, Year: herb",
+                    "Site: height+herbivory, Year: height",
+                    "Site: height+herbivory, Year: height:herb",
+                    "Site: height+herbivory, Year: 1"))
 ```
 Winners: 
 Site: height, Year: height + herb
-Site: herbivory, Year: height
-Site: herbivory, Year: height + herb
-Site: 1, Year: height + herb
+Site: height+herbivory, Year: height
+Site: height+herbivory, Year: height + herb
+Site: height, Year: height
 
 ## Starting with year
 
 ```{r}
 compute <- params$compute
-savefile <- "aictabs_S_RE_Year.RData"
+savefile <- "aictabs_SF_RE_Year.RData"
 
 if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
   
@@ -346,13 +292,13 @@ aictab(list(surv.re.site_haThe.year_haThe,
                     "Year: 1"))
 ```
 Year winners:
-height + herb, height, and height + height:herb
+height and height+herb
 
 Starting with height
 
 ```{r}
 compute <- params$compute
-savefile <- "aictabs_S_RE_Year_Site_1.RData"
+savefile <- "aictabs_SF_RE_Year_Site_1.RData"
 
 if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
   # 3 terms
@@ -393,7 +339,7 @@ Now height + herbivory
 
 ```{r}
 compute <- params$compute
-savefile <- "aictabs_S_RE_Year_Site_2.RData"
+savefile <- "aictabs_SF_RE_Year_Site_2.RData"
 
 if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
   # 3 terms
@@ -430,46 +376,7 @@ if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
 }
 ```
 
-Now height + height:herbivory
 
-```{r}
-compute <- params$compute
-savefile <- "aictabs_S_RE_Year_Site_3.RData"
-
-if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
-  # 3 terms
-  surv.re.site_haThe.year_haPhaIhe <- glmer(surv ~ h_apical*herb_avg + (h_apical*herb_avg|site/transect) + (h_apical+h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  # 2 terms
-  surv.re.site_hePhaIhe.year_haPhaIhe <- glmer(surv ~ h_apical*herb_avg + (h_apical:herb_avg + herb_avg|site/transect) + (h_apical+h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  surv.re.site_haPhaIhe.year_haPhaIhe <- glmer(surv ~ h_apical*herb_avg + (h_apical + h_apical:herb_avg|site/transect) + (h_apical+h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  surv.re.site_haPhe.year_haPhaIhe <- glmer(surv ~ h_apical*herb_avg + (h_apical + herb_avg|site/transect) + (h_apical+h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  # 1 term
-  surv.re.site_he.year_haPhaIhe <- glmer(surv ~ h_apical*herb_avg + (herb_avg|site/transect) + (h_apical+h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  surv.re.site_ha.year_haPhaIhe <- glmer(surv ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical+h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  surv.re.site_haIhe.year_haPhaIhe <- glmer(surv ~ h_apical*herb_avg + (h_apical:herb_avg|site/transect) + (h_apical+h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  # 0 terms
-  surv.re.site_1.year_haPhaIhe <- glmer(surv ~ h_apical*herb_avg + (1|site/transect) + (h_apical+h_apical:herb_avg|year), data=metadata_sc, nAGQ=0, family=binomial())
-  
-  save(surv.re.site_haThe.year_haPhaIhe,
-       surv.re.site_hePhaIhe.year_haPhaIhe,
-       surv.re.site_haPhaIhe.year_haPhaIhe,
-       surv.re.site_haPhe.year_haPhaIhe,
-       surv.re.site_he.year_haPhaIhe,
-       surv.re.site_ha.year_haPhaIhe,
-       surv.re.site_haIhe.year_haPhaIhe,
-       surv.re.site_1.year_haPhaIhe, 
-       file=file.path(mwCache,savefile))
-} else {
-  load(file.path(mwCache,savefile))
-}
-```
 
 ```{r}
 aictab(list(surv.re.site_haThe.year_ha,
@@ -487,15 +394,7 @@ aictab(list(surv.re.site_haThe.year_ha,
        surv.re.site_he.year_haPhe,
        surv.re.site_ha.year_haPhe,
        surv.re.site_haIhe.year_haPhe,
-       surv.re.site_1.year_haPhe,
-       surv.re.site_haThe.year_haPhaIhe,
-       surv.re.site_hePhaIhe.year_haPhaIhe,
-       surv.re.site_haPhaIhe.year_haPhaIhe,
-       surv.re.site_haPhe.year_haPhaIhe,
-       surv.re.site_he.year_haPhaIhe,
-       surv.re.site_ha.year_haPhaIhe,
-       surv.re.site_haIhe.year_haPhaIhe,
-       surv.re.site_1.year_haPhaIhe),
+       surv.re.site_1.year_haPhe),
        modnames = c("Site: height*herb, Year: height", 
                     "Site: herb + height:herb, Year: height", 
                     "Site: height + height:herb, Year: height", 
@@ -511,17 +410,9 @@ aictab(list(surv.re.site_haThe.year_ha,
                     "Site: herb, Year: height + herb",
                     "Site: height, Year: height + herb",
                     "Site: height:herb, Year: height + herb",
-                    "Site: 1, Year: height + herb",
-                   "Site: height*herb, Year: height + height:herb", 
-                    "Site: herb + height:herb, Year: height + height:herb", 
-                    "Site: height + height:herb, Year: height + height:herb", 
-                    "Site: height + herb, Year: height + height:herb",
-                    "Site: herb, Year: height + height:herb",
-                    "Site: height, Year: height + height:herb",
-                    "Site: height:herb, Year: height + height:herb",
-                   "Site: 1, Year: height + height:herb"))
+                    "Site: 1, Year: height + herb"))
 ```
-This keeps the other 4 winners but adds Site: height+herb and Year: height+herb.
+Gives us the same 4 winners.
 
 ## Singularity
 
@@ -529,7 +420,7 @@ Let's start with the most complex model.
 
 ```{r}
 compute <- params$compute
-savefile <- "aictabs_S_Sing_1.RData"
+savefile <- "aictabs_SF_Sing_1.RData"
 
 if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
   surv.fe.haThe.re.site_haPhe.year_haPhe <- glmer(surv ~ h_apical*herb_avg + (h_apical+herb_avg|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
@@ -542,181 +433,43 @@ if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
 rePCA(surv.fe.haThe.re.site_haPhe.year_haPhe)
 ```
 
-Branch point 1. Try dropping height on site
+The model is not singular! Our most complex nonsingular model is:
 
-```{r}
-compute <- params$compute
-savefile <- "aictabs_S_Sing_2.RData"
+Site: height+herb, Year: height+herb
 
-if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
-  surv.fe.haThe.re.site_he.year_haPhe <- glmer(surv ~ h_apical*herb_avg + (herb_avg|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
-
-  save(surv.fe.haThe.re.site_he.year_haPhe, 
-       file=file.path(mwCache,savefile))
-} else {
-  load(file.path(mwCache,savefile))
-}
-rePCA(surv.fe.haThe.re.site_he.year_haPhe)
-```
-Now drop herbivory on site
-
-```{r}
-compute <- params$compute
-savefile <- "aictabs_S_Sing_3.RData"
-
-if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
-  surv.fe.haThe.re.site_1.year_haPhe <- glmer(surv ~ h_apical*herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
-
-  save(surv.fe.haThe.re.site_1.year_haPhe, 
-       file=file.path(mwCache,savefile))
-} else {
-  load(file.path(mwCache,savefile))
-}
-rePCA(surv.fe.haThe.re.site_he.year_haPhe)
-```
-Non singular model: Site: 1, Year: height + herbivory
-
-Return to branch point 1. Try keeping height and dropping herbivory instead
-
-```{r}
-compute <- params$compute
-savefile <- "aictabs_S_Sing_3.RData"
-
-if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
-  surv.fe.haThe.re.site_ha.year_haPhe <- glmer(surv ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
-
-  save(surv.fe.haThe.re.site_ha.year_haPhe, 
-       file=file.path(mwCache,savefile))
-} else {
-  load(file.path(mwCache,savefile))
-}
-rePCA(surv.fe.haThe.re.site_ha.year_haPhe)
-```
-
-Try dropping herbivory on year
-
-```{r}
-compute <- params$compute
-savefile <- "aictabs_S_Sing_4.RData"
-
-if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
-  surv.fe.haThe.re.site_ha.year_ha <- glmer(surv ~ h_apical*herb_avg + (h_apical|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
-
-  save(surv.fe.haThe.re.site_ha.year_ha, 
-       file=file.path(mwCache,savefile))
-} else {
-  load(file.path(mwCache,savefile))
-}
-rePCA(surv.fe.haThe.re.site_ha.year_ha)
-```
-Non-singular model achieved, but what if we dropped height instead?
-
-```{r}
-compute <- params$compute
-savefile <- "aictabs_S_Sing_5.RData"
-
-if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
-  surv.fe.haThe.re.site_ha.year_he <- glmer(surv ~ h_apical*herb_avg + (h_apical|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
-
-  save(surv.fe.haThe.re.site_ha.year_he, 
-       file=file.path(mwCache,savefile))
-} else {
-  load(file.path(mwCache,savefile))
-}
-rePCA(surv.fe.haThe.re.site_ha.year_he)
-```
-
-Similarity in transect within site. Try removing the parameter on site.
-
-```{r}
-compute <- params$compute
-savefile <- "aictabs_S_Sing_6.RData"
-
-if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
-  surv.fe.haThe.re.site_1.year_he <- glmer(surv ~ h_apical*herb_avg + (1|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
-
-  save(surv.fe.haThe.re.site_1.year_he, 
-       file=file.path(mwCache,savefile))
-} else {
-  load(file.path(mwCache,savefile))
-}
-rePCA(surv.fe.haThe.re.site_1.year_he)
-```
-
-Another nonsingular model.
-
-By dropping parameters from the most complex model, we iterated through all other winning models except for Site: herbivory, year: height. Let's try that one now.
-
-```{r}
-compute <- params$compute
-savefile <- "aictabs_S_Sing_7.RData"
-
-if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
-  surv.fe.haThe.re.site_he.year_ha <- glmer(surv ~ h_apical*herb_avg + (herb_avg|site/transect) + (h_apical|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
-
-  save(surv.fe.haThe.re.site_he.year_ha, 
-       file=file.path(mwCache,savefile))
-} else {
-  load(file.path(mwCache,savefile))
-}
-rePCA(surv.fe.haThe.re.site_he.year_ha)
-```
-
-Site is singular, dropping the variable in site gives an already determined model. Here are the nonsingular models we have generated:
-
-Site: 1, Year: height+herb
-Site: height, year: height
-Site: 1, year: herb
-
-Let's run an AIC analysis to see which of these models is best.
-
-```{r}
-aictab(list(surv.fe.haThe.re.site_1.year_haPhe,
-            surv.fe.haThe.re.site_1.year_he,
-            surv.fe.haThe.re.site_ha.year_ha),
-       modnames = c("Site: 1, Year: height + herb",
-                    "Site: 1, Year: herb",
-                    "Site: height, Year: height"))
-```
-Winner is: 
-
-Site: 1, Year: height + herbivory.
 
 ## Fixed Effects
 
 ```{r}
 compute <- params$compute
-savefile <- "aictabs_S_FE.RData"
+savefile <- "aictabs_SF_FE.RData"
 
 if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
-  
-  surv.fe.haThe.re.site_1.year_haPhe <- glmer(surv ~ h_apical*herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
-  
   # 2 terms
-  surv.fe.haPhe.re.site_1.year_haPhe <- glmer(surv ~ h_apical+herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  surv.fe.haPhe.re.site_haPhe.year_haPhe <- glmer(surv ~ h_apical+herb_avg + (h_apical+herb_avg|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
   
-  surv.fe.haPhaIhe.re.site_1.year_haPhe <- glmer(surv ~ h_apical+h_apical:herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  surv.fe.haPhaIhe.re.site_haPhe.year_haPhe <- glmer(surv ~ h_apical+h_apical:herb_avg + (h_apical+herb_avg|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
   
-  surv.fe.hePhaIhe.re.site_1.year_haPhe <- glmer(surv ~ h_apical:herb_avg + herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  surv.fe.hePhaIhe.re.site_haPhe.year_haPhe <- glmer(surv ~ h_apical:herb_avg + herb_avg + (h_apical+herb_avg|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
   
   # 1 term
-  surv.fe.ha.re.site_1.year_haPhe <- glmer(surv ~ h_apical + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  surv.fe.ha.re.site_haPhe.year_haPhe <- glmer(surv ~ h_apical + (h_apical+herb_avg|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
   
-  surv.fe.he.re.site_1.year_haPhe <- glmer(surv ~ herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  surv.fe.he.re.site_haPhe.year_haPhe <- glmer(surv ~ herb_avg + (h_apical+herb_avg|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
   
-  surv.fe.haIhe.re.site_1.year_haPhe <- glmer(surv ~ h_apical:herb_avg + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  surv.fe.haIhe.re.site_haPhe.year_haPhe <- glmer(surv ~ h_apical:herb_avg + (h_apical+herb_avg|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
   
   # 0 terms
-  surv.fe.1.re.site_1.year_haPhe <- glmer(surv ~ 1 + (1|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
+  surv.fe.1.re.site_haPhe.year_haPhe <- glmer(surv ~ 1 + (h_apical+herb_avg|site/transect) + (h_apical+herb_avg|year), data=metadata_sc, nAGQ=1, family=binomial(), control=glmerCtrl)
   
-  save(surv.fe.haThe.re.site_1.year_haPhe,
-       surv.fe.hePhaIhe.re.site_1.year_haPhe,
-       surv.fe.haPhaIhe.re.site_1.year_haPhe,
-       surv.fe.haPhe.re.site_1.year_haPhe,
-       surv.fe.he.re.site_1.year_haPhe,
-       surv.fe.ha.re.site_1.year_haPhe,
-       surv.fe.haIhe.re.site_1.year_haPhe,
-       surv.fe.1.re.site_1.year_haPhe, 
+  save(surv.fe.haThe.re.site_haPhe.year_haPhe,
+       surv.fe.hePhaIhe.re.site_haPhe.year_haPhe,
+       surv.fe.haPhaIhe.re.site_haPhe.year_haPhe,
+       surv.fe.haPhe.re.site_haPhe.year_haPhe,
+       surv.fe.he.re.site_haPhe.year_haPhe,
+       surv.fe.ha.re.site_haPhe.year_haPhe,
+       surv.fe.haIhe.re.site_haPhe.year_haPhe,
+       surv.fe.1.re.site_haPhe.year_haPhe, 
        file=file.path(mwCache,savefile))
 } else {
   load(file.path(mwCache,savefile))
@@ -724,14 +477,14 @@ if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
 ```
 
 ```{r}
-s.fe.AIC <- aictab(list(surv.fe.haThe.re.site_1.year_haPhe,
-       surv.fe.hePhaIhe.re.site_1.year_haPhe,
-       surv.fe.haPhaIhe.re.site_1.year_haPhe,
-       surv.fe.haPhe.re.site_1.year_haPhe,
-       surv.fe.he.re.site_1.year_haPhe,
-       surv.fe.ha.re.site_1.year_haPhe,
-       surv.fe.haIhe.re.site_1.year_haPhe,
-       surv.fe.1.re.site_1.year_haPhe),
+s.fe.AIC <- aictab(list(surv.fe.haThe.re.site_haPhe.year_haPhe,
+       surv.fe.hePhaIhe.re.site_haPhe.year_haPhe,
+       surv.fe.haPhaIhe.re.site_haPhe.year_haPhe,
+       surv.fe.haPhe.re.site_haPhe.year_haPhe,
+       surv.fe.he.re.site_haPhe.year_haPhe,
+       surv.fe.ha.re.site_haPhe.year_haPhe,
+       surv.fe.haIhe.re.site_haPhe.year_haPhe,
+       surv.fe.1.re.site_haPhe.year_haPhe),
        modnames = c("Fixed: height*herb", 
                     "Fixed: herb + height:herb", 
                     "Fixed: height + height:herb", 
@@ -743,26 +496,26 @@ s.fe.AIC <- aictab(list(surv.fe.haThe.re.site_1.year_haPhe,
 
 s.fe.AIC
 ```
-The intercept, herb, height, height:herb, herb + height:herb, and height + herb all fall within an AIC of 3, so let's choose the most complex model.
+They are all within an AIC of 3, so let's choose the most complex model.
 
 
 Winner:
 ```{r}
-summary(surv.fe.haPhe.re.site_1.year_haPhe)
+summary(surv.fe.haThe.re.site_haPhe.year_haPhe)
 ```
 
 Now some diagnostics (aka model validation). Creating standard residual plots.
 ```{r}
 par(mfrow=c(2,2))
-plot(fitted(surv.fe.haPhe.re.site_1.year_haPhe), residuals(surv.fe.haPhe.re.site_1.year_haPhe, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
-plot(metadata_sc$h_apical, residuals(surv.fe.haPhe.re.site_1.year_haPhe, "deviance"), xlab="Apical height", ylab="Deviance residuals")
-plot(metadata_sc$herb_avg, residuals(surv.fe.haPhe.re.site_1.year_haPhe, "deviance"), xlab="Herbivory average", ylab="Deviance residuals")
+plot(fitted(surv.fe.haThe.re.site_haPhe.year_haPhe), residuals(surv.fe.haThe.re.site_haPhe.year_haPhe, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
+plot(metadata_sc$h_apical, residuals(surv.fe.haThe.re.site_haPhe.year_haPhe, "deviance"), xlab="Apical height", ylab="Deviance residuals")
+plot(metadata_sc$herb_avg, residuals(surv.fe.haThe.re.site_haPhe.year_haPhe, "deviance"), xlab="Herbivory average", ylab="Deviance residuals")
 par(mfrow=c(1,1))
 ```
 
 DHARMa Diagnostics. Same process as above. 
 ```{r}
-surv.simulationOutput = DHARMa::simulateResiduals(fittedModel = surv.fe.haPhe.re.site_1.year_haPhe, n=1000)
+surv.simulationOutput = DHARMa::simulateResiduals(fittedModel = surv.fe.haThe.re.site_haPhe.year_haPhe, n=1000)
 ```
 
 ```{r}

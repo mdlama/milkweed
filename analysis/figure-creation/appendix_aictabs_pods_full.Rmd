@@ -1,0 +1,610 @@
+---
+title: "Supplement - AIC Tables - Pods Full"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+params:
+  compute: TRUE
+output: 
+  html_document:
+    toc: true
+---
+<!-- Explore caching options (cache.path=mwCache, cache=params$compute) -->
+
+# Initialization
+
+```{r initialize, message=FALSE}
+library(milkweed)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(lme4)
+library(AICcmodavg)
+library(vegan)
+library(flextable)
+library(webshot)
+
+requirePackages("DHARMa")
+
+data("stemdata")
+metadata <- stemdata
+metadata$year <- factor(metadata$year)
+metadata$transect <- factor(metadata$transect)
+
+# https://stat.ethz.ch/pipermail/r-sig-mixed-models/2014q4/022870.html
+glmerCtrl <- glmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
+lmerCtrl <- lmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
+
+mwCache <- getOption("milkweed.cache")
+```
+
+```{r}
+metadata_usc <- metadata %>% filter(!is.na(h_apical),
+                                    !is.na(h_apical.next),
+                                    !is.na(herb_avg),
+                                    fec.flower == 1, #pods only result from the sexual pathway
+                                    surv == 1, #again, plants must survive to September
+                                    !is.na(N_pods),
+                                    h_apical.next > 50,
+                                    !(site == "YTB" & h_apical <= 50) #necessary to compensate for an issue with some of the plants in YTB site
+                                    ) 
+
+metadata_sc <- metadata_usc %>% mutate_at(.vars = vars(h_apical, h_apical.next, herb_avg),
+                                          .funs = ~ as.numeric(scale(.)))
+
+# Get scaling parameters (really just mean and sd)
+h_apical_sc <- scale(metadata_usc$h_apical)
+h_apical.next_sc <- scale(metadata_usc$h_apical.next)
+herb_avg_sc <- scale(metadata_usc$herb_avg)
+```
+
+### June vs. September Height as a Predictor
+First, do full model. In this case, we will compare to see if height in June or September is a better predictor.
+```{r}
+pods.reg.full_sept = glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next*herb_avg|site/transect)+(h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+
+pods.reg.full_june = glmer(N_pods ~ h_apical*herb_avg + (h_apical*herb_avg|site/transect)+(h_apical*herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+
+aictab(list(pods.reg.full_june, pods.reg.full_sept), modnames = c('June', 'September'))
+summary(pods.reg.full_sept)
+```
+
+### Random Effects
+September wins, so we will continue to use this in our model instead of height in June (h_apical). Now onto selection for random effects. We can try and drop the herb_avg term in the site/transect random effect first due to small variation.
+
+Use nAGQ = 0 for quick approximations, but less exact form of parameter estimation.
+```{r}
+compute <- params$compute
+savefile <- "aictabs_PF_RE_Site.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  # 3 terms
+  pods.re.site_haThe.year_haThe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next*herb_avg|site/transect) + (h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  # 2 terms
+  pods.re.site_hePhaIhe.year_haThe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next:herb_avg + herb_avg|site/transect) + (h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_haPhaIhe.year_haThe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next + h_apical.next:herb_avg|site/transect) + (h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_haPhe.year_haThe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next + herb_avg|site/transect) + (h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  # 1 term
+  pods.re.site_he.year_haThe <- glmer(N_pods ~ h_apical.next*herb_avg + (herb_avg|site/transect) + (h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_ha.year_haThe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect) + (h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_haIhe.year_haThe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next:herb_avg|site/transect) + (h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  # 0 terms
+  pods.re.site_1.year_haThe <- glmer(N_pods ~ h_apical.next*herb_avg + (1|site/transect) + (h_apical.next*herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  save(pods.re.site_haThe.year_haThe,
+       pods.re.site_hePhaIhe.year_haThe,
+       pods.re.site_haPhaIhe.year_haThe,
+       pods.re.site_haPhe.year_haThe,
+       pods.re.site_he.year_haThe,
+       pods.re.site_ha.year_haThe,
+       pods.re.site_haIhe.year_haThe,
+       pods.re.site_1.year_haThe, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+```
+
+```{r}
+pods.re.site.AIC <- aictab(list(pods.re.site_haThe.year_haThe,
+            pods.re.site_hePhaIhe.year_haThe,
+            pods.re.site_haPhaIhe.year_haThe,
+            pods.re.site_haPhe.year_haThe,
+            pods.re.site_he.year_haThe,
+            pods.re.site_ha.year_haThe,
+            pods.re.site_haIhe.year_haThe,
+            pods.re.site_1.year_haThe),
+       modnames = c("Site: height*herb", 
+                    "Site: herb + height:herb", 
+                    "Site: height + height:herb", 
+                    "Site: height + herb",
+                    "Site: herb",
+                    "Site: height",
+                    "Site: height:herb",
+                    "Site: 1"))
+pods.re.site.AIC
+```
+
+Height on site wins.  Let's move on the year.
+```{r}
+compute <- params$compute
+savefile <- "aictabs_PF_RE_Site_Year.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  # 2 terms
+  pods.re.site_ha.year_haPhe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect) + (h_apical.next+herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_ha.year_haPhaIhe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect) + (h_apical.next+h_apical.next:herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_ha.year_hePhaIhe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect) + (h_apical.next:herb_avg + herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  # 1 term
+  pods.re.site_ha.year_he <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_ha.year_ha <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect) + (h_apical.next|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_ha.year_haIhe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect) + (h_apical.next:herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  # 0 terms
+  pods.re.site_ha.year_1 <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect) + (1|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  save(pods.re.site_ha.year_haThe,
+       pods.re.site_ha.year_hePhaIhe,
+       pods.re.site_ha.year_haPhaIhe,
+       pods.re.site_ha.year_haPhe,
+       pods.re.site_ha.year_he,
+       pods.re.site_ha.year_ha,
+       pods.re.site_ha.year_haIhe,
+       pods.re.site_ha.year_1, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+```
+
+```{r}
+p.re.year.AIC <- aictab(list(pods.re.site_ha.year_haThe,
+            pods.re.site_ha.year_hePhaIhe,
+            pods.re.site_ha.year_haPhaIhe,
+            pods.re.site_ha.year_haPhe,
+            pods.re.site_ha.year_he,
+            pods.re.site_ha.year_ha,
+            pods.re.site_ha.year_haIhe,
+            pods.re.site_ha.year_1),
+       modnames = c("Year: height*herb", 
+                    "Year: herb + height:herb", 
+                    "Year: height + height:herb", 
+                    "Year: height + herb",
+                    "Year: herb",
+                    "Year: height",
+                    "Year: height:herb",
+                    "Year: 1"))
+
+p.re.year.AIC
+```
+height + herbivory, and herbivory + height:herbivory are both year winners. Let's try starting from year.
+
+
+```{r}
+compute <- params$compute
+savefile <- "aictabs_PF_RE_Year.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  # 2 terms
+  pods.re.site_haThe.year_haPhe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next*herb_avg|site/transect) + (h_apical.next+herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_haThe.year_haPhaIhe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next*herb_avg|site/transect) + (h_apical.next+h_apical.next:herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_haThe.year_hePhaIhe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next*herb_avg|site/transect) + (h_apical.next:herb_avg + herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  # 1 term
+  pods.re.site_haThe.year_he <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next*herb_avg|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_haThe.year_ha <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next*herb_avg|site/transect) + (h_apical.next|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_haThe.year_haIhe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next*herb_avg|site/transect) + (h_apical.next:herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  # 0 terms
+  pods.re.site_haThe.year_1 <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next*herb_avg|site/transect) + (1|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  save(pods.re.site_haThe.year_haThe,
+       pods.re.site_haThe.year_hePhaIhe,
+       pods.re.site_haThe.year_haPhaIhe,
+       pods.re.site_haThe.year_haPhe,
+       pods.re.site_haThe.year_he,
+       pods.re.site_haThe.year_ha,
+       pods.re.site_haThe.year_haIhe,
+       pods.re.site_haThe.year_1, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+```
+
+```{r}
+p.re.year.AIC <- aictab(list(pods.re.site_haThe.year_haThe,
+            pods.re.site_haThe.year_hePhaIhe,
+            pods.re.site_haThe.year_haPhaIhe,
+            pods.re.site_haThe.year_haPhe,
+            pods.re.site_haThe.year_he,
+            pods.re.site_haThe.year_ha,
+            pods.re.site_haThe.year_haIhe,
+            pods.re.site_haThe.year_1),
+       modnames = c("Year: height*herb", 
+                    "Year: herb + height:herb", 
+                    "Year: height + height:herb", 
+                    "Year: height + herb",
+                    "Year: herb",
+                    "Year: height",
+                    "Year: height:herb",
+                    "Year: 1"))
+
+p.re.year.AIC
+```
+
+Winners:
+Site: height, Year: herb
+Site: height, year: height + herb
+
+Now onto site, starting with random effect on year being just herbivory.
+
+```{r}
+compute <- params$compute
+savefile <- "aictabs_PF_RE_Year_Site_1.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  # 3 terms
+  pods.re.site_haThe.year_he <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next*herb_avg|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  # 2 terms
+  pods.re.site_hePhaIhe.year_he <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next:herb_avg + herb_avg|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_haPhaIhe.year_he <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next + h_apical.next:herb_avg|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_haPhe.year_he <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next + herb_avg|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  # 1 term
+  pods.re.site_he.year_he <- glmer(N_pods ~ h_apical.next*herb_avg + (herb_avg|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_ha.year_he <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_haIhe.year_he <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next:herb_avg|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  # 0 terms
+  pods.re.site_1.year_he <- glmer(N_pods ~ h_apical.next*herb_avg + (1|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  save(pods.re.site_haThe.year_he,
+       pods.re.site_hePhaIhe.year_he,
+       pods.re.site_haPhaIhe.year_he,
+       pods.re.site_haPhe.year_he,
+       pods.re.site_he.year_he,
+       pods.re.site_ha.year_he,
+       pods.re.site_haIhe.year_he,
+       pods.re.site_1.year_he, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+```
+
+Now with year: height + herbivory
+
+```{r}
+compute <- params$compute
+savefile <- "aictabs_PF_RE_Year_Site_2.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  # 3 terms
+  pods.re.site_haThe.year_haPhe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next*herb_avg|site/transect) + (h_apical.next + herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  # 2 terms
+  pods.re.site_hePhaIhe.year_haPhe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next:herb_avg + herb_avg|site/transect) + (h_apical.next + herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_haPhaIhe.year_haPhe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next + h_apical.next:herb_avg|site/transect) + (h_apical.next + herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_haPhe.year_haPhe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next + herb_avg|site/transect) + (h_apical.next + herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  # 1 term
+  pods.re.site_he.year_haPhe <- glmer(N_pods ~ h_apical.next*herb_avg + (herb_avg|site/transect) + (h_apical.next + herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_ha.year_haPhe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect) + (h_apical.next + herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  pods.re.site_haIhe.year_haPhe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next:herb_avg|site/transect) + (h_apical.next + herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  # 0 terms
+  pods.re.site_1.year_haPhe <- glmer(N_pods ~ h_apical.next*herb_avg + (1|site/transect) + (h_apical.next + herb_avg|year), data=metadata_sc, nAGQ=0, family=poisson(link='log'))
+  
+  save(pods.re.site_haThe.year_haPhe,
+       pods.re.site_hePhaIhe.year_haPhe,
+       pods.re.site_haPhaIhe.year_haPhe,
+       pods.re.site_haPhe.year_haPhe,
+       pods.re.site_he.year_haPhe,
+       pods.re.site_ha.year_haPhe,
+       pods.re.site_haIhe.year_haPhe,
+       pods.re.site_1.year_haPhe, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+```
+
+```{r}
+aictab(list(pods.re.site_haThe.year_haPhe,
+       pods.re.site_hePhaIhe.year_haPhe,
+       pods.re.site_haPhaIhe.year_haPhe,
+       pods.re.site_haPhe.year_haPhe,
+       pods.re.site_he.year_haPhe,
+       pods.re.site_ha.year_haPhe,
+       pods.re.site_haIhe.year_haPhe,
+       pods.re.site_1.year_haPhe,
+       pods.re.site_haThe.year_he,
+       pods.re.site_hePhaIhe.year_he,
+       pods.re.site_haPhaIhe.year_he,
+       pods.re.site_haPhe.year_he,
+       pods.re.site_he.year_he,
+       pods.re.site_ha.year_he,
+       pods.re.site_haIhe.year_he,
+       pods.re.site_1.year_he),
+       modnames = c("Site: height*herb, Year: height + herb", 
+                    "Site: herb + height:herb, Year: height + herb", 
+                    "Site: height + height:herb, Year: height + herb", 
+                    "Site: height + herb, Year: height + herb",
+                    "Site: herb, Year: height + herb",
+                    "Site: height, Year: height + herb",
+                    "Site: height:herb, Year: height + herb",
+                    "Site: 1, Year: height + herb",
+                    "Site: height*herb, Year: herb", 
+                    "Site: herb + height:herb, Year: herb", 
+                    "Site: height + height:herb, Year: herb", 
+                    "Site: height + herb, Year: herb",
+                    "Site: herb, Year: herb",
+                    "Site: height, Year: herb",
+                    "Site: height:herb, Year: herb",
+                    "Site: 1, Year: herb"))
+```
+Winners:
+Site: height, Year: height+herb
+Site: height+height:herb, Year: height+herb
+Site: height+herb, Year: height+herb
+Site: height+height:herb, Year: herb
+
+AIC of all winners
+
+```{r}
+aictab(list(pods.re.site_ha.year_haPhe,
+            pods.re.site_ha.year_he,
+            pods.re.site_haPhaIhe.year_haPhe,
+            pods.re.site_haPhe.year_haPhe,
+            pods.re.site_haPhaIhe.year_he),
+       modnames = c("Site: height, Year: height + herb",
+                    "Site: height, Year: herb",
+                    "Site: height+height:herb, Year: height+herb",
+                    "Site: height+herb, Year: height+herb",
+                    "Site: height+height:herb, Year: herb"))
+```
+Winners:
+Site: height, year: height+herb
+Site: height+height:herb, year: height+herb,
+Site: height+herb, year: height+herb
+Site: height+height:herb, year:herb
+
+Note that the final three winners only emerged when starting with year.
+
+## Singularity
+
+Let's start with our most complex model, site: height+herb and year: height+herb
+
+```{r}
+compute <- params$compute
+savefile <- "aictabs_PF_Sing_1.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+    pods.re.site_haPhe.year_haPhe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next+herb_avg|site/transect) + (h_apical.next + herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control = glmerCtrl)
+
+  save(pods.re.site_haPhe.year_haPhe, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+rePCA(pods.re.site_haPhe.year_haPhe)
+```
+
+Let's drop herbivory on site, giving us one of our other winning models.
+
+```{r}
+compute <- params$compute
+savefile <- "aictabs_PF_Sing_2.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+    pods.re.site_ha.year_haPhe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect) + (h_apical.next + herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control = glmerCtrl)
+
+  save(pods.re.site_ha.year_haPhe, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+rePCA(pods.re.site_ha.year_haPhe)
+```
+Still singular. Drop height on site. 
+
+```{r}
+compute <- params$compute
+savefile <- "aictabs_PF_Sing_3.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+    pods.re.site_1.year_haPhe <- glmer(N_pods ~ h_apical.next*herb_avg + (1|site/transect) + (h_apical.next + herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control = glmerCtrl)
+
+  save(pods.re.site_1.year_haPhe, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+rePCA(pods.re.site_1.year_haPhe)
+```
+Nonsingular model achieved!
+
+Let's go back to the beginning and try Site: height+height:herb, Year: height+herb
+
+```{r}
+compute <- params$compute
+savefile <- "aictabs_PF_Sing_4.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+    pods.re.site_haPhaIhe.year_haPhe <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next+h_apical.next:herb_avg|site/transect) + (h_apical.next + herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control = glmerCtrl)
+
+  save(pods.re.site_haPhaIhe.year_haPhe, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+rePCA(pods.re.site_haPhaIhe.year_haPhe)
+```
+Still singular. Dropping the interaction term on site would give us the model we went through earlier.
+
+Let's go back to the beginning and try Site: height+height:herb, year: herb
+
+```{r}
+compute <- params$compute
+savefile <- "aictabs_PF_Sing_5.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+    pods.re.site_haPhaIhe.year_he <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next+h_apical.next:herb_avg|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control = glmerCtrl)
+
+  save(pods.re.site_haPhaIhe.year_he, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+rePCA(pods.re.site_haPhaIhe.year_he)
+```
+Drop interaction term on site.
+
+```{r}
+compute <- params$compute
+savefile <- "aictabs_PF_Sing_6.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+    pods.re.site_ha.year_he <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control = glmerCtrl)
+
+  save(pods.re.site_ha.year_he, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+rePCA(pods.re.site_ha.year_he)
+```
+Nonsingular model!
+
+Nonsingular AIC
+
+```{r}
+aictab(list(pods.re.site_1.year_haPhe,
+            pods.re.site_ha.year_he),
+       modnames = c("Site: 1, Year: height+herb",
+                    "Site: height, Year: herb"))
+```
+
+Winner is site: height, year: herb
+
+
+# Fixed Effects
+
+```{r}
+compute <- params$compute
+savefile <- "aictabs_PF_FE.RData"
+
+if (!file.exists(file.path(mwCache,savefile)) || (compute)) {
+  # 3 terms
+  pods.fe.haThe.re.site_ha.year_he <- glmer(N_pods ~ h_apical.next*herb_avg + (h_apical.next|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  
+  # 2 terms
+  pods.fe.haPhe.re.site_ha.year_he <- glmer(N_pods ~ h_apical.next+herb_avg + (h_apical.next|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  
+  pods.fe.haPhaIhe.re.site_ha.year_he <- glmer(N_pods ~ h_apical.next+h_apical.next:herb_avg + (h_apical.next|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  
+  pods.fe.hePhaIhe.re.site_ha.year_he <- glmer(N_pods ~ h_apical.next:herb_avg + herb_avg + (h_apical.next|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  
+  # 1 term
+  pods.fe.ha.re.site_ha.year_he <- glmer(N_pods ~ h_apical.next + (h_apical.next|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  
+  pods.fe.he.re.site_ha.year_he <- glmer(N_pods ~ herb_avg + (h_apical.next|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  
+  pods.fe.haIhe.re.site_ha.year_he <- glmer(N_pods ~ h_apical.next:herb_avg + (h_apical.next|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  
+  # 0 terms
+  pods.fe.1.re.site_ha.year_he <- glmer(N_pods ~ 1 + (h_apical.next|site/transect) + (herb_avg|year), data=metadata_sc, nAGQ=1, family=poisson(link='log'), control=glmerCtrl)
+  
+  save(pods.fe.haThe.re.site_ha.year_he,
+       pods.fe.hePhaIhe.re.site_ha.year_he,
+       pods.fe.haPhaIhe.re.site_ha.year_he,
+       pods.fe.haPhe.re.site_ha.year_he,
+       pods.fe.he.re.site_ha.year_he,
+       pods.fe.ha.re.site_ha.year_he,
+       pods.fe.haIhe.re.site_ha.year_he,
+       pods.fe.1.re.site_ha.year_he, 
+       file=file.path(mwCache,savefile))
+} else {
+  load(file.path(mwCache,savefile))
+}
+```
+
+```{r}
+p.fe.AIC <- aictab(list(pods.fe.haThe.re.site_ha.year_he,
+       pods.fe.hePhaIhe.re.site_ha.year_he,
+       pods.fe.haPhaIhe.re.site_ha.year_he,
+       pods.fe.haPhe.re.site_ha.year_he,
+       pods.fe.he.re.site_ha.year_he,
+       pods.fe.ha.re.site_ha.year_he,
+       pods.fe.haIhe.re.site_ha.year_he,
+       pods.fe.1.re.site_ha.year_he),
+       modnames = c("Fixed: height*herb", 
+                    "Fixed: herb + height:herb", 
+                    "Fixed: height + height:herb", 
+                    "Fixed: height + herb",
+                    "Fixed: herb",
+                    "Fixed: height",
+                    "Fixed: height:herb",
+                    "Fixed: 1"))
+p.fe.AIC
+```
+
+height+height:herbivory is the most complex model with 3 AIC, so let's take that as our winning model.
+
+Winner:
+```{r}
+summary(pods.fe.haPhaIhe.re.site_ha.year_he)
+```
+
+# Model Validation and Diagnostics
+```{r}
+par(mfrow=c(2,2))
+plot(fitted(pods.fe.haPhaIhe.re.site_ha.year_he), residuals(pods.fe.haPhaIhe.re.site_ha.year_he, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
+plot(metadata_sc$h_apical, residuals(pods.fe.haPhaIhe.re.site_ha.year_he, "deviance"), xlab="Apical height", ylab="Deviance residuals")
+plot(metadata_sc$herb_avg, residuals(pods.fe.haPhaIhe.re.site_ha.year_he, "deviance"), xlab="Herbivory average", ylab="Deviance residuals")
+par(mfrow=c(1,1))
+```
+
+DHARMa Diagnostics
+```{r}
+pods.simulationOutput = DHARMa::simulateResiduals(fittedModel = pods.fe.haPhaIhe.re.site_ha.year_he, n=1000)
+```
+
+
+```{r}
+DHARMa::plotSimulatedResiduals(pods.simulationOutput)
+DHARMa::plotResiduals(metadata_sc$h_apical, pods.simulationOutput$scaledResiduals)
+DHARMa::plotResiduals(metadata_sc$herb_avg, pods.simulationOutput$scaledResiduals)
+```
+
+Data looks good with some serious deviation at the upper end.
+
+```{r}
+DHARMa::testUniformity(pods.simulationOutput)
+```
+
+
