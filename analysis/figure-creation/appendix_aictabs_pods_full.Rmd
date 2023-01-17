@@ -577,21 +577,23 @@ height+height:herbivory is the most complex model with 3 AIC, so let's take that
 
 Winner:
 ```{r}
-summary(pods.fe.haPhaIhe.re.site_ha.year_he)
+# winner <- pods.fe.haPhe.re.site_ha.year_he
+winner <- pods.fe.haPhaIhe.re.site_ha.year_he
+summary(winner)
 ```
 
 # Model Validation and Diagnostics
 ```{r}
 par(mfrow=c(2,2))
-plot(fitted(pods.fe.haPhaIhe.re.site_ha.year_he), residuals(pods.fe.haPhaIhe.re.site_ha.year_he, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
-plot(metadata_sc$h_apical, residuals(pods.fe.haPhaIhe.re.site_ha.year_he, "deviance"), xlab="Apical height", ylab="Deviance residuals")
-plot(metadata_sc$herb_avg, residuals(pods.fe.haPhaIhe.re.site_ha.year_he, "deviance"), xlab="Herbivory average", ylab="Deviance residuals")
+plot(fitted(winner), residuals(winner, "deviance"), xlab="Fitted values", ylab="Deviance residuals")
+plot(metadata_sc$h_apical, residuals(winner, "deviance"), xlab="Apical height", ylab="Deviance residuals")
+plot(metadata_sc$herb_avg, residuals(winner, "deviance"), xlab="Herbivory average", ylab="Deviance residuals")
 par(mfrow=c(1,1))
 ```
 
 DHARMa Diagnostics
 ```{r}
-pods.simulationOutput = DHARMa::simulateResiduals(fittedModel = pods.fe.haPhaIhe.re.site_ha.year_he, n=1000)
+pods.simulationOutput = DHARMa::simulateResiduals(fittedModel = winner, n=1000)
 ```
 
 

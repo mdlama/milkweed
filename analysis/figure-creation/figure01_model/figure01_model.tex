@@ -38,10 +38,10 @@ n_{t+\tau}(z_{h}^{\prime},z_{\omega}) = \ & \int p_{\mathrm{s}}(z_{h},z_{\omega}
 \hline
 \rowcolor{mygray}
 Terms & Description & Functional form \\ \hline
-$p_{\mathrm{s}}(z_{h},z_{\omega})$ & Probability of ramet survival & $logit^{-1}(\alpha + \beta_{z_{h}} + \beta_{z_{\omega}} + u_{\alpha s} + u_{z_{h}s} + u_{\alpha y} + u_{z_{h}y})$ \\ \hline
+$p_{\mathrm{s}}(z_{h},z_{\omega})$ & Probability of ramet survival & $\begin{array}{ll} logit^{-1}(& \!\!\!\!\! \alpha + \beta_{z_{h}} + \beta_{z_{\omega}} + \beta_{z_{h}:z_{\omega}} + \\ & \!\!\! u_{\alpha s} + u_{z_{h}s} + u_{z_{\omega}s} + u_{\alpha y} + u_{z_{h}y} + u_{z_{\omega}y})\end{array}$ \\ \hline
 $G(z_{h}^{\prime}\, | \, z_{h},z_{\omega})$ & Growth & $\begin{array}{ll} \alpha \ + & \!\!\! \beta_{z_{h}} + \beta_{z_{\omega}} + \beta_{z_{h}:z_{\omega}} + \\ & \!\!\! u_{\alpha s} + u_{z_{h}s} + u_{\alpha y} + u_{z_{h}y} + u_{z_{\omega}y} + N(0,\sigma^2)\end{array}$ \\ \hline
-$p_{\mathrm{f}}(z_{h},z_{\omega})$ & Probability of flowering & $\begin{array}{ll} logit^{-1}(\alpha \ + & \!\!\! \beta_{z_{h}} + \beta_{z_{\omega}} + \beta_{z_{h}:z_{\omega}} + \\ & \!\!\! u_{\alpha s} + u_{\alpha y} + u_{z_{h}y} + u_{z_{\omega}y})\end{array}$ \\ \hline
-$N_{\mathrm{pods}}\left(z_{h}^{\prime},z_{\omega}\right)$ & Number of pods & $exp(\alpha + \beta_{z_{h}^{\prime}} + \beta_{z_{\omega}} + u_{\alpha s} + u_{\alpha y} + u_{z_{h}^{\prime}:z_{\omega}y} + u_{z_{\omega}y})$ \\ \hline
+$p_{\mathrm{f}}(z_{h},z_{\omega})$ & Probability of flowering & $\begin{array}{ll} logit^{-1}(& \!\!\!\!\! \alpha \ + \beta_{z_{h}} + \beta_{z_{\omega}} + \beta_{z_{h}:z_{\omega}} + \\ & \!\!\! u_{\alpha s} + u_{\alpha y} + u_{z_{h}y} + u_{z_{\omega}y})\end{array}$ \\ \hline
+$N_{\mathrm{pods}}\left(z_{h}^{\prime},z_{\omega}\right)$ & Number of pods & $exp(\alpha + \beta_{z_{h}^{\prime}} + \beta_{z_{h}^{\prime}:z_{\omega}} + u_{\alpha s} + u_{z_{h}^{\prime}s} + u_{\alpha y} + u_{z_{\omega}y})$ \\ \hline
 $N_{\mathrm{seeds/pod}}$ & Number of seeds per pod & $\alpha$ \\ \hline
 $N_{\mathrm{buds/stem}}(z_{\omega})$ & Number of buds per stem & $exp(\alpha + \beta_{z_{\omega}})$ \\ \hline
 $p_{\mathrm{r}}$ & Probability of seed recruitment & $\alpha$ \\ \hline
