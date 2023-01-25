@@ -228,6 +228,8 @@ p4 <- ggplot(mycurves, aes(x = h_apical,
       geom_line(size = 1.0) + 
       scale_x_continuous(limits = c(0, max(x)), 
                          expand = c(0, 0)) + 
+      scale_y_continuous(limits = c(0, max(x)),
+                         expand = c(0, 0)) + 
       scale_color_manual(values = RColorBrewer::brewer.pal(5, "YlOrRd")[2:4]) +
       # coord_cartesian(xlim = c(0, max(x))) + 
       xlab("Height (cm)") +
@@ -237,6 +239,7 @@ p4 <- ggplot(mycurves, aes(x = h_apical,
 
 p4
 ```
+
 ## Survival: Panel (a)
 
 ```{r}
@@ -299,6 +302,7 @@ p5 <- p5 + ggtitle("(a)") +
 
 p5
 ```
+
 ### Bottom
 
 ```{r}
@@ -330,6 +334,8 @@ p6 <- ggplot(mycurves, aes(x = h_apical,
                            linetype = Herbivory)) +
       geom_line(size = 1.0) + 
       scale_x_continuous(limits = c(0, max(x)), 
+                         expand = c(0, 0)) + 
+      scale_y_continuous(limits = c(0, 1),
                          expand = c(0, 0)) + 
       scale_color_manual(values = RColorBrewer::brewer.pal(5, "YlOrRd")[2:4]) +
       # coord_cartesian(xlim = c(0, max(x))) + 
@@ -474,7 +480,7 @@ gg$widths <- grid::unit.pmax(g3$widths, g4$widths)
 
 p <- gridExtra::grid.arrange(g, gg, ncol=2)
 # p <- gridExtra::grid.arrange(p2, p4, ncol=2)
-ggsave("Figure2_FloweringAndGrowth.png", width=7, height=5, device = "png", p)
+ggsave("Figure2_Appendix_1.png", width=7, height=5, device = "png", p)
 ```
 ```{r}
 g5 <- ggplotGrob(p5)
@@ -493,5 +499,5 @@ gg$widths <- grid::unit.pmax(g7$widths, g8$widths)
 
 p <- gridExtra::grid.arrange(g, gg, ncol=2)
 # p <- gridExtra::grid.arrange(p2, p4, ncol=2)
-ggsave("Figure2pt2_FloweringAndGrowth.png", width=7, height=5, device = "png", p)
+ggsave("Figure2_Appendix_2.png", width=7, height=5, device = "png", p)
 ```

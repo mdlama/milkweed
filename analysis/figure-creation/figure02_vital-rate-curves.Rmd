@@ -1,0 +1,297 @@
+---
+title: "Figure 2: Vital Rate Curves"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: true
+---
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(milkweed)
+library(dplyr)
+library(ggplot2)
+requirePackages(c("plot3D", "RColorBrewer", "gtable", "grid", "gridExtra"))
+'%$%' <- magrittr::'%$%'
+ipm <- mwIPM(list(compute = TRUE))
+```
+
+Let's prepare the data we will use for all vital rates.
+
+```{r}
+x <- seq(from = 0, to = 160, length.out = 100)
+y <- seq(from = 0, to = 6, length.out = 100)
+M <- plot3D::mesh(x, y)
+```
+
+## Flowering: Panel (a)
+
+```{r}
+herb_avg <- ipm$data %>% 
+  filter(!is.na(h_apical),
+         !is.na(herb_avg),
+         !is.na(fec.flower)) %$%
+  herb_avg
+
+herb_ex <- data.frame(yintercept = c(0, 
+                                     mean(herb_avg), 
+                                     max(herb_avg)))
+```
+
+```{r}
+theme_set(theme_classic())
+
+min <- data.frame(h_apical = x, 
+                 prob.flower = predict(ipm$pars$flower.fit, 
+                                       newdata=data.frame(h_apical = x, 
+                                                          herb_avg = herb_ex[1,1]), 
+                                       type="Bertha"),
+                 Herbivory = "min")
+avg <- data.frame(h_apical = x, 
+                  prob.flower = predict(ipm$pars$flower.fit, 
+                                        newdata=data.frame(h_apical = x,
+                                                           herb_avg = herb_ex[2,1]),
+                                        type="Bertha"),
+                  Herbivory = "avg")
+max <- data.frame(h_apical = x, 
+                  prob.flower = predict(ipm$pars$flower.fit, 
+                                        newdata=data.frame(h_apical = x, 
+                                                           herb_avg = herb_ex[3,1]),
+                                        type="Bertha"),
+                  Herbivory = "max")
+
+mycurves <- rbind(min, avg, max) 
+mycurves$Herbivory <- factor(mycurves$Herbivory, levels = c("min", "avg", "max"))
+
+pf <- ggplot(mycurves, aes(x = h_apical, 
+                           y = prob.flower, 
+                           col = Herbivory, 
+                           linetype = Herbivory)) +
+      geom_line(size = 1.0) + 
+      scale_x_continuous(limits = c(0, max(x)+5), 
+                         expand = c(0, 0)) + 
+      scale_color_manual(values = RColorBrewer::brewer.pal(5, "YlOrRd")[2:4]) +
+      # coord_cartesian(xlim = c(0, max(x)+5)) + 
+      xlab("Height (cm)") +
+      ylab("Flowering Probability") +
+      theme(legend.key.size =  unit(0.2, "in"),
+            legend.position = c(0.88, 0.30)) +
+      ggtitle("(c)")
+
+pf <- pf + theme(legend.position = "none")
+
+pf
+```
+
+## Growth: Panel (b)
+
+Load the aggregate data set & necessary packages
+```{r}
+# Transform data
+herb_avg <- ipm$data %>% 
+  filter(!is.na(h_apical),
+         !is.na(h_apical.next),
+         !is.na(herb_avg),
+         fec.flower == 1,
+         surv == 1) %$%
+  herb_avg
+
+herb_ex <- data.frame(yintercept = c(0, 
+                                     mean(herb_avg), 
+                                     max(herb_avg)))
+
+x <- seq(from = 0, to = 160, length.out = 100)
+y <- seq(from = 0, to = 6, length.out = 100)
+M <- plot3D::mesh(x, y)
+```
+
+```{r}
+min <- data.frame(h_apical = x, 
+                  h_apical.next = predict(ipm$pars$growth.fit, 
+                                          newdata=data.frame(h_apical = x, 
+                                                             herb_avg = herb_ex[1,1]), 
+                                          type="Bertha"),
+                  Herbivory = "min")
+avg <- data.frame(h_apical = x, 
+                  h_apical.next = predict(ipm$pars$growth.fit, 
+                                          newdata=data.frame(h_apical = x,
+                                                             herb_avg = herb_ex[2,1]),
+                                          type="Bertha"),
+                  Herbivory = "avg")
+max <- data.frame(h_apical = x, 
+                  h_apical.next = predict(ipm$pars$growth.fit, 
+                                          newdata=data.frame(h_apical = x, 
+                                                             herb_avg = herb_ex[3,1]),
+                                          type="Bertha"),
+                  Herbivory = "max")
+
+mycurves <- rbind(min, avg, max) 
+mycurves$Herbivory <- factor(mycurves$Herbivory, levels = c("min", "avg", "max"))
+
+pg <- ggplot(mycurves, aes(x = h_apical, 
+                           y = h_apical.next, 
+                           col = Herbivory, 
+                           linetype = Herbivory)) +
+      geom_line(size = 1.0) + 
+      scale_x_continuous(limits = c(0, max(x)+5), 
+                         expand = c(0, 0)) + 
+      scale_y_continuous(limits = c(0, max(x)+5),
+                         expand = c(0, 0)) +
+      scale_color_manual(values = RColorBrewer::brewer.pal(5, "YlOrRd")[2:4]) +
+      # coord_cartesian(xlim = c(0, max(x)+5)) + 
+      xlab("Height (cm)") +
+      ylab("Height (Late Season)")
+
+pg <- pg + theme(legend.key.size =  unit(0.2, "in"),
+                 legend.position = c(0.88, 0.30)) +
+  ggtitle("(b)")
+
+pg
+```
+
+## Survival: Panel (a)
+
+```{r}
+herb_avg <- ipm$data %>% 
+  filter(!is.na(h_apical),
+         !is.na(herb_avg),
+         !is.na(surv),
+        fec.flower == 1) %$%
+  herb_avg
+
+herb_ex <- data.frame(yintercept = c(0, 
+                                     mean(herb_avg), 
+                                     max(herb_avg)))
+```
+
+```{r}
+min <- data.frame(h_apical = x, 
+                 prob.surv = predict(ipm$pars$surv.fit, 
+                                       newdata=data.frame(h_apical = x, 
+                                                          herb_avg = herb_ex[1,1]), 
+                                       type="Bertha"),
+                 Herbivory = "min")
+avg <- data.frame(h_apical = x, 
+                  prob.surv = predict(ipm$pars$surv.fit, 
+                                        newdata=data.frame(h_apical = x,
+                                                           herb_avg = herb_ex[2,1]),
+                                        type="Bertha"),
+                  Herbivory = "avg")
+max <- data.frame(h_apical = x, 
+                  prob.surv = predict(ipm$pars$surv.fit, 
+                                        newdata=data.frame(h_apical = x, 
+                                                           herb_avg = herb_ex[3,1]),
+                                        type="Bertha"),
+                  Herbivory = "max")
+
+mycurves <- rbind(min, avg, max) 
+mycurves$Herbivory <- factor(mycurves$Herbivory, levels = c("min", "avg", "max"))
+
+ps <- ggplot(mycurves, aes(x = h_apical, 
+                           y = prob.surv, 
+                           col = Herbivory, 
+                           linetype = Herbivory)) +
+      geom_line(size = 1.0) + 
+      scale_x_continuous(limits = c(0, max(x)+5), 
+                         expand = c(0, 0)) + 
+      scale_y_continuous(limits = c(0, 1),
+                         expand = c(0, 0)) +
+      scale_color_manual(values = RColorBrewer::brewer.pal(5, "YlOrRd")[2:4]) +
+      # coord_cartesian(xlim = c(0, max(x)+5)) + 
+      xlab("Height (cm)") +
+      ylab("Survival Probability")     
+
+ps <- ps + theme(legend.position = "none") + ggtitle("(a)")
+
+ps
+```
+
+## Pods: Panel (b)
+
+Load the aggregate data set & necessary packages
+```{r}
+# Transform data
+herb_avg <- ipm$data %>% 
+  filter(!is.na(h_apical),
+                                    !is.na(h_apical.next),
+                                    !is.na(herb_avg),
+                                    fec.flower == 1, #pods only result from the sexual pathway
+                                    surv == 1, #again, plants must survive to September
+                                    !is.na(N_pods),
+                                    h_apical.next > 50,
+                                    !(site == "YTB" & h_apical <= 50))  %$%
+  herb_avg
+
+herb_ex <- data.frame(yintercept = c(0, 
+                                     mean(herb_avg), 
+                                     max(herb_avg)))
+
+x <- seq(from = 0, to = 160, length.out = 100)
+y <- seq(from = 0, to = 6, length.out = 100)
+M <- plot3D::mesh(x, y)
+```
+
+```{r}
+min <- data.frame(h_apical.next = x, 
+                  N_pods = predict(ipm$pars$pods.fit, 
+                                          newdata=data.frame(h_apical.next = x, 
+                                                             herb_avg = herb_ex[1,1]), 
+                                          type="Bertha"),
+                  Herbivory = "min")
+avg <- data.frame(h_apical.next = x, 
+                  N_pods = predict(ipm$pars$pods.fit, 
+                                          newdata=data.frame(h_apical.next = x,
+                                                             herb_avg = herb_ex[2,1]),
+                                          type="Bertha"),
+                  Herbivory = "avg")
+max <- data.frame(h_apical.next = x, 
+                  N_pods = predict(ipm$pars$pods.fit, 
+                                          newdata=data.frame(h_apical.next = x, 
+                                                             herb_avg = herb_ex[3,1]),
+                                          type="Bertha"),
+                  Herbivory = "max")
+
+mycurves <- rbind(min, avg, max) 
+mycurves$Herbivory <- factor(mycurves$Herbivory, levels = c("min", "avg", "max"))
+
+pp <- ggplot(mycurves, aes(x = h_apical.next, 
+                           y = N_pods, 
+                           col = Herbivory, 
+                           linetype = Herbivory)) +
+      geom_line(size = 1.0) + 
+      scale_x_continuous(limits = c(0, max(x)+5), 
+                         expand = c(0, 0)) + 
+      scale_color_manual(values = RColorBrewer::brewer.pal(5, "YlOrRd")[2:4]) +
+      # coord_cartesian(xlim = c(0, max(x)+5)) + 
+      xlab("Late Season Height (cm)") +
+      ylab("Number of Pods") +
+      theme(legend.key.size =  unit(0.2, "in"),
+            legend.position = c(1.3, 0.30)) +
+      ggtitle("(d)")
+
+pp
+```
+
+
+Now combine them!
+
+## Figure 2
+
+```{r}
+gs <- ggplotGrob(ps)
+gf <- ggplotGrob(pf)
+gs <- gtable::gtable_add_cols(gs, unit(0, "mm"))
+gf <- gtable::gtable_add_cols(gf, unit(0, "mm"))
+g1 <- rbind(gs, gf, size="first")
+g1$widths <- grid::unit.pmax(gs$widths, gf$widths)
+ 
+gg <- ggplotGrob(pg)
+gp <- ggplotGrob(pp)
+gg <- gtable::gtable_add_cols(gg, unit(0, "mm"))
+gp <- gtable::gtable_add_cols(gp, unit(0, "mm"))
+g2 <- rbind(gg, gp, size="first")
+g2$widths <- grid::unit.pmax(gg$widths, gp$widths)
+
+p <- gridExtra::grid.arrange(g1, g2, ncol=2)
+# p <- gridExtra::grid.arrange(p2, p4, ncol=2)
+ggsave("Figure2.png", width=7, height=5, device = "png", p)
+```

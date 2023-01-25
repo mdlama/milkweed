@@ -6,3 +6,13 @@
 dev
 *.html
 *.png
+.bash_history
+.gitconfig
+bin
+.local
+.config
+.wget-hsts
+analysis/figure-creation/exploratory
+*.aux
+*.dvi
+*.log
