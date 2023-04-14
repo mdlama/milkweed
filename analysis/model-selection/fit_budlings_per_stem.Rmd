@@ -10,7 +10,11 @@ output:
 library(milkweed)
 library(dplyr)
 library(ggplot2)
+library(lme4)
 library(AICcmodavg)
+
+glmerCtrl <- glmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
+lmerCtrl <- lmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=150000))
 ```
 
 Load data.
@@ -62,31 +66,42 @@ data16_17 <- data_gp %>% filter(year %in% 2016:2017 & site != 'GRN' & ! transect
             herb_mean = first(herb_mean),
             site = first(site))
 
-fulldat <- bind_rows(data13_14, data14_15, data15_16, data16_17)
+fulldat <- bind_rows(data13_14, data14_15, data15_16, data16_17) %>%
+  filter(!is.na(bdlgs_per_stem))
 ```
 
-Let's average over transects.
-
+Let's use GLMs and random effects to avoid averaging.
 ```{r}
-merged <- fulldat %>% group_by(transect) %>% 
-  summarize(herb_mean = mean(herb_mean),
-            bdlgs_per_stem = mean(bdlgs_per_stem),
-            site = first(site)) %>%
-  filter(!is.nan(herb_mean)) %>%
-  filter(!is.nan(bdlgs_per_stem))
-```
+fulldat$transect <- factor(fulldat$transect)
+fulldat$site <- factor(fulldat$site)
+fulldat_sc <- fulldat %>%
+  filter(!is.na(bdlgs_per_stem))
 
-Model fits.
-```{r}
-exp.model <- lm(log(bdlgs_per_stem) ~ herb_mean, data=merged)
-lin.model <- lm(bdlgs_per_stem ~ herb_mean, data=merged)
-cst.model <- lm(bdlgs_per_stem ~ 1, data=merged)
+mean_herb <- mean(fulldat_sc$herb_mean)
+sd_herb <- sd(fulldat_sc$herb_mean)
+
+fulldat_sc <- fulldat_sc %>%
+  mutate(herb_mean = (herb_mean - mean_herb)/sd_herb) %>%
+  mutate(buds = as.integer(bdlgs_per_stem == 0))
+
+bin1.model <- glm(buds ~ 1, data=fulldat_sc, family=binomial())
+bin2.model <- glm(buds ~ herb_mean, data=fulldat_sc, family=binomial())
+
+tmp <- glmmTMB(bdlgs_per_stem ~ herb_mean + (herb_mean-1|site), family=ziGamma(link="log"), ziformula=~herb_mean, data= fulldat_sc)
+
+fulldat_sc <- fulldat_sc %>%
+  filter(bdlgs_per_stem > 0)
+
+cst.model <- lmer(bdlgs_per_stem ~ 1 + (herb_mean-1|site), data=fulldat_sc, REML=T, control=lmerCtrl)
+lin.model <- lmer(bdlgs_per_stem ~ herb_mean + (herb_mean-1|site), data=fulldat_sc, REML=T, control=lmerCtrl)
+gamma.model <- glmer(bdlgs_per_stem ~ herb_mean + (herb_mean-1|site), data=fulldat_sc, nAGQ=1, family=Gamma(link = "log"), control = glmerCtrl)
 AICc(cst.model)
 AICc(lin.model)
-AICc(exp.model)
+AICc(gamma.model)
 ```
 
-Linear is the best fit, following behind by the constant model.
+# Linear
+
 ```{r}
 fit <- lin.model 
 
@@ -131,4 +146,103 @@ p <- p + theme_bw() +
                legend.position = c(0.875, 0.65))
 
 p
+```
+
+# Exponential
+```{r}
+fit <- exp.model
+
+plotdata <- data.frame(herb_avg = fit$model$herb_mean, 
+                       buds_per_stem = exp(fit$model$`log(bdlgs_per_stem + 0.01)`)-0.01,
+                       site = merged$site)
+
+p <- plotdata %>% ggplot(aes(x = herb_avg, 
+                             y = buds_per_stem,
+                             color = site)) + 
+                  geom_point()
+
+xpts <- seq(from=0, to=6, length.out = 1000)
+ypts <- predict(fit, 
+                new = data.frame(herb_mean = xpts))
+plotdata <- data.frame(herb_avg = xpts, 
+                       buds_per_stem = exp(ypts),
+                       site = NA)
+
+p <- p + geom_line(data = plotdata, 
+                   color = "black", 
+                   linetype = "solid") +
+         scale_y_continuous(limits = c(0, 2.0))
+         
+p <- p + theme_bw() +
+         xlab("Herbivory Score") +
+         ylab("Per capita clonal reproduction\n (sprouts/stem)") +
+         labs(color="Sites") + 
+         theme(legend.background = element_rect(fill="lightgrey",
+                                                size=0.1,
+                                                linetype="solid"),
+               legend.key.size =  unit(0.2, "in"),
+               legend.position = c(0.875, 0.65))
+
+p
+```
+
+# Gamma
+```{r}
+fit <- gamma.model
+sites <- as.character(unique(fulldat$site))
+
+budling.fit <- mwMod(list(mdl = fit, vars = c("herb_mean"), scaled = list(herb_mean = scale(fulldat$herb_mean))))
+
+plotdata <- data.frame(herb_avg = fulldat$herb_mean, 
+                       buds_per_stem = fulldat$bdlgs_per_stem,
+                       site = fulldat$site)
+
+p <- plotdata %>% ggplot(aes(x = herb_avg, 
+                             y = buds_per_stem,
+                             color = site)) + 
+                  geom_point()
+
+xpts <- seq(from=0, to=6, length.out = 20)
+ypts <- predict(budling.fit,
+                newdata = data.frame(herb_mean = xpts),
+                type = "Bertha")
+plotdata <- data.frame(herb_avg = xpts, 
+                       buds_per_stem = exp(ypts)-1,
+                       site = NA)
+# for (i in 1:length(sites)) {
+#   ypts <- predict(budling.fit,
+#                 newdata = data.frame(herb_mean = xpts),
+#                 type = sites[i])
+#   plotdata <- rbind(plotdata,
+#                     data.frame(herb_avg = xpts,
+#                                buds_per_stem = ypts,
+#                                site = sites[i]))
+# }
+
+p <- p + geom_line(data = plotdata, 
+                   linetype = "solid",
+                   color = "black",
+                   size = 1) + 
+         scale_y_continuous(limits = c(0, 3.0))
+```
+
+Let's average over transects.
+
+```{r}
+merged <- fulldat %>% group_by(transect) %>% 
+  summarize(herb_mean = mean(herb_mean),
+            bdlgs_per_stem = mean(bdlgs_per_stem),
+            site = first(site)) %>%
+  filter(!is.nan(herb_mean)) %>%
+  filter(!is.nan(bdlgs_per_stem))
+```
+
+Model fits.
+```{r}
+exp.model <- lm(log(bdlgs_per_stem) ~ herb_mean, data=merged)
+lin.model <- lm(bdlgs_per_stem ~ herb_mean, data=merged)
+cst.model <- lm(bdlgs_per_stem ~ 1, data=merged)
+AICc(cst.model)
+AICc(lin.model)
+AICc(exp.model)
 ```
