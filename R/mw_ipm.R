@@ -999,35 +999,25 @@ setBudlingsPerStemFit.mwIPM <- function(obj, compute = FALSE, saveresults = FALS
                 herb_mean = first(herb_mean),
                 site = first(site))
 
-    fulldat <- bind_rows(data13_14, data14_15, data15_16, data16_17)
-
-    merged <- fulldat %>% group_by(transect) %>%
-      summarize(herb_mean = mean(herb_mean),
-                bdlgs_per_stem = mean(bdlgs_per_stem),
-                site = first(site))
+    merged <- bind_rows(data13_14, data14_15, data15_16, data16_17) %>%
+      filter(bdlgs_per_stem > 0)
 
     cat(paste0("Calculating budlings per stem fit..."))
-    mdl <- lm(bdlgs_per_stem ~ herb_mean, data=merged)
+    mdl <- glm(bdlgs_per_stem ~ herb_mean, data=merged, family=Gamma(link = "log"))
     cat("done!\n")
-
-    # Add data, as nls doesn't store the data
-    mdl$merged <- merged
 
     budlings.per.stem.fit <- vector("list", 3)
     budlings.per.stem.fit[[1]] <- mdl
     budlings.per.stem.fit[[2]] <- merged$site
-    if (obj$mdlargs$method == 'pow') {
-      budlings.per.stem.fit[[3]] <- function (x, pars, perturb = rep(0,2)) {
-        pars <- pars + perturb
-        y <- pars[1]*x^pars[2]
-      }
-    } else {
-      budlings.per.stem.fit[[3]] <- function (x, pars, perturb = rep(0,2)) {
-        pars <- pars + perturb
-        y <- pars[1] + pars[2]*x
-      }
+    budlings.per.stem.fit[[3]] <- function (x, pars, perturb = rep(0,2)) {
+      pars <- pars + perturb
+      y <- pmax(exp(pars[1] + pars[2]*x), .Machine$double.eps)
     }
     names(budlings.per.stem.fit) <- c("fit","site","predict")
+
+    # budlings.per.stem.fit <- mwMod(list(mdl = mdl,
+    #                                     vars = c("herb_mean"),
+    #                                     scaled = list(herb_mean = scale(merged_usc$herb_mean))))
 
     if (saveresults) {
       save(budlings.per.stem.fit, file = file.path(mwCache,"budlingsPerStemFit.RData"))
@@ -1277,7 +1267,10 @@ computeClonalKernel.mwIPM <- function(obj, update = TRUE, perturb = rep(0,4)) {
                                                                  stats::coef(obj$pars$budlings.per.stem.fit$fit),
                                                                  perturb[1:2])
   } else {
-
+    # mean.buds.per.stem <- t(predict(obj$pars$budlings.per.stem.fit,
+    #                                 newdata = data.frame(herb_mean = obj$vars$herb_avg$x),
+    #                                 type=obj$model,
+    #                                 perturb=perturb[1:2]))
     mean.buds.per.stem <- t(obj$pars$budlings.per.stem.fit$predict(obj$vars$herb_avg$x,
                                                                    stats::coef(obj$pars$budlings.per.stem.fit$fit),
                                                                    perturb[1:2])) %*%
@@ -1371,6 +1364,8 @@ computeMPM.mwIPM <- function(obj) {
     mean.buds.per.stem <- obj$pars$budlings.per.stem.fit$predict(mean.herb_avg,
                                                                  stats::coef(obj$pars$budlings.per.stem.fit$fit))
   } else {
+    # mean.buds.per.stem <- t(predict(obj$pars$budlings.per.stem.fit,
+    #                                 newdata = data.frame(herb_mean = obj$vars$herb_avg$x))) %*%
     mean.buds.per.stem <- t(obj$pars$budlings.per.stem.fit$predict(obj$vars$herb_avg$x,
                                                                    stats::coef(obj$pars$budlings.per.stem.fit$fit))) %*%
       t(t(obj$matrices$H[1+(0:(obj$N-1))*obj$N,1]))*obj$vars$herb_avg$dx

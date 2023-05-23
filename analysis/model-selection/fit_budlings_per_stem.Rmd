@@ -12,6 +12,7 @@ library(dplyr)
 library(ggplot2)
 library(lme4)
 library(AICcmodavg)
+library(glmmTMB)
 
 glmerCtrl <- glmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
 lmerCtrl <- lmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=150000))
@@ -33,7 +34,8 @@ data_gp <- stemdata %>%
             herb_mean = mean(herb_avg, na.rm=T),
             site = first(site)) %>%
   ungroup(year, transect) %>%
-  ##NOTE: these 4 bind_rows() calls add in explicit 0s where transects died off, resulting in a year with 0 stems, necessary as it would skew the model if it were not included
+##NOTE: these 4 bind_rows() calls add in explicit 0s where transects died off, resulting in a year with 0 stems, necessary as it would skew the model if it were not included
+##NOTENOTE: Actually, don't think these are necessary
   bind_rows(data.frame(year = 2016, transect = 60, N_seedlings = 0, N_total = 0, N_budlings = 0, herb_mean = 0, site = "YTB")) %>%
   bind_rows(data.frame(year = 2016, transect = 61, N_seedlings = 0, N_total = 0, N_budlings = 0, herb_mean = 0, site = "YTB")) %>%
   bind_rows(data.frame(year = 2016, transect = 63, N_seedlings = 0, N_total = 0, N_budlings = 0, herb_mean = 0, site = "YTB")) %>%
@@ -74,30 +76,28 @@ Let's use GLMs and random effects to avoid averaging.
 ```{r}
 fulldat$transect <- factor(fulldat$transect)
 fulldat$site <- factor(fulldat$site)
-fulldat_sc <- fulldat %>%
-  filter(!is.na(bdlgs_per_stem))
-
-mean_herb <- mean(fulldat_sc$herb_mean)
-sd_herb <- sd(fulldat_sc$herb_mean)
-
-fulldat_sc <- fulldat_sc %>%
-  mutate(herb_mean = (herb_mean - mean_herb)/sd_herb) %>%
-  mutate(buds = as.integer(bdlgs_per_stem == 0))
-
-bin1.model <- glm(buds ~ 1, data=fulldat_sc, family=binomial())
-bin2.model <- glm(buds ~ herb_mean, data=fulldat_sc, family=binomial())
-
-tmp <- glmmTMB(bdlgs_per_stem ~ herb_mean + (herb_mean-1|site), family=ziGamma(link="log"), ziformula=~herb_mean, data= fulldat_sc)
-
-fulldat_sc <- fulldat_sc %>%
+fulldat_usc <- fulldat %>%
+  filter(!is.na(bdlgs_per_stem)) %>%
   filter(bdlgs_per_stem > 0)
 
-cst.model <- lmer(bdlgs_per_stem ~ 1 + (herb_mean-1|site), data=fulldat_sc, REML=T, control=lmerCtrl)
-lin.model <- lmer(bdlgs_per_stem ~ herb_mean + (herb_mean-1|site), data=fulldat_sc, REML=T, control=lmerCtrl)
+mean_herb <- mean(fulldat_usc$herb_mean)
+sd_herb <- sd(fulldat_usc$herb_mean)
+
+fulldat_sc <- fulldat_usc %>%
+  mutate(herb_mean = (herb_mean - mean_herb)/sd_herb)
+
+# bin1.model <- glm(buds ~ 1, data=fulldat_sc, family=binomial())
+# bin2.model <- glm(buds ~ herb_mean, data=fulldat_sc, family=binomial())
+
+tmp <- glmmTMB(bdlgs_per_stem ~ herb_mean, family=ziGamma(link="log"), ziformula=~1, data= fulldat_sc)
+cst.model <- glmer(bdlgs_per_stem ~ 1 + (herb_mean-1|site), data=fulldat_sc, family=gaussian, control=lmerCtrl)
+lin.model <- glmer(bdlgs_per_stem ~ herb_mean + (herb_mean-1|site), data=fulldat_sc, family=gaussian, control=lmerCtrl)
 gamma.model <- glmer(bdlgs_per_stem ~ herb_mean + (herb_mean-1|site), data=fulldat_sc, nAGQ=1, family=Gamma(link = "log"), control = glmerCtrl)
-AICc(cst.model)
-AICc(lin.model)
-AICc(gamma.model)
+gamma3.model <- glm(bdlgs_per_stem ~ herb_mean, data=fulldat_sc, family=Gamma(link = "log"))
+
+# https://stackoverflow.com/questions/55290938/using-aictab-for-lmer-and-glmer-models
+# This version of AICctab is more general as it relies only on the log likelihood
+bbmle::AICctab(cst.model, lin.model, gamma.model, gamma3.model, tmp)
 ```
 
 # Linear
@@ -189,6 +189,98 @@ p
 # Gamma
 ```{r}
 fit <- gamma.model
+sites <- as.character(unique(fulldat_usc$site))
+
+plotdata <- data.frame(herb_avg = fulldat_usc$herb_mean, 
+                       buds_per_stem = fulldat_usc$bdlgs_per_stem,
+                       site = fulldat_usc$site)
+
+p <- plotdata %>% ggplot(aes(x = herb_avg, 
+                             y = buds_per_stem,
+                             color = site)) + 
+                  geom_point()
+
+xpts <- seq(from=0, to=6, length.out = 20)
+ypts <- predict(budling.fit,
+                newdata = data.frame(herb_mean = xpts),
+                type = "Bertha")
+plotdata <- data.frame(herb_avg = xpts, 
+                       buds_per_stem = ypts,
+                       site = NA)
+# for (i in 1:length(sites)) {
+#   ypts <- predict(budling.fit,
+#                 newdata = data.frame(herb_mean = xpts),
+#                 type = sites[i])
+#   plotdata <- rbind(plotdata,
+#                     data.frame(herb_avg = xpts,
+#                                buds_per_stem = ypts,
+#                                site = sites[i]))
+# }
+
+p <- p + geom_line(data = plotdata, 
+                   linetype = "solid",
+                   color = "black",
+                   size = 1) + 
+         scale_y_continuous(limits = c(0, 3.0))
+```
+
+# Regular gamma
+```{r, warning=FALSE, message=FALSE}
+plotdata <- data.frame(herb_avg = fulldat_usc$herb_mean, 
+                       buds_per_stem = fulldat_usc$bdlgs_per_stem,
+                       site = fulldat_usc$site)
+
+p <- plotdata %>% ggplot(aes(x = herb_avg, 
+                             y = buds_per_stem,
+                             color = site)) + 
+                  geom_point()
+
+p
+```
+
+Let's add the fit.
+
+```{r, warning=FALSE, message=FALSE}
+xpts <- seq(from=min(fulldat_sc$herb_mean), to=max(fulldat_sc$herb_mean), length.out = 100)
+
+# https://fromthebottomoftheheap.net/2018/12/10/confidence-intervals-for-glms/
+# Correct way to compute confidence intervals for GLMs (predict on link scale, the default, and then linkinv)
+
+ilink <- family(gamma3.model)$linkinv
+ypts <- predict(gamma3.model, newdata=data.frame(herb_mean = xpts), se.fit = TRUE)
+
+plotdata <- data.frame(herb_avg = mean_herb + sd_herb*xpts, 
+                       buds_per_stem = ilink(ypts$fit),
+                       lwr = ilink(ypts$fit - 2*ypts$se.fit),
+                       upr = ilink(ypts$fit + 2*ypts$se.fit),
+                       site = NA)
+
+p <- p + geom_line(data = plotdata, 
+                   color = "black", 
+                   linetype = "solid") +
+         geom_ribbon(data = plotdata, 
+                     aes(ymin=lwr, 
+                         ymax=upr), 
+                     alpha = 0.2) # + 
+         # scale_y_continuous(limits = c(0, 3.5))
+         
+p <- p + theme_bw() +
+         xlab("Herbivory severity") +
+         ylab("Per capita clonal reproduction\n (sprouts/stem)") +
+         labs(color="Sites") + 
+         # scale_x_continuous(limits = c(0.0, 2.0)) + 
+         theme(legend.background = element_rect(fill="lightgrey",
+                                                size=0.1,
+                                                linetype="solid"),
+               legend.key.size =  unit(0.2, "in"),
+               legend.position = c(0.875, 0.75))
+
+p
+```
+
+# Zero-inflated Gamma
+```{r}
+fit <- tmp
 sites <- as.character(unique(fulldat$site))
 
 budling.fit <- mwMod(list(mdl = fit, vars = c("herb_mean"), scaled = list(herb_mean = scale(fulldat$herb_mean))))
