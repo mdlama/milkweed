@@ -30,7 +30,7 @@ mwMod <- function(x) {
 #' @export
 predict.mwMod <- function(obj, newdata, type="Bertha", perturb=rep(0,4)) {
   pars <- obj$pars$unscaled
-  linpart <- (pars[type,"(Intercept)"]+perturb[1]) + (pars[type,obj$vars[1]]+perturb[2])*newdata[[obj$vars[1]]] + (pars[type,obj$vars[2]]+perturb[3])*newdata[[obj$vars[2]]] + (pars[type,paste0(obj$vars[1],":",obj$vars[2])]+perturb[4])*newdata[[obj$vars[1]]]*newdata[[obj$vars[2]]]
+  linpart <- (pars[type,"(Intercept)"]+perturb[1]) + (pars[type,obj$vars[1]]+perturb[2])*newdata[[obj$vars[1]]] + switch(as.character(length(obj$vars) < 2), "TRUE" = 0, "FALSE" = (pars[type,obj$vars[2]]+perturb[3])*newdata[[obj$vars[2]]] + (pars[type,paste0(obj$vars[1],":",obj$vars[2])]+perturb[4])*newdata[[obj$vars[1]]]*newdata[[obj$vars[2]]])
   if (class(obj$mdl) == "glmerMod") {
     predict.vrate <- obj$mdl@resp$family$linkinv(linpart)
   } else {
@@ -46,33 +46,49 @@ predict.mwMod <- function(obj, newdata, type="Bertha", perturb=rep(0,4)) {
 #'
 #' @return List of scaled and unscaled parameters.
 calcPars <- function(mdl, scaled, vars) {
-  sites <- rownames(coef(mdl)$site)
-  years <- rownames(coef(mdl)$year)
-  num_sites <- length(sites)
-  num_years <- length(years)
+  if ("site" %in% names(coef(mdl))) {
+    sites <- rownames(coef(mdl)$site)
+    num_sites <- length(sites)
+  } else {
+    sites <- NULL
+    num_sites <- 0
+  }
+  if ("year" %in% names(coef(mdl))) {
+    years <- rownames(coef(mdl)$year)
+    num_years <- length(years)
+  } else {
+    years <- NULL
+    num_years <- 0
+  }
   num_pars <- 1+num_sites+num_years # Don't forget Bertha!
   growth <- (class(mdl) == "lmerMod")
   pars <- list(scaled=NA, unscaled=NA)
-  pars$scaled <- matrix(rep(0,num_pars*4), byrow=TRUE, nrow=num_pars)
-  colnames(pars$scaled) <- c("(Intercept)", vars[1], vars[2], paste0(vars[1], ":", vars[2]))
+  pars$scaled <- matrix(rep(0,num_pars*2*length(vars)), byrow=TRUE, nrow=num_pars)
+  colnames(pars$scaled) <- c("(Intercept)", vars[1], switch(length(vars) == 2, c(vars[2], paste0(vars[1], ":", vars[2]))))
   rownames(pars$scaled) <- c("Bertha", sites, years)
 
   # Assign values for Bertha
+  r <- 2
   assignme <- rownames(coef(summary(mdl)))
   for (i in 1:length(assignme)) {
     pars$scaled["Bertha", assignme[i]] <- coef(summary(mdl))[assignme[i], "Estimate"]
   }
 
   # Assign values for sites
-  for (i in 1:ncol(coef(mdl)$site)) {
-    varexp <- colnames(coef(mdl)$site)[i]
-    pars$scaled[2:(1+num_sites),varexp] <- coef(mdl)$site[,varexp]
+  if ("site" %in% names(coef(mdl))) {
+    for (i in 1:ncol(coef(mdl)$site)) {
+      varexp <- colnames(coef(mdl)$site)[i]
+      pars$scaled[r:(1+num_sites),varexp] <- coef(mdl)$site[,varexp]
+    }
+    r <- 2 + num_sites
   }
 
   # Assign values for years
-  for (i in 1:ncol(coef(mdl)$year)) {
-    varexp <- colnames(coef(mdl)$year)[i]
-    pars$scaled[(1+num_sites+1):num_pars,varexp] <- coef(mdl)$year[,varexp]
+  if ("year" %in% names(coef(mdl))) {
+    for (i in 1:ncol(coef(mdl)$year)) {
+      varexp <- colnames(coef(mdl)$year)[i]
+      pars$scaled[r:num_pars,varexp] <- coef(mdl)$year[,varexp]
+    }
   }
 
   mur <- 0
@@ -90,19 +106,26 @@ calcPars <- function(mdl, scaled, vars) {
   }
   mux <- c(0,0)
   sdx <- c(0,0)
-  for (i in 1:2) {
+  for (i in 1:length(vars)) {
     mux[i] <- attributes(scaled[[vars[i]]])$'scaled:center'
     sdx[i] <- attributes(scaled[[vars[i]]])$'scaled:scale'
   }
 
   # Calculate unscaled parameters
-  pars$unscaled <- pars$scaled %*% diag(c(sdr, sdr/sdx[1], sdr/sdx[2], sdr/(sdx[1]*sdx[2]))) %*%
-    cbind(c(1, -1*mux[1], -1*mux[2], mux[1]*mux[2]),
-          c(0,         1,         0,     -1*mux[2]),
-          c(0,         0,         1,     -1*mux[1]),
-          c(0,         0,         0,            1)) +
-    cbind(rep(mur, num_pars), matrix(rep(0, 3*num_pars), nrow=num_pars))
-  colnames(pars$unscaled) <- c("(Intercept)", vars[1], vars[2], paste0(vars[1], ":", vars[2]))
+  if (length(vars) == 2) {
+    pars$unscaled <- pars$scaled %*% diag(c(sdr, sdr/sdx[1], sdr/sdx[2], sdr/(sdx[1]*sdx[2]))) %*%
+      cbind(c(1, -1*mux[1], -1*mux[2], mux[1]*mux[2]),
+            c(0,         1,         0,     -1*mux[2]),
+            c(0,         0,         1,     -1*mux[1]),
+            c(0,         0,         0,            1)) +
+      cbind(rep(mur, num_pars), matrix(rep(0, 3*num_pars), nrow=num_pars))
+  } else {
+    pars$unscaled <- pars$scaled %*% diag(c(sdr, sdr/sdx[1])) %*%
+      cbind(c(1, -1*mux[1]),
+            c(0, 1)) +
+      cbind(rep(mur, num_pars), matrix(rep(0, num_pars), nrow=num_pars))
+  }
+  colnames(pars$unscaled) <- c("(Intercept)", vars[1], switch(length(vars) == 2, c(vars[2], paste0(vars[1], ":", vars[2]))))
 
   return(pars)
 }
@@ -114,13 +137,21 @@ calcPars <- function(mdl, scaled, vars) {
 #'
 #' @export
 checkPars <- function(obj) {
-  sites <- rownames(coef(obj$mdl)$site)
-  years <- rownames(coef(obj$mdl)$year)
+  if ("site" %in% names(coef(obj$mdl))) {
+    sites <- rownames(coef(obj$mdl)$site)
+  } else {
+    sites <- NULL
+  }
+  if ("year" %in% names(coef(obj$mdl))) {
+    years <- rownames(coef(obj$mdl)$year)
+  } else {
+    years <- NULL
+  }
 
   growth <- (class(obj$mdl) == "lmerMod")
   mux <- c(0,0)
   sdx <- c(0,0)
-  for (i in 1:2) {
+  for (i in 1:length(obj$vars)) {
     mux[i] <- attributes(obj$scaled[[obj$vars[i]]])$'scaled:center'
     sdx[i] <- attributes(obj$scaled[[obj$vars[i]]])$'scaled:scale'
   }
@@ -132,8 +163,9 @@ checkPars <- function(obj) {
     sdr <- attributes(obj$scaled$h_apical.next)$'scaled:scale'
   }
   newdata <- data.frame(row.names = 1:nrow(obj$mdl@frame))
-  newdata[[obj$vars[1]]] <- mux[1] + sdx[1]*obj$scaled[[obj$vars[1]]]
-  newdata[[obj$vars[2]]] <- mux[2] + sdx[2]*obj$scaled[[obj$vars[2]]]
+  for (i in 1:length(obj$vars)) {
+    newdata[[obj$vars[i]]] <- mux[i] + sdx[i]*obj$mdl@frame[[obj$vars[i]]]
+  }
 
   # First, check Bertha
   estresp <- predict(obj, newdata=newdata, type='Bertha')
@@ -142,42 +174,46 @@ checkPars <- function(obj) {
   cat(sprintf("Bertha error: %g\n", E))
 
   # Now for sites
-  num_sites <- length(sites)
-  sites <- rownames(obj$pars$unscaled)[2:(1+num_sites)]
-  # Get random effect terms
-  terms <- sapply(lme4::findbars(formula(obj$mdl)), deparse)
-  # Get location of site random effect (space is necessary in front)
-  I <- which(grepl(" site", terms))
-  # Reformulate with ~
-  re.form <- reformulate(paste0("(", terms[I], ")"))
-  fitresp <- mur + sdr*predict(obj$mdl, type="response", re.form=re.form)
-  E <- rep(0, length(sites)-1)
-  for (i in 1:length(sites)) {
-    isite <- sites[i]
-    I <- which(obj$mdl@frame$site == isite)
-    newsitedata <- newdata[I,]
-    estresp <- predict(obj, newdata=newsitedata, type=isite)
-    E[i] <- max(abs(estresp-fitresp[I]))
+  if (!is.null(sites)) {
+    num_sites <- length(sites)
+    # sites <- rownames(obj$pars$unscaled)[2:(1+num_sites)]
+    # Get random effect terms
+    terms <- sapply(lme4::findbars(formula(obj$mdl)), deparse)
+    # Get location of site random effect (space is necessary in front)
+    I <- which(grepl(" site", terms))
+    # Reformulate with ~
+    re.form <- reformulate(paste0("(", terms[I], ")"))
+    fitresp <- mur + sdr*predict(obj$mdl, type="response", re.form=re.form)
+    E <- rep(0, length(sites)-1)
+    for (i in 1:length(sites)) {
+      isite <- sites[i]
+      I <- which(obj$mdl@frame$site == isite)
+      newsitedata <- slice(newdata, I) # Using slice to make sure newsitedata is a data frame
+      estresp <- predict(obj, newdata=newsitedata, type=isite)
+      E[i] <- max(abs(estresp-fitresp[I]))
+    }
+    cat(sprintf("Max site errors: %g\n", max(E)))
   }
-  cat(sprintf("Max site errors: %g\n", max(E)))
 
   # Now for years
-  num_years <- length(years)
-  sites <- rownames(obj$pars$unscaled)[(1+num_sites+1):(1+num_sites+num_years)]
-  # Get random effect terms
-  terms <- sapply(lme4::findbars(formula(obj$mdl)), deparse)
-  # Get location of site random effect (space is necessary in front)
-  I <- which(grepl(" year", terms))
-  # Reformulate with ~
-  re.form <- reformulate(paste0("(", terms[I], ")"))
-  fitresp <- mur + sdr*predict(obj$mdl, type="response", re.form=re.form)
-  E <- rep(0, length(years)-1)
-  for (i in 1:length(years)) {
-    iyear <- years[i]
-    I <- which(obj$mdl@frame$year == iyear)
-    newyeardata <- newdata[I,]
-    estresp <- predict(obj, newdata=newyeardata, type=iyear)
-    E[i] <- max(abs(estresp-fitresp[I]))
+  if (!is.null(years)) {
+    num_years <- length(years)
+    sites <- rownames(obj$pars$unscaled)[(1+num_sites+1):(1+num_sites+num_years)]
+    # Get random effect terms
+    terms <- sapply(lme4::findbars(formula(obj$mdl)), deparse)
+    # Get location of site random effect (space is necessary in front)
+    I <- which(grepl(" year", terms))
+    # Reformulate with ~
+    re.form <- reformulate(paste0("(", terms[I], ")"))
+    fitresp <- mur + sdr*predict(obj$mdl, type="response", re.form=re.form)
+    E <- rep(0, length(years)-1)
+    for (i in 1:length(years)) {
+      iyear <- years[i]
+      I <- which(obj$mdl@frame$year == iyear)
+      newyeardata <- newdata[I,]
+      estresp <- predict(obj, newdata=newyeardata, type=iyear)
+      E[i] <- max(abs(estresp-fitresp[I]))
+    }
+    cat(sprintf("Max year errors: %g\n", max(E)))
   }
-  cat(sprintf("Max year errors: %g\n", max(E)))
 }
