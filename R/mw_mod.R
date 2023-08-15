@@ -61,9 +61,9 @@ calcPars <- function(mdl, scaled, vars) {
     num_years <- 0
   }
   num_pars <- 1+num_sites+num_years # Don't forget Bertha!
-  growth <- (class(mdl) == "lmerMod")
+  growth <- (class(mdl) %in% c("lmerMod", "lm"))
   pars <- list(scaled=NA, unscaled=NA)
-  pars$scaled <- matrix(rep(0,num_pars*2*length(vars)), byrow=TRUE, nrow=num_pars)
+  pars$scaled <- matrix(rep(0,num_pars*(2^length(vars))), byrow=TRUE, nrow=num_pars)
   colnames(pars$scaled) <- c("(Intercept)", vars[1], switch(length(vars) == 2, c(vars[2], paste0(vars[1], ":", vars[2]))))
   rownames(pars$scaled) <- c("Bertha", sites, years)
 
@@ -99,16 +99,26 @@ calcPars <- function(mdl, scaled, vars) {
 
     pars$sd <- rep(0,num_pars)
     names(pars$sd) <- rownames(pars$scaled)
-    pars$sd['Bertha'] <- sdr*sd(mdl@frame$h_apical.next - predict(mdl, type="response", re.form=NA))
+    if (class(mdl) == "lm") {
+      pars$sd['Bertha'] <- sdr*sd(mdl$data$h_apical.next - predict(mdl, type="response", re.form=NA))
+    } else {
+      pars$sd['Bertha'] <- sdr*sd(mdl@frame$h_apical.next - predict(mdl, type="response", re.form=NA))
+    }
 
-    pars$sd[2:(1+num_sites)] <- sdr*sd(mdl@frame$h_apical.next - predict(mdl, type="response", re.form=~(1|site)))
-    pars$sd[(1+num_sites+1):num_pars] <- sdr*sd(mdl@frame$h_apical.next - predict(mdl, type="response", re.form=~(1|year)))
+    if ("site" %in% names(coef(mdl))) {
+      pars$sd[2:(1+num_sites)] <- sdr*sd(mdl@frame$h_apical.next - predict(mdl, type="response", re.form=~(1|site)))
+    }
+    if ("year" %in% names(coef(mdl))) {
+      pars$sd[(1+num_sites+1):num_pars] <- sdr*sd(mdl@frame$h_apical.next - predict(mdl, type="response", re.form=~(1|year)))
+    }
   }
   mux <- c(0,0)
   sdx <- c(0,0)
-  for (i in 1:length(vars)) {
-    mux[i] <- attributes(scaled[[vars[i]]])$'scaled:center'
-    sdx[i] <- attributes(scaled[[vars[i]]])$'scaled:scale'
+  if (length(vars) > 0) {
+    for (i in 1:length(vars)) {
+      mux[i] <- attributes(scaled[[vars[i]]])$'scaled:center'
+      sdx[i] <- attributes(scaled[[vars[i]]])$'scaled:scale'
+    }
   }
 
   # Calculate unscaled parameters
@@ -119,11 +129,13 @@ calcPars <- function(mdl, scaled, vars) {
             c(0,         0,         1,     -1*mux[1]),
             c(0,         0,         0,            1)) +
       cbind(rep(mur, num_pars), matrix(rep(0, 3*num_pars), nrow=num_pars))
-  } else {
+  } else if (length(vars) == 1) {
     pars$unscaled <- pars$scaled %*% diag(c(sdr, sdr/sdx[1])) %*%
       cbind(c(1, -1*mux[1]),
             c(0, 1)) +
       cbind(rep(mur, num_pars), matrix(rep(0, num_pars), nrow=num_pars))
+  } else {
+    pars$unscaled <- pars$scaled
   }
   colnames(pars$unscaled) <- c("(Intercept)", vars[1], switch(length(vars) == 2, c(vars[2], paste0(vars[1], ":", vars[2]))))
 
@@ -148,7 +160,7 @@ checkPars <- function(obj) {
     years <- NULL
   }
 
-  growth <- (class(obj$mdl) == "lmerMod")
+  growth <- (class(obj$mdl) %in% c("lmerMod", "lm"))
   mux <- c(0,0)
   sdx <- c(0,0)
   for (i in 1:length(obj$vars)) {
@@ -162,9 +174,17 @@ checkPars <- function(obj) {
     mur <- attributes(obj$scaled$h_apical.next)$'scaled:center'
     sdr <- attributes(obj$scaled$h_apical.next)$'scaled:scale'
   }
-  newdata <- data.frame(row.names = 1:nrow(obj$mdl@frame))
-  for (i in 1:length(obj$vars)) {
-    newdata[[obj$vars[i]]] <- mux[i] + sdx[i]*obj$mdl@frame[[obj$vars[i]]]
+
+  if (class(obj$mdl) == "lm") {
+    newdata <- data.frame(row.names = 1:nrow(obj$mdl$data))
+    for (i in 1:length(obj$vars)) {
+      newdata[[obj$vars[i]]] <- mux[i] + sdx[i]*obj$mdl$data[[obj$vars[i]]]
+    }
+  } else {
+    newdata <- data.frame(row.names = 1:nrow(obj$mdl@frame))
+    for (i in 1:length(obj$vars)) {
+      newdata[[obj$vars[i]]] <- mux[i] + sdx[i]*obj$mdl@frame[[obj$vars[i]]]
+    }
   }
 
   # First, check Bertha

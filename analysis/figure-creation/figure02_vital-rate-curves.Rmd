@@ -12,7 +12,9 @@ library(dplyr)
 library(ggplot2)
 requirePackages(c("plot3D", "RColorBrewer", "gtable", "grid", "gridExtra"))
 '%$%' <- magrittr::'%$%'
-ipm <- mwIPM(list(compute = TRUE))
+ipm <- mwIPM(list(compute=TRUE))
+glmerCtrl <- lme4::glmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
+lmerCtrl <- lmerControl(optimizer = c("bobyqa"), optCtrl = list(maxfun=50000))
 ```
 
 Let's prepare the data we will use for all vital rates.
@@ -71,15 +73,102 @@ pf <- ggplot(mycurves, aes(x = h_apical,
                          expand = c(0, 0)) + 
       scale_color_manual(values = RColorBrewer::brewer.pal(5, "YlOrRd")[2:4]) +
       # coord_cartesian(xlim = c(0, max(x)+5)) + 
+      # xlab("Height (cm)") +
+      xlab("") +
+      ylab("Flowering Probability") +
+      theme(legend.key.size =  unit(0.2, "in"),
+            legend.position = c(0.88, 0.30),
+            axis.text.x = element_blank(),
+            axis.ticks.x = element_blank()) +
+      ggtitle("Flowering")
+
+pf <- pf + theme(legend.position = "none",
+                 plot.title = element_text(hjust = 0.5))
+
+pf
+```
+
+### Experimental data
+
+Transform experimental data variables to names from observational data
+```{r}
+metadata <- expdata %>%
+  mutate(h_apical = height_1,
+         h_apical.next = height_2,
+         herb_avg = avg_herb_2,
+         fec.flower = flowered_binary,
+         year = year,
+         surv = survival,
+         N_pods = tot_pods_ever
+  )
+```
+
+Perform fit.
+```{r}
+metadata_sc <- metadata %>% mutate_at(.vars = vars(h_apical, herb_avg),
+                                      .funs = funs(as.numeric(scale(.))))
+
+cat("Computing flowering fit...")
+flower.mdl <- lme4::glmer(fec.flower ~ h_apical + herb_avg + (1|site),
+                          data=metadata_sc,
+                          nAGQ=1,
+                          family=binomial(),
+                          control=glmerCtrl)
+cat("done!\n")
+
+flower.fit <- mwMod(list(mdl = flower.mdl,
+                         vars = c("h_apical", "herb_avg"),
+                         scaled = list(h_apical = scale(metadata$h_apical),
+                                       herb_avg = scale(metadata$herb_avg))))
+
+# Check parameters
+cat("Checking parameters:\n")
+checkPars(flower.fit)
+```
+
+```{r}
+theme_set(theme_classic())
+
+min <- data.frame(h_apical = x,
+                 prob.flower = predict(flower.fit,
+                                       newdata=data.frame(h_apical = x,
+                                                          herb_avg = herb_ex[1,1]),
+                                       type="Bertha"),
+                 Herbivory = "min")
+avg <- data.frame(h_apical = x,
+                  prob.flower = predict(flower.fit,
+                                        newdata=data.frame(h_apical = x,
+                                                           herb_avg = herb_ex[2,1]),
+                                        type="Bertha"),
+                  Herbivory = "avg")
+max <- data.frame(h_apical = x,
+                  prob.flower = predict(flower.fit,
+                                        newdata=data.frame(h_apical = x,
+                                                           herb_avg = herb_ex[3,1]),
+                                        type="Bertha"),
+                  Herbivory = "max")
+
+mycurves <- rbind(min, avg, max)
+mycurves$Herbivory <- factor(mycurves$Herbivory, levels = c("min", "avg", "max"))
+
+pfe <- ggplot(mycurves, aes(x = h_apical,
+                           y = prob.flower,
+                           col = Herbivory,
+                           linetype = Herbivory)) +
+      geom_line(size = 1.0) +
+      scale_x_continuous(limits = c(0, max(x)+5),
+                         expand = c(0, 0)) +
+      scale_color_manual(values = RColorBrewer::brewer.pal(5, "YlOrRd")[2:4]) +
+      # coord_cartesian(xlim = c(0, max(x)+5)) +
       xlab("Height (cm)") +
       ylab("Flowering Probability") +
       theme(legend.key.size =  unit(0.2, "in"),
-            legend.position = c(0.88, 0.30)) +
-      ggtitle("(c)")
+            legend.position = c(0.88, 0.30)) # +
+      # ggtitle("(c)")
 
-pf <- pf + theme(legend.position = "none")
+pfe <- pfe + theme(legend.position = "none")
 
-pf
+pfe
 ```
 
 ## Growth: Panel (b)
@@ -138,14 +227,94 @@ pg <- ggplot(mycurves, aes(x = h_apical,
                          expand = c(0, 0)) +
       scale_color_manual(values = RColorBrewer::brewer.pal(5, "YlOrRd")[2:4]) +
       # coord_cartesian(xlim = c(0, max(x)+5)) + 
-      xlab("Height (cm)") +
+      # xlab("Height (cm)") +
+      xlab("") +
       ylab("Height (Late Season)")
 
 pg <- pg + theme(legend.key.size =  unit(0.2, "in"),
-                 legend.position = c(0.88, 0.30)) +
-  ggtitle("(b)")
+                 legend.position = c(0.88, 0.30),
+                 axis.text.x = element_blank(),
+                 axis.ticks.x = element_blank(),
+                 plot.title = element_text(hjust = 0.5)) +
+  ggtitle("Growth")
 
 pg
+```
+
+### Experimental data
+
+Perform fit
+```{r}
+metadata_usc <- metadata %>% filter(!is.na(h_apical),
+                                    !is.na(h_apical.next),
+                                    !is.na(herb_avg),
+                                    surv == 1)
+
+metadata_sc <- metadata_usc %>% mutate_at(.vars = vars(h_apical, h_apical.next, herb_avg),
+                                          .funs = funs(as.numeric(scale(.))))
+
+# Transform data
+herb_avg <- metadata_sc %$% herb_avg
+
+herb_ex <- data.frame(yintercept = c(min(herb_avg),
+                                     mean(herb_avg),
+                                     max(herb_avg)))
+
+cat("Computing growth fit...")
+growth.mdl <- lm(h_apical.next ~ h_apical + herb_avg - 1, data=metadata_sc)
+cat("done!\n")
+
+# Create model class
+scaled <- list(h_apical = scale(metadata_usc$h_apical), 
+               herb_avg = scale(metadata_usc$herb_avg), 
+               h_apical.next = scale(metadata_usc$h_apical.next))
+growth.mdl$data <- metadata_sc # Need this since lm doesn't have a frame slot
+growth.fit <- mwMod(list(mdl = growth.mdl, 
+                         vars = c("h_apical", "herb_avg"), 
+                         scaled = scaled))
+checkPars(growth.fit) # Check parameters
+```
+
+```{r}
+min <- data.frame(h_apical = x,
+                  h_apical.next = predict(growth.fit,
+                                          newdata=data.frame(h_apical = x,
+                                                             herb_avg = herb_ex[1,1])),
+                  Herbivory = "min")
+avg <- data.frame(h_apical = x,
+                  h_apical.next = predict(growth.fit,
+                                          newdata=data.frame(h_apical = x,
+                                                             herb_avg = herb_ex[2,1])),
+                  Herbivory = "avg")
+max <- data.frame(h_apical = x,
+                  h_apical.next = predict(growth.fit,
+                                          newdata=data.frame(h_apical = x,
+                                                             herb_avg = herb_ex[3,1])),
+                  Herbivory = "max")
+
+mycurves <- rbind(min, avg, max)
+mycurves$Herbivory <- factor(mycurves$Herbivory, levels = c("min", "avg", "max"))
+
+pge <- ggplot(mycurves, aes(x = h_apical,
+                           y = h_apical.next,
+                           col = Herbivory,
+                           linetype = Herbivory)) +
+      geom_line(size = 1.0) +
+      scale_x_continuous(limits = c(0, max(x)+5),
+                         expand = c(0, 0)) +
+      scale_y_continuous(limits = c(0, max(x)+5),
+                         expand = c(0, 0)) +
+      scale_color_manual(values = RColorBrewer::brewer.pal(5, "YlOrRd")[2:4]) +
+      # coord_cartesian(xlim = c(0, max(x)+5)) +
+      xlab("Height (cm)") +
+      ylab("Height (Late Season)")
+
+pge <- pge + theme(legend.key.size =  unit(0.2, "in"),
+                 # legend.position = c(0.88, 0.30)) # +
+                 legend.position = "none")
+  # ggtitle("(b)")
+
+pge
 ```
 
 ## Survival: Panel (a)
@@ -200,9 +369,53 @@ ps <- ggplot(mycurves, aes(x = h_apical,
       xlab("Height (cm)") +
       ylab("Survival Probability")     
 
-ps <- ps + theme(legend.position = "none") + ggtitle("(a)")
+ps <- ps + theme(legend.position = "none",
+                 plot.title = element_text(hjust = 0.5)) +
+  ggtitle("Survival")
 
 ps
+```
+
+### Experimental data
+
+```{r}
+herb_avg <- metadata %>%
+  filter(!is.na(h_apical),
+         !is.na(herb_avg),
+         !is.na(surv),
+        fec.flower == 1) %$%
+  herb_avg
+
+herb_ex <- data.frame(yintercept = c(0,
+                                     mean(herb_avg),
+                                     max(herb_avg)))
+```
+
+Perform fit.
+```{r}
+metadata_usc <- metadata %>% filter(!is.na(h_apical),
+                                    !is.na(herb_avg),
+                                    fec.flower == 1, # filtering out 0s because only the sexual pathway uses the survival function
+                                    !is.na(surv))
+  
+metadata_sc <- metadata_usc %>% mutate_at(.vars = vars(h_apical, herb_avg),
+                                          .funs = funs(as.numeric(scale(.))))
+
+cat("Computing survival fit...")
+surv.mdl <- lme4::glmer(surv ~ 1 + (1|site), 
+                        data=metadata_sc, 
+                        family=binomial(),
+                        nAGQ=1, 
+                        control=glmerCtrl)
+cat("done!\n")
+
+surv.fit <- mwMod(list(mdl = surv.mdl,
+                       vars = c(),
+                       scaled = list()))
+
+# Check parameters
+cat("Checking parameters:\n")
+checkPars(surv.fit)
 ```
 
 ## Pods: Panel (b)
@@ -264,9 +477,11 @@ pp <- ggplot(mycurves, aes(x = h_apical.next,
       # coord_cartesian(xlim = c(0, max(x)+5)) + 
       xlab("Late Season Height (cm)") +
       ylab("Number of Pods") +
-      theme(legend.key.size =  unit(0.2, "in"),
-            legend.position = c(1.3, 0.30)) +
-      ggtitle("(d)")
+      theme(legend.key.size =  unit(0.17, "in"),
+            legend.position = c(0.9, 0.22),
+            plot.title = element_text(hjust = 0.5),
+            legend.background = element_rect(fill = "transparent")) +
+      ggtitle("Pods")
 
 pp
 ```
@@ -274,24 +489,39 @@ pp
 
 Now combine them!
 
-## Figure 2
+## Figure 2(a)
 
 ```{r}
-gs <- ggplotGrob(ps)
 gf <- ggplotGrob(pf)
-gs <- gtable::gtable_add_cols(gs, unit(0, "mm"))
+gfe <- ggplotGrob(pfe)
 gf <- gtable::gtable_add_cols(gf, unit(0, "mm"))
-g1 <- rbind(gs, gf, size="first")
-g1$widths <- grid::unit.pmax(gs$widths, gf$widths)
+gfe <- gtable::gtable_add_cols(gfe, unit(0, "mm"))
+g1 <- rbind(gf, gfe, size="first")
+g1$widths <- grid::unit.pmax(gf$widths, gfe$widths)
  
 gg <- ggplotGrob(pg)
-gp <- ggplotGrob(pp)
+gge <- ggplotGrob(pge)
 gg <- gtable::gtable_add_cols(gg, unit(0, "mm"))
-gp <- gtable::gtable_add_cols(gp, unit(0, "mm"))
-g2 <- rbind(gg, gp, size="first")
-g2$widths <- grid::unit.pmax(gg$widths, gp$widths)
+gge <- gtable::gtable_add_cols(gge, unit(0, "mm"))
+g2 <- rbind(gg, gge, size="first")
+g2$widths <- grid::unit.pmax(gg$widths, gge$widths)
 
 p <- gridExtra::grid.arrange(g1, g2, ncol=2)
 # p <- gridExtra::grid.arrange(p2, p4, ncol=2)
 ggsave("Figure2.png", width=7, height=5, device = "png", p)
+```
+
+## Figure 2(a)
+
+```{r}
+gs <- ggplotGrob(ps)
+gp <- ggplotGrob(pp)
+gs <- gtable::gtable_add_cols(gs, unit(0, "mm"))
+gp <- gtable::gtable_add_cols(gp, unit(0, "mm"))
+# g1 <- rbind(gf, gfe, size="first")
+# g1$widths <- grid::unit.pmax(gf$widths, gfe$widths)
+ 
+p <- gridExtra::grid.arrange(gs, gp, ncol=2)
+# p <- gridExtra::grid.arrange(p2, p4, ncol=2)
+ggsave("Figure2b.png", width=7, height=2.5, device = "png", p)
 ```

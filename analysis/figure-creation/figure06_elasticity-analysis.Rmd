@@ -216,7 +216,7 @@ r_budlings <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 25-ym, ymax = 26+
 r_bdlgs_per_stem <- annotate("rect", xmin = -Inf, xmax = Inf, ymin = 27-ym, ymax = 28+ym, fill = "black", alpha = al)
 
 # Functional form labels
-xc <- -0.4
+xc <- -0.225
 sz <- 2.5
 t_bdlgs_per_stem <- annotate("text", x = xc, y = 27.5, label = "Buds per stem", size = sz)
 t_budlings <- annotate("text", x = xc, y = 25.5, label = "Budling recruits", size = sz)
@@ -253,7 +253,7 @@ elastiplot <- elastiplot +
 # Labels and such
 elastiplot <- elastiplot + 
   scale_y_discrete(labels = rev(fancypantslabels)) +
-  scale_x_continuous(limits = c(-1.2, 1.2)) +
+  scale_x_continuous(limits = c(-0.3, 0.3)) +
   xlab("Parameter elasticity") +
   ylab("Parameters") + 
   theme_bw() +
@@ -291,7 +291,7 @@ plotdata %<>% bind_rows(tbl_df(data.frame(h_apical_t0 = as.vector(M$x),
 ### Render expanded elasticity plots for herbivory parameters
 
 ```{r}
-maxval <- max(abs(c(as.vector(E1), as.vector(E3))))
+maxval <- max(abs(c(as.vector(E1), as.vector(E2))))
 colorpal <- RColorBrewer::brewer.pal(3, "RdBu")
 
 pmunch_elastiplot <- ggplot(plotdata, aes(x = h_apical_t0, 

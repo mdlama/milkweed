@@ -12,7 +12,7 @@ library(dplyr)
 library(ggplot2)
 requirePackages(c("grid", "gridExtra","latex2exp"))
 '%$%' <- magrittr::'%$%'
-ipm <- mwIPM(list(compute = TRUE))
+ipm <- mwIPM()
 ```
 
 Random effect error bar reference:  https://stackoverflow.com/questions/13847936/in-r-plotting-random-effects-from-lmer-lme4-package-using-qqmath-or-dotplot
@@ -285,7 +285,7 @@ pf <- mydata %>% filter(rate == type) %>%
                  axis.title.y = element_blank(),
                  axis.title.x = element_blank())
 
-if (any(qfadj > 0)) {
+if (FALSE) { # if (any(abs(qfadj) > 0)) {
   pf <- pf + annotate("point", 
                       x = qfadj[1]-qfadj[2], 
                       y = 0.55, 
@@ -324,13 +324,13 @@ pg <- mydata %>% filter(rate == type) %>%
                  axis.ticks.y = element_blank(),
                  axis.title.x = element_blank())
 
-if (any(qgadj > 0)) {
+if (FALSE) { # if (any(abs(qgadj) > 0)) {
   pg <- pg + annotate("point", 
-                      x = qgadj[1]-qgadj[2], 
+                      x = growth.fit$pars$unscaled["Bertha", "herb_avg"] + qgadj[1], # qgadj[1]-qgadj[2], 
                       y = 0.55, 
                       shape=25) +
     annotate("point", 
-             x = qgadj[3]-qgadj[2], 
+             x = growth.fit$pars$unscaled["Bertha", "herb_avg"] + qgadj[3], # qgadj[3]-qgadj[2], 
              y = 0.55, 
              shape=25, 
              fill="black")
@@ -363,7 +363,7 @@ ps <- mydata %>% filter(rate == type) %>%
                  axis.ticks.y = element_blank(),
                  axis.title.x = element_blank())
 
-if (any(qsadj > 0)) {
+if (FALSE) { # if (any(qsadj > 0)) {
   ps <- ps + annotate("point", 
                       x = qsadj[1]-qsadj[2], 
                       y = 0.55, 
@@ -400,7 +400,7 @@ pp <- mydata %>% filter(rate == type) %>%
                  axis.title.y = element_blank(),
                  axis.title.x = element_blank())
 
-if (any(qpadj > 0)) {
+if (FALSE) { # if (any(qpadj > 0)) {
   pp <- pp + annotate("point", 
                       x = qpadj[1]-qpadj[2], 
                       y = 0.55, 
